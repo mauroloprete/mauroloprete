@@ -17,7 +17,7 @@
 </div>  
   
 
-# <div align="center">Statistics student (Udelar-UY)</div>  
+# <div align="center">Statistics student in (Udelar-UY)</div>  
   
 
 <br/>  
