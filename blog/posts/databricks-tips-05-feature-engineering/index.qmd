@@ -1,0 +1,189 @@
+---
+title: "Databricks Tips #6: Feature Engineering — diseñar features que sobrevivan a producción"
+author: "Mauro Loprete"
+date: "2026-03-31"
+draft: true
+categories: [Databricks Tips, Machine Learning, Feature Engineering]
+description: "Feature Store, point-in-time lookups, online features, feature freshness y los errores clásicos de data leakage."
+---
+
+Quinta entrega de **Databricks Tips**. Feature Engineering es donde la mayoría de los proyectos de ML fallan silenciosamente: el modelo funciona en el notebook pero no en producción. Casi siempre el problema está en los features.
+
+## El problema: training-serving skew
+
+El error más común en ML no es elegir el modelo equivocado. Es que los features en producción se calculan diferente a como se calcularon en entrenamiento:
+
+```python
+# En el notebook (entrenamiento):
+df["avg_purchases_30d"] = df.groupby("customer_id")["amount"] \
+    .transform(lambda x: x.rolling(30).mean())
+# Esto usa datos FUTUROS (data leakage)
+
+# En producción (serving):
+# No tenés acceso a los últimos 30 días de datos
+# El feature se calcula con otra ventana
+# El modelo predice basura
+```
+
+La solución: **Feature Store con point-in-time correctness**.
+
+## Feature Store: la fuente de verdad
+
+```python
+from databricks.feature_engineering import FeatureEngineeringClient
+
+fe = FeatureEngineeringClient()
+
+# Feature table con timestamp key (crítico para PIT)
+fe.create_table(
+    name="catalog.ml.customer_features",
+    primary_keys=["customer_id"],
+    timestamp_keys=["feature_date"],
+    df=features_df,
+    description="Features diarios de comportamiento de clientes"
+)
+```
+
+**Las tres reglas del Feature Store**:
+
+1. **Primary key**: identifica la entidad (customer_id, product_id)
+2. **Timestamp key**: cuándo se calculó el feature (para point-in-time)
+3. **Feature columns**: los valores calculados
+
+## Point-in-time lookups: evitar data leakage
+
+Acá es donde la mayoría la embarran. Si entrenás con features calculados al momento de correr el notebook, estás usando información del futuro:
+
+```python
+from databricks.feature_engineering import FeatureLookup
+
+# CORRECTO: point-in-time lookup
+# Para cada fila de labels, busca los features
+# que existían ANTES del evento (no después)
+training_set = fe.create_training_set(
+    df=labels_df,  # customer_id, event_date, churned
+    feature_lookups=[
+        FeatureLookup(
+            table_name="catalog.ml.customer_features",
+            feature_names=[
+                "avg_purchases_30d",
+                "days_since_last_purchase",
+                "support_tickets_count"
+            ],
+            lookup_key="customer_id",
+            timestamp_lookup_key="event_date"
+            # ^ busca features con feature_date <= event_date
+        )
+    ],
+    label="churned"
+)
+
+training_df = training_set.load_df()
+```
+
+El `timestamp_lookup_key` garantiza que para un evento del 15 de marzo, solo usa features calculados hasta el 14 de marzo. Sin esto, tenés data leakage y métricas infladas.
+
+## Pipeline de features: batch + streaming
+
+Un patrón que funciona bien en producción:
+
+```python
+# 1. Features batch (se calculan diariamente)
+@dlt.table(
+    name="customer_features_daily",
+    comment="Features diarios calculados en batch"
+)
+def compute_daily_features():
+    orders = dlt.read("silver_orders")
+    return (orders
+        .groupBy("customer_id", "feature_date")
+        .agg(
+            F.avg("amount").alias("avg_order_amount"),
+            F.count("*").alias("order_count"),
+            F.sum("amount").alias("total_spent")
+        ))
+
+# 2. Features streaming (near real-time)
+@dlt.table(
+    name="customer_features_rt",
+    comment="Features en tiempo real"
+)
+def compute_rt_features():
+    events = dlt.read_stream("bronze_events")
+    return (events
+        .withWatermark("event_time", "1 hour")
+        .groupBy(
+            "customer_id",
+            F.window("event_time", "1 hour")
+        )
+        .agg(
+            F.count("*").alias("events_last_hour"),
+            F.countDistinct("page").alias("pages_visited")
+        ))
+
+# 3. Publicar al Feature Store
+fe.write_table(
+    name="catalog.ml.customer_features",
+    df=daily_features,
+    mode="merge"
+)
+```
+
+## Online Feature Store: serving en milisegundos
+
+Para modelos que sirven predicciones en tiempo real, leer features de Delta (segundos) es muy lento. Necesitás un online store:
+
+```python
+from databricks.feature_engineering import FeatureEngineeringClient
+
+fe = FeatureEngineeringClient()
+
+# Publicar features a online store
+# Esto sincroniza Delta → Cosmos DB / DynamoDB
+spec = fe.publish_table(
+    name="catalog.ml.customer_features",
+    online_store=OnlineStoreSpec(
+        cloud="azure",
+        write_secret_prefix="online-store"
+    ),
+    features=["avg_purchases_30d", "days_since_last_purchase"]
+)
+
+# En serving, el modelo busca features online automáticamente
+# Latencia: ~10ms vs ~2s de Delta
+```
+
+## Feature freshness: monitoreo
+
+Los features se vuelven stale. Un pipeline que falla silenciosamente produce features viejos y predicciones malas:
+
+```python
+# Chequear freshness antes de servir
+from datetime import datetime, timedelta
+
+latest_feature = spark.sql("""
+    SELECT MAX(feature_date) as latest
+    FROM catalog.ml.customer_features
+""").collect()[0]["latest"]
+
+staleness = datetime.now() - latest_feature
+if staleness > timedelta(hours=26):  # batch diario + margen
+    raise Alert(f"Features stale by {staleness}")
+```
+
+**Tip**: configurá un `quality_monitor` de Unity Catalog sobre tu feature table para alertas automáticas de drift y freshness.
+
+## Checklist de Feature Engineering
+
+| Paso | Pregunta | Si no lo hacés... |
+|---|---|---|
+| Point-in-time | ¿Tus features respetan el orden temporal? | Data leakage, métricas falsas |
+| Feature Store | ¿Los features se comparten entre modelos? | Duplicación, inconsistencia |
+| Online Store | ¿El serving necesita baja latencia? | Timeouts en producción |
+| Freshness | ¿Monitoreás la antigüedad de los features? | Predicciones con datos viejos |
+| Lineage | ¿Sabés qué tablas alimentan cada feature? | No podés debuggear |
+| Idempotencia | ¿Si recalculás features, el resultado es igual? | Drift silencioso |
+
+---
+
+*Próxima semana: Lakeflow Declarative Pipelines (ex-DLT) — expectations, materialized views y serverless compute.*

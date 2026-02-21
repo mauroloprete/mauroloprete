@@ -1,0 +1,164 @@
+---
+title: "Databricks Tips #2: 7 cosas de Delta Lake que ojalá me hubieran dicho antes"
+author: "Mauro Loprete"
+date: "2026-03-03"
+categories: [Databricks Tips, Data Engineering, Delta Lake]
+description: "Liquid clustering, OPTIMIZE, Z-ORDER, vacuum, time travel y trucos que cambian cómo trabajás con Delta."
+draft: true
+---
+
+Segunda entrega de la serie **Databricks Tips**, donde cada semana comparto algo avanzado que descubrí en producción. Esta vez: Delta Lake.
+
+## 1. Liquid Clustering reemplaza a Z-ORDER
+
+Si todavía estás usando `OPTIMIZE table ZORDER BY (col)` a mano, pará. Desde DBR 13.3+, **Liquid Clustering** hace esto automático y adaptativo:
+
+```sql
+-- Crear tabla con liquid clustering
+CREATE TABLE catalog.schema.events (
+  event_date DATE,
+  user_id BIGINT,
+  event_type STRING,
+  payload STRING
+)
+USING DELTA
+CLUSTER BY (event_date, user_id);
+
+-- Aplicar a tabla existente
+ALTER TABLE catalog.schema.events
+CLUSTER BY (event_date, user_id);
+
+-- Trigger manual (normalmente no necesario)
+OPTIMIZE catalog.schema.events;
+```
+
+La diferencia clave: Z-ORDER es estático (siempre ordena por las mismas columnas), Liquid Clustering se adapta a los patrones de consulta reales. Además podés cambiar las columnas de clustering sin reescribir la tabla.
+
+**Cuándo seguir con Z-ORDER**: tablas donde necesitás control exacto del orden físico y tenés un patrón de consulta que nunca cambia.
+
+## 2. OPTIMIZE no es lo que pensás
+
+Mucha gente corre `OPTIMIZE` como cron job diario en todas las tablas. Mal:
+
+- **Sin predicado**: reescribe *toda* la tabla. En tablas de TB, esto son horas de compute.
+- **Con predicado**: solo reescribe las particiones que matchean.
+
+```sql
+-- Malo: reescribe todo
+OPTIMIZE catalog.schema.events;
+
+-- Mejor: solo la partición de ayer
+OPTIMIZE catalog.schema.events
+WHERE event_date = current_date() - INTERVAL 1 DAY;
+
+-- Aún mejor con liquid clustering: no necesitás OPTIMIZE manual
+-- El motor lo hace incrementalmente en escritura
+```
+
+**Tip**: si usás Liquid Clustering, `OPTIMIZE` corre incremental (solo archivos no clusterizados). Es seguro correrlo seguido porque no reescribe lo que ya está bien.
+
+## 3. VACUUM: el detalle que nadie te cuenta
+
+`VACUUM` borra archivos viejos que ya no son parte de la tabla. El default es 7 días de retención. Pero:
+
+```sql
+-- Esto puede romper queries activas
+VACUUM catalog.schema.events RETAIN 0 HOURS;
+
+-- Seguro: respetar la retención
+VACUUM catalog.schema.events RETAIN 168 HOURS; -- 7 días
+```
+
+Lo que nadie te dice: **VACUUM no borra los archivos de log** (delta log). Si necesitás limpiar el log, usá:
+
+```sql
+-- Ver cuánto ocupa el log
+DESCRIBE DETAIL catalog.schema.events;
+
+-- El checkpoint automático ocurre cada 10 commits
+-- Podés forzar un checkpoint y después limpiar logs viejos
+```
+
+**En producción**: automatizá VACUUM con un job semanal, nunca con retención menor a la ventana de time travel que necesites.
+
+## 4. Time Travel: más allá del SELECT AS OF
+
+Todos conocen `SELECT * FROM table VERSION AS OF 5`. Pero time travel tiene más usos:
+
+```sql
+-- Restaurar una tabla a una versión anterior (rollback)
+RESTORE TABLE catalog.schema.events TO VERSION AS OF 42;
+
+-- Comparar dos versiones (ideal para validar pipelines)
+SELECT * FROM catalog.schema.events VERSION AS OF 10
+EXCEPT
+SELECT * FROM catalog.schema.events VERSION AS OF 11;
+
+-- Clone una versión específica para debugging
+CREATE TABLE catalog.schema.events_debug
+SHALLOW CLONE catalog.schema.events VERSION AS OF 42;
+
+-- Ver el historial completo de operaciones
+DESCRIBE HISTORY catalog.schema.events;
+```
+
+El `SHALLOW CLONE` es muy útil: crea una referencia a los datos sin copiarlos. Podés hacer queries de investigación sobre una versión sin tocar la tabla original.
+
+## 5. Delta Lake Change Data Feed (CDF)
+
+Si tenés pipelines downstream que necesitan saber *qué cambió* en una tabla, no necesitás comparar snapshots. Activá CDF:
+
+```sql
+-- Activar CDF
+ALTER TABLE catalog.schema.events
+SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
+
+-- Leer los cambios entre versiones
+SELECT * FROM table_changes('catalog.schema.events', 5, 10);
+
+-- En PySpark
+df_changes = (spark.read.format("delta")
+    .option("readChangeFeed", "true")
+    .option("startingVersion", 5)
+    .option("endingVersion", 10)
+    .table("catalog.schema.events"))
+
+# Columnas extra: _change_type, _commit_version, _commit_timestamp
+df_changes.filter("_change_type = 'update_postimage'").show()
+```
+
+`_change_type` puede ser: `insert`, `update_preimage`, `update_postimage`, `delete`. Esto es la base para hacer CDC eficiente sin herramientas externas.
+
+## 6. Deletion Vectors: borrar sin reescribir
+
+Desde DBR 14.1, Delta Lake soporta **Deletion Vectors** (DVs). En vez de reescribir archivos Parquet para borrar filas, se escribe un archivo liviano que marca qué filas están borradas:
+
+```sql
+-- Activar DVs
+ALTER TABLE catalog.schema.events
+SET TBLPROPERTIES (
+  'delta.enableDeletionVectors' = true
+);
+
+-- Ahora DELETE y UPDATE son mucho más rápidos
+-- porque no reescriben archivos completos
+DELETE FROM catalog.schema.events
+WHERE user_id = 12345;
+```
+
+**Impacto real**: en tablas grandes, un `DELETE` que antes tardaba 30 minutos (reescribir archivos de GB) ahora tarda segundos. Los archivos se limpian eventualmente con `OPTIMIZE` o `VACUUM`.
+
+## 7. Tabla: cuándo usar cada feature
+
+| Necesidad | Feature | Desde DBR |
+|---|---|---|
+| Ordenar datos para queries rápidas | Liquid Clustering | 13.3 |
+| Compactar archivos chicos | OPTIMIZE | 7.0 |
+| Limpiar archivos viejos | VACUUM | 7.0 |
+| Rollback de datos | Time Travel + RESTORE | 7.0 |
+| Propagar cambios downstream | Change Data Feed | 10.4 |
+| Borrados/updates rápidos | Deletion Vectors | 14.1 |
+
+---
+
+*Próxima semana: Unity Catalog — permisos, linaje y patrones de gobernanza que nadie implementa bien.*

@@ -1,0 +1,230 @@
+---
+title: "Databricks Tips #5: MLflow + Unity Catalog — del experimento al modelo en producción"
+author: "Mauro Loprete"
+date: "2026-03-24"
+draft: true
+categories: [Databricks Tips, Machine Learning, MLflow, Unity Catalog]
+description: "Registro de modelos en UC, aliases en vez de stages, linaje de datos a modelo, y model serving con AI Gateway."
+---
+
+Cuarta entrega de **Databricks Tips**. Si estás preparando el ML Professional o trabajás con modelos en Databricks, acá va el workflow moderno de MLflow integrado con Unity Catalog.
+
+## El cambio: de Workspace Registry a Unity Catalog
+
+El modelo viejo (Workspace Model Registry) usaba **stages**: `None → Staging → Production → Archived`. El modelo nuevo (Unity Catalog) usa **aliases**:
+
+```python
+import mlflow
+
+# Viejo (NO usar): workspace registry con stages
+mlflow.set_registry_uri("databricks")
+# Modelo registrado en workspace-level, sin gobernanza
+
+# Nuevo: Unity Catalog registry
+mlflow.set_registry_uri("databricks-uc")
+# Modelo registrado en catalog.schema.model_name
+```
+
+**Por qué importa**: con UC, los modelos tienen los mismos permisos, linaje y auditoría que tus tablas Delta. Un analista puede ver de qué tablas se entrenó un modelo sin preguntar.
+
+## Registro de modelos: el workflow completo
+
+```python
+import mlflow
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import f1_score
+
+mlflow.set_registry_uri("databricks-uc")
+
+# 1. Entrenar con tracking
+with mlflow.start_run(run_name="gbm_v2") as run:
+    model = GradientBoostingClassifier(
+        n_estimators=200,
+        max_depth=5,
+        learning_rate=0.1
+    )
+    model.fit(X_train, y_train)
+
+    # Métricas
+    preds = model.predict(X_test)
+    f1 = f1_score(y_test, preds)
+    mlflow.log_metric("f1_score", f1)
+    mlflow.log_param("n_estimators", 200)
+
+    # Log del dataset para linaje
+    dataset = mlflow.data.from_spark(
+        training_df,
+        table_name="catalog.gold.features",
+        version="3"
+    )
+    mlflow.log_input(dataset, context="training")
+
+    # 2. Registrar en Unity Catalog
+    model_uri = f"runs:/{run.info.run_id}/model"
+    mv = mlflow.register_model(
+        model_uri,
+        "catalog.ml.churn_predictor"
+    )
+    print(f"Version: {mv.version}")
+```
+
+## Aliases: el reemplazo de stages
+
+Olvidate de `transition_model_version_stage()`. Ahora se usan aliases:
+
+```python
+from mlflow import MlflowClient
+
+client = MlflowClient()
+
+# Asignar alias (reemplaza stages)
+client.set_registered_model_alias(
+    name="catalog.ml.churn_predictor",
+    alias="champion",
+    version=3
+)
+
+client.set_registered_model_alias(
+    name="catalog.ml.churn_predictor",
+    alias="challenger",
+    version=4
+)
+
+# Cargar modelo por alias (en producción)
+model = mlflow.pyfunc.load_model(
+    "models:/catalog.ml.churn_predictor@champion"
+)
+
+# Comparar champion vs challenger
+champion = mlflow.pyfunc.load_model(
+    "models:/catalog.ml.churn_predictor@champion"
+)
+challenger = mlflow.pyfunc.load_model(
+    "models:/catalog.ml.churn_predictor@challenger"
+)
+```
+
+**Ventaja de aliases**: podés tener múltiples aliases simultáneos (`champion`, `challenger`, `shadow`, `rollback`). Con stages solo tenías uno por stage.
+
+## Linaje de datos a modelo
+
+Cuando registrás el dataset con `mlflow.log_input()`, Unity Catalog conecta la tabla de features con el modelo entrenado. Esto responde preguntas como:
+
+- "¿Qué tablas se usaron para entrenar este modelo?" → visible en el linaje
+- "Si cambio la tabla `gold.features`, ¿qué modelos se ven afectados?" → linaje inverso
+- "¿Con qué versión de los datos se entrenó el modelo v3?" → metadata del run
+
+```python
+# Ver los inputs de un modelo
+run = client.get_run(run_id)
+for input_data in run.inputs.dataset_inputs:
+    print(f"Dataset: {input_data.dataset.name}")
+    print(f"Source: {input_data.dataset.source}")
+    print(f"Context: {input_data.tags}")
+```
+
+## Model Serving con AI Gateway
+
+Una vez que tenés el modelo registrado, servirlo es configuración:
+
+```python
+import requests
+
+# Crear endpoint vía API
+endpoint_config = {
+    "name": "churn-predictor",
+    "config": {
+        "served_entities": [
+            {
+                "entity_name": "catalog.ml.churn_predictor",
+                "entity_version": "3",
+                "workload_size": "Small",
+                "scale_to_zero_enabled": True
+            }
+        ],
+        "traffic_config": {
+            "routes": [
+                {
+                    "served_model_name": "churn_predictor-3",
+                    "traffic_percentage": 100
+                }
+            ]
+        }
+    }
+}
+
+# A/B testing: split traffic entre champion y challenger
+ab_config = {
+    "routes": [
+        {
+            "served_model_name": "churn_predictor-3",  # champion
+            "traffic_percentage": 90
+        },
+        {
+            "served_model_name": "churn_predictor-4",  # challenger
+            "traffic_percentage": 10
+        }
+    ]
+}
+```
+
+**AI Gateway** agrega rate limiting, logging y guardrails encima del endpoint:
+
+```python
+# Todas las llamadas al endpoint se logean automáticamente
+# en una tabla de inference logs para monitoreo
+```
+
+## Feature Engineering con Feature Store
+
+El Feature Store de Databricks está integrado con Unity Catalog:
+
+```python
+from databricks.feature_engineering import FeatureEngineeringClient
+
+fe = FeatureEngineeringClient()
+
+# Crear feature table (es una tabla Delta con PK)
+fe.create_table(
+    name="catalog.ml.customer_features",
+    primary_keys=["customer_id"],
+    timestamp_keys=["event_date"],
+    df=feature_df,
+    description="Features de clientes para churn prediction"
+)
+
+# Entrenar con feature lookups (linaje automático)
+from databricks.feature_engineering import FeatureLookup
+
+training_set = fe.create_training_set(
+    df=labels_df,  # solo customer_id + label
+    feature_lookups=[
+        FeatureLookup(
+            table_name="catalog.ml.customer_features",
+            feature_names=["total_purchases", "days_since_last"],
+            lookup_key="customer_id"
+        )
+    ],
+    label="churned"
+)
+
+training_df = training_set.load_df()
+
+# El modelo sabe de dónde vienen los features
+# En serving, los busca automáticamente
+```
+
+## Tabla resumen: viejo vs nuevo
+
+| Concepto | Workspace Registry | Unity Catalog |
+|---|---|---|
+| Namespace | `model_name` | `catalog.schema.model` |
+| Promoción | Stages (Staging→Production) | Aliases (champion, challenger) |
+| Permisos | Workspace ACLs | UC GRANTS |
+| Linaje | Manual | Automático |
+| Feature Store | Separado | Integrado con UC |
+| Gobernanza | Limitada | Completa |
+
+---
+
+*Próxima semana: Feature Engineering — cómo diseñar features que escalen y no se rompan en producción.*

@@ -1,0 +1,758 @@
+---
+title: "Si arrancara de cero"
+subtitle: "Qué priorizaría aprender en Data Engineering"
+description: "Python, SQL, Spark, dbt, Databricks — el orden importa. Slides del episodio del podcast Spark de Ideas."
+author: "Mauro Loprete"
+date: "2026-02-22"
+categories: [Podcast, Data Engineering, Carrera]
+format:
+  revealjs:
+    output-file: index.html
+---
+
+## {data-background-color="#1e293b" visibility="uncounted"}
+
+::: {style="color: white; text-align: center; margin-top: 0.5em;"}
+
+![](../spark-de-ideas-cover.jpg){width=180 style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"}
+
+[**Spark de Ideas**]{style="font-size: 1.6em; color: #FFA166; display: block; margin-top: 0.3em;"}
+
+[La chispa de la ingeniería de datos en español]{style="font-size: 0.9em; color: #94a3b8;"}
+
+:::
+
+## {data-background-color="#1e293b"}
+
+::: {style="color: white; text-align: center; margin-top: 1em;"}
+
+### Mauro Loprete
+
+[Data Engineer en F1RST (Grupo Santander)]{style="font-size: 1.1em;"}
+
+[**Databricks Professional + Associate**]{style="color: #FFA166; font-size: 1.2em;"}
+
+[Docente en UdelaR · Yendo por el MVP]{style="color: #94a3b8; font-size: 0.9em;"}
+
+:::
+
+## La pirámide: de abajo hacia arriba
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3.5
+#| fig-align: center
+
+library(ggplot2)
+
+levels <- data.frame(
+  label = c("Python + SQL", "Apache Spark", "dbt", "Databricks"),
+  sub   = c("Los fundamentos — no hay atajo",
+            "Procesamiento distribuido",
+            "Transformación modular en SQL",
+            "Unity Catalog · DABs · LDP"),
+  y     = c(1, 2, 3, 4),
+  width = c(6.0, 4.5, 3.0, 1.8),
+  color = c("#0d9488", "#2563eb", "#ea580c", "#7c3aed")
+)
+
+ggplot(levels) +
+  geom_tile(aes(x = 0, y = y, width = width, height = 1.0, fill = color),
+            color = NA, show.legend = FALSE) +
+  geom_text(aes(x = 0, y = y + 0.07, label = label),
+            color = "white", fontface = "bold", size = 6) +
+  geom_text(aes(x = 0, y = y - 0.2, label = sub),
+            color = "white", size = 3.5, alpha = 0.85) +
+  scale_fill_identity() +
+  scale_y_continuous(expand = expansion(mult = 0.02)) +
+  theme_void() +
+  theme(plot.margin = margin(2, 2, 2, 2))
+```
+
+## {data-background-color="#0d9488"}
+
+::: {style="color: white; text-align: center;"}
+
+[**1**]{style="font-size: 3em; opacity: 0.4;"}
+
+### Python: la base de todo
+
+[No estoy hablando de `print("Hola mundo")`]{style="font-size: 0.9em;"}
+
+:::
+
+## Python — lo que realmente necesitás
+
+- **Estructuras de datos**: listas, diccionarios, sets, tuplas
+- **Funciones y decoradores**: composición de funciones
+- **Manejo de archivos**: JSON, CSV, YAML, Parquet
+- **Entornos virtuales**: `venv`, `pip`, `pyproject.toml`
+- **Testing básico**: `pytest`
+
+. . .
+
+> El 80% de lo que hacés en data es manipular estructuras.
+
+## Python — dataclasses {auto-animate=true}
+
+```python
+from dataclasses import dataclass
+from typing import List, Optional
+
+@dataclass
+class DataProduct:
+    name: str
+    owner: str
+    tables: List[str]
+    sla_hours: Optional[int] = None
+```
+
+## Python — dataclasses {auto-animate=true}
+
+```python
+from dataclasses import dataclass
+from typing import List, Optional
+
+@dataclass
+class DataProduct:
+    name: str
+    owner: str
+    tables: List[str]
+    sla_hours: Optional[int] = None
+
+    def is_critical(self) -> bool:
+        return self.sla_hours is not None and self.sla_hours <= 4
+
+# Leer config, parsear, validar — el 60% del laburo real
+with open("products.json") as f:
+    products = [DataProduct(**p) for p in json.load(f)]
+
+critical = [p for p in products if p.is_critical()]
+```
+
+## Python — inmutabilidad {auto-animate=true}
+
+El problema de los objetos mutables:
+
+```python
+@dataclass
+class Config:
+    host: str
+    port: int
+    timeout: int = 30
+
+config = Config("db.prod.internal", 5432)
+```
+
+## Python — inmutabilidad {auto-animate=true}
+
+El problema de los objetos mutables:
+
+```python
+@dataclass
+class Config:
+    host: str
+    port: int
+    timeout: int = 30
+
+config = Config("db.prod.internal", 5432)
+
+# Función B modifica la config sin que te des cuenta
+def add_debug_settings(config):
+    config.host = "localhost"  # ← cambió producción
+
+connect(config)           # → "db.prod.internal:5432" ✓
+add_debug_settings(config)
+connect(config)           # → "localhost:5432" ← BUG
+```
+
+## Python — la solución: frozen {auto-animate=true}
+
+```python
+@dataclass(frozen=True)
+class Config:
+    host: str
+    port: int
+    timeout: int = 30
+
+config = Config("db.prod.internal", 5432)
+
+config.host = "localhost"  # ← FrozenInstanceError
+
+# Si necesitás una versión modificada, creás una nueva:
+from dataclasses import replace
+debug_config = replace(config, host="localhost", timeout=999)
+
+print(config.host)        # → "db.prod.internal"
+print(debug_config.host)  # → "localhost"
+```
+
+> **Crear en vez de mutar** — la forma más segura de trabajar con datos.
+
+## Python — Pydantic para validación
+
+```python
+from pydantic import BaseModel, field_validator
+
+class DataContract(BaseModel):
+    name: str
+    owner: str
+    sla_hours: int
+    columns: list[str]
+
+    @field_validator("sla_hours")
+    @classmethod
+    def sla_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("SLA debe ser mayor a 0")
+        return v
+
+# Valida automáticamente al crear:
+contract = DataContract(
+    name="transactions", owner="backend-team",
+    sla_hours=4, columns=["id", "amount", "date"]
+)
+```
+
+## Python — ¿cuándo usar cada tipo?
+
+| Situación | Tipo |
+|-----------|------|
+| Modelo de datos simple (mayoría) | `@dataclass` |
+| Config que no debe cambiar | `@dataclass(frozen=True)` |
+| Resultado liviano, desempaquetable | `NamedTuple` |
+| Parsing JSON/YAML con validación | Pydantic `BaseModel` |
+| Lógica de negocio compleja | Clase tradicional |
+| Dato descartable, se usa una vez | `dict` |
+
+. . .
+
+> Arrancá con `@dataclass`. Si necesitás inmutabilidad → `frozen=True`. Si necesitás validación → Pydantic.
+
+## {data-background-color="#0d9488"}
+
+::: {style="color: white; text-align: center;"}
+
+[**2**]{style="font-size: 3em; opacity: 0.4;"}
+
+### SQL: el lenguaje que nunca muere
+
+[+50 años y sigue siendo el más usado en datos]{style="font-size: 0.9em;"}
+
+:::
+
+## SQL — lo que tenés que dominar
+
+- **Window functions**: `ROW_NUMBER()`, `LAG()`, `LEAD()`, `RANK()`
+- **CTEs**: queries legibles, no anidados de 200 líneas
+- **JOINs**: `CROSS`, `ANTI`, `SEMI` — no solo `INNER` y `LEFT`
+- **Aggregations**: `HAVING`, `GROUPING SETS`
+- **Subqueries correlacionadas**: para saber cuándo evitarlas
+
+. . .
+
+> Cuando dominás window functions, resolvés en una query lo que antes te llevaba 3 scripts de Python.
+
+## SQL — ejemplo real {auto-animate=true}
+
+```{.sql code-line-numbers="1-8|9-20|21-28"}
+WITH daily_sales AS (
+    SELECT
+        customer_id,
+        sale_date AS sale_day,
+        SUM(amount) AS daily_total,
+        COUNT(*) AS txn_count
+    FROM sales
+    WHERE status = 'COMPLETED'
+    GROUP BY 1, 2
+),
+ranked AS (
+    SELECT *,
+        ROW_NUMBER() OVER (
+            PARTITION BY customer_id
+            ORDER BY daily_total DESC
+        ) AS rn,
+        LAG(daily_total) OVER (
+            PARTITION BY customer_id
+            ORDER BY sale_day
+        ) AS prev_day_total
+    FROM daily_sales
+)
+SELECT customer_id, sale_day, daily_total,
+    prev_day_total,
+    ROUND((daily_total - prev_day_total)
+          / prev_day_total * 100, 2) AS pct_change
+FROM ranked WHERE rn <= 5
+ORDER BY customer_id, rn
+```
+
+## {data-background-color="#2563eb"}
+
+::: {style="color: white; text-align: center;"}
+
+[**3**]{style="font-size: 3em; opacity: 0.4;"}
+
+### Spark: pensar en distribuido
+
+[No es "pandas grande" — es un paradigma distinto]{style="font-size: 0.9em;"}
+
+:::
+
+## Spark — lo esencial
+
+- **Lazy evaluation**: nada se ejecuta hasta `collect()`, `count()`, `write()`
+- **Particiones**: datos distribuidos — `coalesce(1)` en 500GB mata el cluster
+- **Shuffle**: la operación más cara — cada `JOIN`, `GROUP BY` puede generar uno
+- **Broadcast joins**: tabla chica (< 10MB) → broadcasteala
+- **Catalyst optimizer**: optimiza tu plan... si usás funciones nativas
+
+## Spark — funciones nativas vs UDF {auto-animate=true}
+
+```{.python code-line-numbers="1-2|3-12"}
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+# Bien: funciones nativas de Spark
+df = (
+    spark.read.table("sales.transactions")
+    .filter(F.col("status") == "completed")
+    .withColumn(
+        "running_total",
+        F.sum("amount").over(
+            Window.partitionBy("customer_id")
+            .orderBy("transaction_date")
+            .rowsBetween(Window.unboundedPreceding,
+                         Window.currentRow)
+        )
+    )
+)
+```
+
+## Spark — la diferencia clave
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3.5
+#| fig-align: center
+
+library(ggplot2)
+
+native <- data.frame(
+  x = 1:4,
+  label = c("DataFrame", "withColumn\n+ F.when", "Catalyst\noptimiza", "Resultado"),
+  group = "Spark nativo"
+)
+udf <- data.frame(
+  x = 1:4,
+  label = c("DataFrame", "Serializar\nfila a Python", "Ejecutar\nfunción Python", "Serializar\nresultado a JVM"),
+  group = "UDF por fila"
+)
+steps <- rbind(
+  transform(native, y = 2),
+  transform(udf, y = 0.7)
+)
+
+arrows <- data.frame(
+  x = rep(1:3, 2),
+  xend = rep(2:4, 2),
+  y = c(rep(2, 3), rep(0.7, 3))
+)
+
+ggplot() +
+  annotate("rect", xmin = 0.4, xmax = 4.6, ymin = 1.55, ymax = 2.45,
+           fill = "#f0fdf4", color = "#86efac", linewidth = 0.5, radius = grid::unit(6, "pt")) +
+  annotate("rect", xmin = 0.4, xmax = 4.6, ymin = 0.25, ymax = 1.15,
+           fill = "#fef2f2", color = "#fca5a5", linewidth = 0.5, radius = grid::unit(6, "pt")) +
+  annotate("text", x = 0.55, y = 2.4, label = "Spark nativo", hjust = 0,
+           fontface = "bold", size = 4, color = "#166534") +
+  annotate("text", x = 0.55, y = 1.1, label = "UDF por fila", hjust = 0,
+           fontface = "bold", size = 4, color = "#991b1b") +
+  geom_tile(data = steps[steps$y == 2,], aes(x = x, y = y),
+            width = 0.75, height = 0.55, fill = "#22c55e", color = NA) +
+  geom_tile(data = steps[steps$y == 0.7,], aes(x = x, y = y),
+            width = 0.75, height = 0.55, fill = "#ef4444", color = NA) +
+  geom_text(data = steps, aes(x = x, y = y, label = label),
+            color = "white", size = 3.5, fontface = "bold", lineheight = 0.9) +
+  geom_segment(data = arrows, aes(x = x + 0.4, xend = xend - 0.4, y = y, yend = y),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.6) +
+  coord_cartesian(xlim = c(0.3, 4.7), ylim = c(0.1, 2.55)) +
+  theme_void() +
+  theme(plot.margin = margin(5, 5, 5, 5))
+```
+
+**Serde overhead**: serialización JVM ↔ Python fila por fila = lento.
+
+## Spark — wrapper functions ≠ UDFs
+
+```{.python code-line-numbers="1-6|8-12"}
+# Wrapper: usa API nativa — Spark la entiende y optimiza
+def add_revenue_flag(df, threshold=1000):
+    return df.withColumn(
+        "high_revenue",
+        F.when(F.col("amount") > threshold, True)
+         .otherwise(False)
+    )
+
+# UDF: Python puro — fila por fila, sin optimización
+@udf(returnType=BooleanType())
+def high_revenue_udf(amount):
+    return amount > 1000
+```
+
+. . .
+
+> Si no te queda otra, usá **Pandas UDFs** — procesan por batch, no fila por fila.
+
+## {data-background-color="#ea580c"}
+
+::: {style="color: white; text-align: center;"}
+
+[**4**]{style="font-size: 3em; opacity: 0.4;"}
+
+### dbt: SQL con ingeniería de software
+
+[Modularidad, testing, documentación, linaje]{style="font-size: 0.9em;"}
+
+:::
+
+## dbt — por qué importa
+
+- **Modularidad**: cada modelo es un `SELECT`, se referencian con `{{ ref() }}`
+- **Testing**: `not_null`, `unique`, `relationships`, tests custom
+- **Documentación**: se genera automáticamente desde YAML
+- **Linaje**: sabés qué modelo depende de qué
+- **Versionamiento**: todo es código, todo va a Git
+
+## dbt — modelo + tests {auto-animate=true}
+
+```{.sql code-line-numbers="1-13"}
+-- models/staging/stg_transactions.sql
+WITH source AS (
+    SELECT * FROM {{ source('raw', 'transactions') }}
+),
+cleaned AS (
+    SELECT
+        transaction_id,
+        customer_id,
+        CAST(amount AS DECIMAL(18,2)) AS amount,
+        CAST(transaction_date AS DATE) AS transaction_date,
+        UPPER(TRIM(status)) AS status
+    FROM source
+    WHERE transaction_id IS NOT NULL
+)
+SELECT * FROM cleaned
+```
+
+## dbt — modelo + tests {auto-animate=true}
+
+```{.yaml}
+# models/staging/stg_transactions.yml
+version: 2
+models:
+  - name: stg_transactions
+    description: "Transacciones limpias del core bancario"
+    columns:
+      - name: transaction_id
+        tests: [not_null, unique]
+      - name: amount
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000000
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['COMPLETED', 'PENDING', 'FAILED']
+```
+
+## dbt — ¿cuándo dbt y cuándo PySpark?
+
+| Caso | Herramienta |
+|------|------------|
+| Transformaciones SQL (limpieza, joins, agg) | **dbt** |
+| Lógica con APIs externas | **PySpark** |
+| ML pipelines | **PySpark + MLflow** |
+| Archivos no estructurados (JSON, XML) | **PySpark** |
+| Modelos dimensionales (Kimball) | **dbt** |
+| Streaming / near-real-time | **Structured Streaming** |
+
+. . .
+
+> Si tu transformación es SQL puro, usá dbt. Si necesitás lógica compleja, PySpark.
+
+## {data-background-color="#7c3aed"}
+
+::: {style="color: white; text-align: center;"}
+
+[**5**]{style="font-size: 3em; opacity: 0.4;"}
+
+### Databricks: la plataforma que lo une todo
+
+[No es solo "Spark en la nube"]{style="font-size: 0.9em;"}
+
+:::
+
+## Databricks — lo que priorizaría
+
+1. **Unity Catalog** — gobernanza de 3 niveles: `catalog.schema.table`
+2. **Lakeflow Declarative Pipelines** — Bronze → Silver → Gold con expectations
+3. **Databricks Asset Bundles** — infra como código, todo en YAML + Git
+4. **Workflows** — orquestación nativa con triggers y retry
+5. **SQL Warehouses** — serverless para analistas y dashboards
+
+## Databricks — desde el día 1 {auto-animate=true}
+
+```{.sql code-line-numbers="1-3|5-13|15-18"}
+-- Crear catalog y schema
+CREATE CATALOG IF NOT EXISTS analytics;
+CREATE SCHEMA IF NOT EXISTS analytics.sales;
+
+-- Tabla con Liquid Clustering
+CREATE TABLE analytics.sales.transactions (
+    transaction_id BIGINT,
+    customer_id BIGINT,
+    amount DECIMAL(18,2),
+    transaction_date DATE
+)
+USING DELTA
+CLUSTER BY (transaction_date, customer_id);
+
+-- Gobernanza básica
+GRANT USE CATALOG ON CATALOG analytics TO `analysts`;
+GRANT USE SCHEMA ON SCHEMA analytics.sales TO `analysts`;
+GRANT SELECT ON TABLE analytics.sales.transactions TO `analysts`;
+```
+
+## {data-background-color="#dc2626"}
+
+::: {style="color: white; text-align: center;"}
+
+[**BONUS**]{style="font-size: 2em; opacity: 0.5;"}
+
+### Los notebooks NO son para producción
+
+[El error más común — y el que más cuesta corregir]{style="font-size: 0.9em;"}
+
+:::
+
+## Notebooks — el problema real
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 7
+#| fig-height: 3.5
+#| fig-align: center
+
+library(ggplot2)
+
+problems <- data.frame(
+  label = c("Sin testing", "Code review imposible",
+            "Estado compartido entre celdas",
+            "Sin manejo de dependencias",
+            "Copy-paste sin módulos",
+            "'Funciona en mi notebook'"),
+  y = 6:1
+)
+
+ggplot(problems) +
+  annotate("rect", xmin = -0.3, xmax = 5.5, ymin = 6.65, ymax = 7.25,
+           fill = "#dc2626", color = NA) +
+  annotate("text", x = 2.6, y = 6.95, label = "Notebook en producción",
+           color = "white", fontface = "bold", size = 5.5) +
+  geom_tile(aes(x = 2.6, y = y, width = 5.8, height = 0.75),
+            fill = "#fee2e2", color = "#fca5a5", linewidth = 0.3) +
+  geom_text(aes(x = 2.6, y = y, label = label),
+            color = "#991b1b", size = 4.5, fontface = "bold") +
+  scale_y_continuous(expand = expansion(mult = 0.02)) +
+  coord_cartesian(xlim = c(-0.3, 5.5)) +
+  theme_void() +
+  theme(plot.margin = margin(2, 5, 2, 5))
+```
+
+## Notebooks — cómo se hace bien
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 1.8
+#| fig-align: center
+
+library(ggplot2)
+
+flow <- data.frame(
+  x = 1:5,
+  label = c("Notebook\nExplorar", "Módulo .py\nExtraer lógica", "Tests\npytest",
+            "DABs\nDeploy CI/CD", "Notebook\nArchivar"),
+  color = c("#f59e0b", "#2563eb", "#16a34a", "#7c3aed", "#6b7280")
+)
+
+arrows <- data.frame(x = 1:4, xend = 2:5)
+
+ggplot(flow) +
+  geom_tile(aes(x = x, y = 0, fill = color), width = 0.85, height = 0.7,
+            color = NA, show.legend = FALSE) +
+  geom_text(aes(x = x, y = 0, label = label), color = "white",
+            fontface = "bold", size = 4, lineheight = 0.9) +
+  geom_segment(data = arrows, aes(x = x + 0.45, xend = xend - 0.45, y = 0, yend = 0),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.7) +
+  scale_fill_identity() +
+  coord_cartesian(ylim = c(-0.5, 0.5)) +
+  theme_void() +
+  theme(plot.margin = margin(2, 2, 2, 2))
+```
+
+. . .
+
+> **La regla**: si algo corre más de una vez, no debería estar en un notebook.
+
+## Notebooks — el código que sí va a producción
+
+```{.python code-line-numbers="1-10|12-19"}
+# src/transformations/clean_sales.py
+def clean_transactions(df):
+    return (
+        df
+        .filter(F.col("transaction_id").isNotNull())
+        .withColumn("amount",
+            F.col("amount").cast("decimal(18,2)"))
+        .withColumn("status",
+            F.upper(F.trim(F.col("status"))))
+        .filter(F.col("amount") > 0)
+    )
+
+# tests/test_clean_sales.py
+def test_clean_removes_nulls(spark):
+    input_df = spark.createDataFrame([
+        (1, 100.0, "completed"),
+        (None, 200.0, "pending"),
+    ], ["transaction_id", "amount", "status"])
+    result = clean_transactions(input_df)
+    assert result.count() == 1
+```
+
+## El roadmap: en qué orden
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3.5
+#| fig-align: center
+
+library(ggplot2)
+
+gantt <- data.frame(
+  task  = c("Python", "SQL", "Spark", "dbt", "Databricks", "Especialización"),
+  detail = c("Python puro, no pandas", "Window functions, CTEs",
+             "Lazy eval, particiones, shuffle", "Modularidad, testing, docs",
+             "Unity Catalog, DABs, Workflows", "Streaming, ML, Arquitectura"),
+  start = c(1, 3, 4, 5, 6, 7),
+  end   = c(3, 4, 5, 6, 7, 9),
+  color = c("#0d9488", "#0d9488", "#2563eb", "#ea580c", "#7c3aed", "#6b7280"),
+  y     = 6:1
+)
+
+ggplot(gantt) +
+  geom_rect(aes(xmin = start, xmax = end, ymin = y - 0.35, ymax = y + 0.35, fill = color),
+            color = NA, show.legend = FALSE) +
+  geom_text(aes(x = (start + end) / 2, y = y + 0.05, label = task),
+            color = "white", fontface = "bold", size = 4.5) +
+  geom_text(aes(x = (start + end) / 2, y = y - 0.18, label = detail),
+            color = "white", size = 3, alpha = 0.85) +
+  scale_x_continuous(
+    breaks = 1:9,
+    labels = c("Mes 1", "2", "3", "4", "5", "6", "7", "8", "9+"),
+    position = "top", expand = expansion(mult = 0.02)
+  ) +
+  scale_fill_identity() +
+  theme_void() +
+  theme(
+    axis.text.x.top = element_text(size = 10, color = "#64748b", face = "bold"),
+    plot.margin = margin(5, 10, 5, 10)
+  )
+```
+
+## Lo que NO priorizaría
+
+- **Airflow** — Databricks Workflows cubre el 90% de los casos
+- **Kafka** — Auto Loader + Structured Streaming resuelve la mayoría
+- **Kubernetes** — sabé lo básico, no te metas en ese rabbit hole
+- **Todos los clouds a la vez** — elegí uno y dominalo
+
+. . .
+
+> Los conceptos se transfieren. No necesitás aprenderlos todos al mismo tiempo.
+
+## {data-background-color="#1e293b"}
+
+::: {style="color: white; text-align: center; margin-top: 1em;"}
+
+### Lo más importante
+
+[**Construí algo.**]{style="color: #FFA166; font-size: 1.5em;"}
+
+[Agarrá un dataset público, armá un pipeline de punta a punta,]{style="font-size: 0.9em;"}
+[deployalo, rompelo, arreglalo.]{style="font-size: 0.9em;"}
+
+[Eso vale más que 10 cursos.]{style="color: #94a3b8; font-size: 0.85em;"}
+
+:::
+
+## Links y recursos
+
+- [Episodio del podcast](https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w) — la charla completa
+- [Notebooks del episodio](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero) — ejecutalos en Databricks Community Edition
+- [Fundamentals of Data Engineering](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/) — el mejor libro para arrancar
+- [dbt Learn](https://courses.getdbt.com/) — curso gratuito oficial
+- [Databricks Academy](https://www.databricks.com/learn) — cursos oficiales
+
+## {data-background-color="#1e293b"}
+
+:::: {style="color: white; display: flex; align-items: center; justify-content: center; gap: 3em; margin-top: 1em;"}
+
+::: {style="text-align: center;"}
+![](qr-blog.png){width=320 style="border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);"}
+:::
+
+::: {style="text-align: left; max-width: 500px;"}
+[**Material disponible**]{style="color: #FFA166; font-size: 1.3em; display: block; margin-bottom: 0.4em;"}
+
+A partir de ahora, las slides, notebooks y recursos de cada episodio van a estar en mi página web y en GitHub.
+
+[{{< fa brands github >}} **spark-de-ideas-labs** — notebooks reproducibles en Databricks Community Edition]{style="font-size: 0.8em; display: block; margin-top: 0.5em;"}
+
+[Blog con contenido expandido + slides para revisar a tu ritmo.]{style="font-size: 0.75em; color: #94a3b8; display: block; margin-top: 0.3em;"}
+:::
+
+::::
+
+## {data-background-color="#1e293b" visibility="uncounted"}
+
+::: {style="color: white; text-align: center; margin-top: 0.5em;"}
+
+![](../spark-de-ideas-cover.jpg){width=160 style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"}
+
+[**Spark de Ideas**]{style="font-size: 1.5em; color: #FFA166; display: block; margin-top: 0.3em;"}
+
+[Gracias por escuchar]{style="font-size: 1em;"}
+
+[{{< fa brands spotify >}} Spotify](https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w){style="color: #1DB954; margin-right: 1.5em;"}
+[{{< fa globe >}} Web](https://mauroloprete.github.io/mauroloprete/){style="color: #FFA166;"}
+
+[Ya disponible: **Databricks Tips #1 — Asset Bundles**]{style="font-size: 0.8em; color: #94a3b8; display: block; margin-top: 1em;"}
+[Cada miércoles un nuevo tip — el próximo: **#2 Delta Lake**]{style="font-size: 0.8em; color: #94a3b8;"}
+
+:::

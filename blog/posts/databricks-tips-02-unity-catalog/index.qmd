@@ -1,0 +1,169 @@
+---
+title: "Databricks Tips #3: Unity Catalog — el modelo de gobernanza que nadie implementa bien"
+author: "Mauro Loprete"
+date: "2026-03-10"
+draft: true
+categories: [Databricks Tips, Data Engineering, Unity Catalog]
+description: "Namespace de 3 niveles, GRANTS heredados, linaje automático, row/column security y errores comunes de gobernanza."
+---
+
+Segunda entrega de **Databricks Tips**. Unity Catalog parece simple (catalog.schema.table), pero la mayoría de las implementaciones que vi tienen problemas de gobernanza desde el día uno.
+
+## El modelo de 3 niveles: más que un namespace
+
+```
+metastore
+  └── catalog          (env o dominio)
+       └── schema      (área funcional)
+            └── table  (dato)
+```
+
+La primera decisión crítica: **cómo organizar los catalogs**. Hay dos escuelas:
+
+### Opción A: catalogs por ambiente
+
+```sql
+CREATE CATALOG dev;
+CREATE CATALOG staging;
+CREATE CATALOG prod;
+
+-- Mismos schemas en cada catalog
+CREATE SCHEMA dev.sales;
+CREATE SCHEMA staging.sales;
+CREATE SCHEMA prod.sales;
+```
+
+**Ventaja**: el código cambia solo el catalog (`${environment}.sales.orders`), los schemas y tablas son idénticos.
+
+**Desventaja**: necesitás 3x los permisos. Fácil cometer errores cruzando ambientes.
+
+### Opción B: catalogs por dominio
+
+```sql
+CREATE CATALOG sales;
+CREATE CATALOG finance;
+CREATE CATALOG marketing;
+
+-- Schemas por etapa
+CREATE SCHEMA sales.bronze;
+CREATE SCHEMA sales.silver;
+CREATE SCHEMA sales.gold;
+```
+
+**Ventaja**: alineado con Data Mesh. Cada dominio tiene ownership claro.
+
+**Desventaja**: el deploy es más complejo (no podés simplemente cambiar un prefijo).
+
+**Mi recomendación**: arrancá con la Opción A si tenés un equipo chico. Migrá a Opción B cuando tengas ownership claro por dominio.
+
+## GRANTS heredados: el error más común
+
+Los permisos en Unity Catalog son **heredables hacia abajo**. Esto es poderoso pero peligroso:
+
+```sql
+-- Este GRANT da acceso a TODAS las tablas presentes y FUTURAS del catalog
+GRANT USE CATALOG ON CATALOG prod TO `data-analysts`;
+GRANT USE SCHEMA ON CATALOG prod TO `data-analysts`;
+GRANT SELECT ON CATALOG prod TO `data-analysts`;
+
+-- Mejor: dar acceso solo al schema gold
+GRANT USE CATALOG ON CATALOG prod TO `data-analysts`;
+GRANT USE SCHEMA ON SCHEMA prod.gold TO `data-analysts`;
+GRANT SELECT ON SCHEMA prod.gold TO `data-analysts`;
+```
+
+**Regla de oro**: nunca des `SELECT ON CATALOG`. Siempre bajá al nivel de schema o tabla.
+
+## Row & Column Level Security
+
+Esto casi nadie lo usa pero es muy potente para cumplir con regulaciones (GDPR, PCI):
+
+```sql
+-- Column masking: ocultar PII
+CREATE FUNCTION prod.security.mask_email(email STRING)
+RETURNS STRING
+RETURN CASE
+  WHEN is_member('pii-authorized') THEN email
+  ELSE regexp_replace(email, '(.).*@', '$1***@')
+END;
+
+ALTER TABLE prod.gold.customers
+ALTER COLUMN email SET MASK prod.security.mask_email;
+
+-- Row filtering: cada equipo ve solo sus datos
+CREATE FUNCTION prod.security.region_filter(region STRING)
+RETURNS BOOLEAN
+RETURN CASE
+  WHEN is_member('global-access') THEN true
+  WHEN is_member('latam-team') THEN region IN ('LATAM', 'BR', 'UY', 'AR')
+  WHEN is_member('eu-team') THEN region IN ('EU', 'UK', 'DE', 'FR')
+  ELSE false
+END;
+
+ALTER TABLE prod.gold.customers
+SET ROW FILTER prod.security.region_filter ON (region);
+```
+
+Ahora un analista de LATAM hace `SELECT * FROM prod.gold.customers` y solo ve clientes de su región, con emails enmascarados. Sin cambiar una línea de código.
+
+## Linaje automático
+
+Unity Catalog trackea linaje automáticamente para cualquier operación que pase por Spark. Para aprovecharlo:
+
+```sql
+-- Ver linaje de una tabla (qué tablas la alimentan)
+-- Esto se ve en el UI, pero también vía API:
+-- GET /api/2.1/unity-catalog/lineage/table-lineage
+
+-- Para que el linaje sea completo:
+-- 1. Usar tablas de Unity Catalog (no paths directos)
+-- 2. Evitar df.write.parquet() - usar df.write.saveAsTable()
+-- 3. En DLT, el linaje es automático al 100%
+```
+
+**Tip**: si tenés un pipeline que lee de un path S3 directo, Unity Catalog no puede trackear el linaje. Registrá el path como External Location y External Table:
+
+```sql
+CREATE EXTERNAL LOCATION raw_s3
+URL 's3://my-bucket/raw/'
+WITH (STORAGE CREDENTIAL my_credential);
+
+CREATE TABLE prod.bronze.events
+USING DELTA
+LOCATION 's3://my-bucket/raw/events/';
+```
+
+## Volumes: archivos no tabulares
+
+Desde DBR 13.3, Unity Catalog gobierna también archivos (CSV, JSON, modelos, artefactos):
+
+```sql
+-- Volume managed: Databricks gestiona el storage
+CREATE VOLUME prod.ml.model_artifacts;
+
+-- Volume external: vos controlás el storage
+CREATE EXTERNAL VOLUME prod.raw.landing_zone
+LOCATION 's3://my-bucket/landing/';
+
+-- Subir archivos
+-- PUT /api/2.0/fs/files/Volumes/prod/ml/model_artifacts/model.pkl
+
+-- Usar en código
+df = spark.read.csv("/Volumes/prod/raw/landing_zone/customers.csv")
+```
+
+Los Volumes tienen los mismos GRANTS que tablas (`READ VOLUME`, `WRITE VOLUME`), así que tenés gobernanza uniforme.
+
+## Checklist de gobernanza
+
+- [ ] Catalogs organizados por ambiente O dominio (no mezclados)
+- [ ] `SELECT ON CATALOG` nunca otorgado a grupos amplios
+- [ ] Column masking en todas las columnas PII
+- [ ] Row filters para datos multi-tenant
+- [ ] External Locations registradas (no paths hardcodeados)
+- [ ] Volumes para archivos no tabulares
+- [ ] Service Principals para jobs de producción (no usuarios personales)
+
+---
+
+*Próxima semana: Structured Streaming — watermarks, triggers y cómo no perder datos en micro-batch.*
