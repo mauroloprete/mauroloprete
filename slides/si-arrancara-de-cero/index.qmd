@@ -28,7 +28,7 @@ format:
 
 ### Mauro Loprete
 
-[Data Engineer · Docente en UdelaR]{style="font-size: 1.1em;"}
+[Data Engineer]{style="font-size: 1.1em;"}
 
 ![](../../badge-professional.png){width=120 style="display: inline-block; margin: 0.3em 0.5em;"} ![](../../badge-associate.png){width=120 style="display: inline-block; margin: 0.3em 0.5em;"}
 
@@ -84,6 +84,10 @@ ggplot(levels) +
   theme(plot.margin = margin(2, 2, 2, 2))
 ```
 
+::: {.notes}
+La idea es simple: hay un orden lógico para aprender. Python y SQL son la base, sin eso no podés hacer nada. Después Spark para escalar, dbt para modularizar, y Databricks como plataforma. No es que uno sea más importante que otro, sino que cada nivel se apoya en el anterior.
+:::
+
 ## {data-background-color="#0d9488"}
 
 ::: {style="color: white; text-align: center;"}
@@ -94,6 +98,10 @@ ggplot(levels) +
 
 [No estoy hablando de `print("Hola mundo")`]{style="font-size: 0.9em;"}
 
+:::
+
+::: {.notes}
+Acá arrancamos con Python, pero ojo — no es el Python de un curso introductorio. Es el Python que usás todos los días en data engineering: leer archivos, parsear configs, modelar datos, testear.
 :::
 
 ## Python — lo que realmente necesitás
@@ -107,6 +115,10 @@ ggplot(levels) +
 . . .
 
 > El 80% de lo que hacés en data es manipular estructuras.
+
+::: {.notes}
+Esto es lo que necesitás para el día a día. No hace falta ser experto en todo, pero sí tener soltura. Lo de testing con pytest es clave — muchos data engineers no testean nada y después pagan las consecuencias en producción.
+:::
 
 ## Python — dataclasses {auto-animate=true}
 
@@ -145,6 +157,10 @@ with open("products.json") as f:
 critical = [p for p in products if p.is_critical()]
 ```
 
+::: {.notes}
+Dataclasses son la opción por defecto. Antes de escribir un diccionario para modelar algo, pensá si no es mejor una dataclass. Tenés autocompletado, type hints, y el código queda mucho más legible. El ejemplo de leer un JSON y convertirlo a objetos tipados es algo que hacemos todo el tiempo.
+:::
+
 ## Python — inmutabilidad {auto-animate=true}
 
 El problema de los objetos mutables:
@@ -181,6 +197,10 @@ add_debug_settings(config)
 connect(config)           # → "localhost:5432" ← BUG
 ```
 
+::: {.notes}
+Este es un bug real que vi en producción. Una función auxiliar modificaba la config y afectaba a todo el pipeline. El problema es que Python por defecto te deja mutar todo. En data engineering, donde pasás configs y DataFrames entre funciones, esto es una fuente constante de bugs silenciosos.
+:::
+
 ## Python — la solución: frozen {auto-animate=true}
 
 ```python
@@ -203,6 +223,10 @@ print(debug_config.host)  # → "localhost"
 ```
 
 > **Crear en vez de mutar** — la forma más segura de trabajar con datos.
+
+::: {.notes}
+frozen=True te protege en tiempo de ejecución. Si alguien intenta modificar el objeto, explota con un error claro. Y si necesitás una variante, usás replace() que te crea una copia nueva. Es el mismo principio de inmutabilidad que usa Spark internamente con los DataFrames.
+:::
 
 ## Python — Pydantic para validación
 
@@ -229,6 +253,10 @@ contract = DataContract(
 )
 ```
 
+::: {.notes}
+Pydantic es para cuando necesitás validación. Un data contract, un schema de API, una configuración que viene de un YAML externo. La diferencia con dataclass es que Pydantic valida al crear el objeto — si el SLA es negativo, te lo dice ahí mismo en vez de fallar 3 horas después en producción.
+:::
+
 ## Python — ¿cuándo usar cada tipo?
 
 | Situación | Tipo |
@@ -244,6 +272,10 @@ contract = DataContract(
 
 > Arrancá con `@dataclass`. Si necesitás inmutabilidad → `frozen=True`. Si necesitás validación → Pydantic.
 
+::: {.notes}
+Esta tabla es la cheat sheet. La regla es simple: arrancá siempre con dataclass. Solo subí de complejidad cuando lo necesitás. El error más común es usar clases tradicionales con herencia para todo, o peor, diccionarios para todo.
+:::
+
 ## {data-background-color="#0d9488"}
 
 ::: {style="color: white; text-align: center;"}
@@ -254,6 +286,10 @@ contract = DataContract(
 
 [+50 años y sigue siendo el más usado en datos]{style="font-size: 0.9em;"}
 
+:::
+
+::: {.notes}
+SQL lleva más de 50 años y sigue siendo el lenguaje más usado en datos. Databricks, Snowflake, BigQuery — todos usan SQL como interfaz principal. No importa qué herramienta uses, vas a necesitar SQL.
 :::
 
 ## SQL — lo que tenés que dominar
@@ -267,6 +303,10 @@ contract = DataContract(
 . . .
 
 > Cuando dominás window functions, resolvés en una query lo que antes te llevaba 3 scripts de Python.
+
+::: {.notes}
+Las window functions son lo que separa a alguien que sabe SQL básico de alguien que lo domina. ROW_NUMBER, LAG, LEAD — con eso resolvés el 80% de los problemas analíticos. Los CTEs hacen que las queries sean legibles en vez de tener subqueries anidados imposibles de mantener.
+:::
 
 ## SQL — ejemplo real {auto-animate=true}
 
@@ -301,6 +341,10 @@ FROM ranked WHERE rn <= 5
 ORDER BY customer_id, rn
 ```
 
+::: {.notes}
+Este ejemplo es real. Primero agrupamos por día con un CTE, después aplicamos ROW_NUMBER para rankear y LAG para comparar con el día anterior. Fíjense cómo con 3 funciones resolvemos ranking + comparación temporal. Sin window functions esto serían múltiples queries o un script de Python.
+:::
+
 ## {data-background-color="#2563eb"}
 
 ::: {style="color: white; text-align: center;"}
@@ -313,6 +357,10 @@ ORDER BY customer_id, rn
 
 :::
 
+::: {.notes}
+Mucha gente viene de pandas y piensa que Spark es lo mismo pero más grande. No. Spark es computación distribuida — tus datos están repartidos en múltiples nodos y eso cambia completamente cómo tenés que pensar.
+:::
+
 ## Spark — lo esencial
 
 - **Lazy evaluation**: nada se ejecuta hasta `collect()`, `count()`, `write()`
@@ -320,6 +368,10 @@ ORDER BY customer_id, rn
 - **Shuffle**: la operación más cara — cada `JOIN`, `GROUP BY` puede generar uno
 - **Broadcast joins**: tabla chica (< 10MB) → broadcasteala
 - **Catalyst optimizer**: optimiza tu plan... si usás funciones nativas
+
+::: {.notes}
+Estos 5 conceptos son el core de Spark. Si entendés lazy evaluation, particiones y shuffle, ya estás por encima del 80% de la gente que usa Spark. Lo del Catalyst optimizer es clave: si usás funciones nativas, Spark puede optimizar tu query. Si usás UDFs, no puede.
+:::
 
 ## Spark — funciones nativas vs UDF {auto-animate=true}
 
@@ -341,6 +393,10 @@ df = (
     )
 )
 ```
+
+::: {.notes}
+Fíjense que acá estamos usando F.col, F.sum, Window — todo API nativa de Spark. Esto es lo que el optimizador entiende y puede pushdown, reordenar, paralelizar. El running total con window function es un caso de uso super común en pipelines financieros.
+:::
 
 ## Spark — la diferencia clave
 
@@ -400,6 +456,10 @@ ggplot() +
 
 **Serde overhead**: serialización JVM ↔ Python fila por fila = lento.
 
+::: {.notes}
+Este gráfico muestra la diferencia fundamental. Con funciones nativas, Spark habla directamente con la JVM y Catalyst optimiza todo. Con UDFs, cada fila tiene que ir de la JVM a Python, ejecutar tu función, y volver. Esa serialización/deserialización (serde) es lo que mata el rendimiento. En el lab pueden ver el benchmark con números reales.
+:::
+
 ## Spark — wrapper functions ≠ UDFs
 
 ```{.python code-line-numbers="1-6|8-12"}
@@ -421,6 +481,10 @@ def high_revenue_udf(amount):
 
 > Si no te queda otra, usá **Pandas UDFs** — procesan por batch, no fila por fila.
 
+::: {.notes}
+Esto es super importante: un wrapper function NO es una UDF. Un wrapper usa la API nativa internamente, Spark lo entiende y optimiza. Una UDF es Python puro que corre fila por fila. Si realmente necesitás una UDF — por ejemplo para llamar a una API externa o usar una librería que no tiene equivalente en Spark — usá Pandas UDFs que procesan por batch y son mucho más eficientes.
+:::
+
 ## {data-background-color="#ea580c"}
 
 ::: {style="color: white; text-align: center;"}
@@ -433,6 +497,10 @@ def high_revenue_udf(amount):
 
 :::
 
+::: {.notes}
+dbt le trajo ingeniería de software al mundo SQL. Antes las transformaciones SQL eran scripts sueltos sin tests, sin documentación, sin versionamiento. dbt cambió eso completamente.
+:::
+
 ## dbt — por qué importa
 
 - **Modularidad**: cada modelo es un `SELECT`, se referencian con `{{ ref() }}`
@@ -440,6 +508,10 @@ def high_revenue_udf(amount):
 - **Documentación**: se genera automáticamente desde YAML
 - **Linaje**: sabés qué modelo depende de qué
 - **Versionamiento**: todo es código, todo va a Git
+
+::: {.notes}
+Lo de ref() es genial — en vez de hardcodear nombres de tablas, referenciás otros modelos y dbt arma el DAG automáticamente. Sabés exactamente qué depende de qué, y si algo cambia, sabés qué se ve afectado. Los tests son first-class citizens: not_null, unique, valores aceptados.
+:::
 
 ## dbt — modelo + tests {auto-animate=true}
 
@@ -484,6 +556,10 @@ models:
               values: ['COMPLETED', 'PENDING', 'FAILED']
 ```
 
+::: {.notes}
+Miren el YAML de tests. Con 10 líneas tenés: validación de not_null, unique, rango de valores y valores aceptados. En un pipeline de PySpark eso serían 50 líneas de asserts manuales. dbt además genera documentación automática de todo esto.
+:::
+
 ## dbt — ¿cuándo dbt y cuándo PySpark?
 
 | Caso | Herramienta |
@@ -499,6 +575,10 @@ models:
 
 > Si tu transformación es SQL puro, usá dbt. Si necesitás lógica compleja, PySpark.
 
+::: {.notes}
+La pregunta que siempre hacen: ¿cuándo uso dbt y cuándo PySpark? La regla es simple: si tu transformación se puede expresar en SQL puro — limpieza, joins, aggregations, modelos dimensionales — usá dbt. Si necesitás llamar APIs, hacer ML, procesar archivos no estructurados o streaming — PySpark. No son excluyentes, se complementan.
+:::
+
 ## {data-background-color="#7c3aed"}
 
 ::: {style="color: white; text-align: center;"}
@@ -511,6 +591,10 @@ models:
 
 :::
 
+::: {.notes}
+Databricks es mucho más que Spark en la nube. Es una plataforma completa de datos con gobernanza, orquestación, serving, y herramientas de desarrollo. Hay que aprender a usar la plataforma, no solo el motor de procesamiento.
+:::
+
 ## Databricks — lo que priorizaría
 
 1. **Unity Catalog** — gobernanza de 3 niveles: `catalog.schema.table`
@@ -518,6 +602,10 @@ models:
 3. **Databricks Asset Bundles** — infra como código, todo en YAML + Git
 4. **Workflows** — orquestación nativa con triggers y retry
 5. **SQL Warehouses** — serverless para analistas y dashboards
+
+::: {.notes}
+Estos 5 son los que priorizaría. Unity Catalog es fundamental — sin gobernanza no hay data platform seria. LDP para pipelines de calidad. DABs para infra como código — el próximo Databricks Tips va a profundizar en esto. Workflows para orquestación. Y SQL Warehouses para que los analistas consulten sin tocar clusters.
+:::
 
 ## Databricks — desde el día 1 {auto-animate=true}
 
@@ -542,6 +630,10 @@ GRANT USE SCHEMA ON SCHEMA analytics.sales TO `analysts`;
 GRANT SELECT ON TABLE analytics.sales.transactions TO `analysts`;
 ```
 
+::: {.notes}
+Desde el día 1 deberías pensar en catalog.schema.table. Liquid Clustering es una mejora enorme sobre el particionamiento clásico — Databricks optimiza los archivos automáticamente. Y los GRANTs son gobernanza básica: quién puede ver qué. Todo esto es SQL, no necesitás Python para configurarlo.
+:::
+
 ## {data-background-color="#dc2626"}
 
 ::: {style="color: white; text-align: center;"}
@@ -552,6 +644,10 @@ GRANT SELECT ON TABLE analytics.sales.transactions TO `analysts`;
 
 [El error más común — y el que más cuesta corregir]{style="font-size: 0.9em;"}
 
+:::
+
+::: {.notes}
+Este es un tema que me apasiona. Los notebooks son geniales para explorar, pero son un desastre en producción. Lo he visto en todos lados — pipelines enteros corriendo en notebooks sin tests, sin code review, sin módulos. Y después cuando algo falla, nadie sabe por qué.
 :::
 
 ## Notebooks — el problema real
@@ -629,6 +725,10 @@ ggplot(flow) +
 
 > **La regla**: si algo corre más de una vez, no debería estar en un notebook.
 
+::: {.notes}
+El flujo correcto: explorás en un notebook, cuando la lógica funciona la extraés a un módulo .py, le escribís tests con pytest, lo deployás con DABs y CI/CD, y el notebook original queda como documentación. El notebook no desaparece, pero deja de ser el código de producción.
+:::
+
 ## Notebooks — el código que sí va a producción
 
 ```{.python code-line-numbers="1-10|12-19"}
@@ -653,6 +753,10 @@ def test_clean_removes_nulls(spark):
     result = clean_transactions(input_df)
     assert result.count() == 1
 ```
+
+::: {.notes}
+Miren la diferencia: la función de transformación es pura — recibe un DataFrame, devuelve un DataFrame. Se puede testear fácilmente con un DataFrame de prueba. El test verifica que los nulls se eliminan. Esto es lo que va a producción: código testeable, modular, sin estado compartido.
+:::
 
 ## El roadmap: en qué orden
 
@@ -697,6 +801,10 @@ ggplot(gantt) +
   )
 ```
 
+::: {.notes}
+Este es el roadmap sugerido de 9 meses. Python y SQL primero — mínimo 2-3 meses para tener soltura. Después Spark, que requiere entender un paradigma nuevo. dbt y Databricks pueden ir en paralelo si ya tenés la base. La especialización viene al final: streaming, ML, arquitectura. No intenten hacer todo al mismo tiempo.
+:::
+
 ## Lo que NO priorizaría
 
 - **Airflow** — Databricks Workflows cubre el 90% de los casos
@@ -707,6 +815,10 @@ ggplot(gantt) +
 . . .
 
 > Los conceptos se transfieren. No necesitás aprenderlos todos al mismo tiempo.
+
+::: {.notes}
+Esto es importante: no estoy diciendo que estas herramientas no sirvan. Airflow es genial, Kafka es fundamental en ciertos contextos. Pero si estás arrancando, no las necesitás todavía. Dominá los fundamentos primero. Los conceptos se transfieren — si sabés orquestar con Databricks Workflows, aprender Airflow después es mucho más fácil.
+:::
 
 ## {data-background-color="#1e293b"}
 
@@ -723,6 +835,10 @@ ggplot(gantt) +
 
 :::
 
+::: {.notes}
+Este es el mensaje final y el más importante. Construir algo real te enseña más que cualquier curso. Agarrá un dataset público, armá un pipeline completo: ingesta, transformación, tests, deploy. Rompelo, arreglalo. Eso es experiencia real.
+:::
+
 ## Links y recursos
 
 - [Episodio del podcast](https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w) — la charla completa
@@ -730,6 +846,10 @@ ggplot(gantt) +
 - [Fundamentals of Data Engineering](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/) — el mejor libro para arrancar
 - [dbt Learn](https://courses.getdbt.com/) — curso gratuito oficial
 - [Databricks Academy](https://www.databricks.com/learn) — cursos oficiales
+
+::: {.notes}
+Estos son los links. El libro de Reis y Housley es el mejor para arrancar en data engineering. dbt Learn es gratuito y excelente. Y Databricks Academy tiene cursos oficiales — algunos gratuitos. Los notebooks del episodio están en GitHub para que los ejecuten en Free Edition.
+:::
 
 ## {data-background-color="#1e293b"}
 
