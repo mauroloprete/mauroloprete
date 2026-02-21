@@ -229,11 +229,11 @@ Mauro Loprete
 </section>
 <section id="section-1" class="slide level2" data-background-color="#1e293b">
 <h2></h2>
-<section id="la-pregunta-que-me-hacen-siempre" style="color: white; text-align: center; margin-top: 1em;">
-<h3>La pregunta que me hacen siempre</h3>
-<p><span style="font-size: 1.1em;">Si pudieras arrancar de cero en Data Engineering,</span></p>
-<p><span style="color: #FFA166; font-size: 1.4em;"><strong>¿qué aprenderías primero?</strong></span></p>
-<p><span style="color: #94a3b8; font-size: 0.9em;">La respuesta no es “todo a la vez”. El orden importa.</span></p>
+<section id="mauro-loprete" style="color: white; text-align: center; margin-top: 1em;">
+<h3>Mauro Loprete</h3>
+<p><span style="font-size: 1.1em;">Data Engineer en F1RST (Grupo Santander)</span></p>
+<p><span style="color: #FFA166; font-size: 1.2em;"><strong>Databricks Professional + Associate</strong></span></p>
+<p><span style="color: #94a3b8; font-size: 0.9em;">Docente en UdelaR · Yendo por el MVP</span></p>
 </section>
 </section>
 <section id="la-pirámide-de-abajo-hacia-arriba" class="slide level2">
@@ -438,31 +438,34 @@ Mauro Loprete
 </section>
 <section id="sql-ejemplo-real" class="slide level2" data-auto-animate="true">
 <h2 data-id="quarto-animate-title">SQL — ejemplo real</h2>
-<div class="sourceCode" id="cb7" data-code-line-numbers="1-7|8-18|19-25"><pre class="sourceCode numberSource sql number-lines code-with-copy" data-id="quarto-animate-code"><code class="sourceCode sql hljs"><span id="cb7-1" class="hljs-ln-code"><a></a><span class="kw">WITH</span> daily_sales <span class="kw">AS</span> (</span>
+<div class="sourceCode" id="cb7" data-code-line-numbers="1-8|9-20|21-28"><pre class="sourceCode numberSource sql number-lines code-with-copy" data-id="quarto-animate-code"><code class="sourceCode sql hljs"><span id="cb7-1" class="hljs-ln-code"><a></a><span class="kw">WITH</span> daily_sales <span class="kw">AS</span> (</span>
 <span id="cb7-2" class="hljs-ln-code"><a></a>    <span class="kw">SELECT</span></span>
 <span id="cb7-3" class="hljs-ln-code"><a></a>        customer_id,</span>
-<span id="cb7-4" class="hljs-ln-code"><a></a>        DATE_TRUNC(<span class="st">'day'</span>, sale_date) <span class="kw">AS</span> sale_day,</span>
+<span id="cb7-4" class="hljs-ln-code"><a></a>        sale_date <span class="kw">AS</span> sale_day,</span>
 <span id="cb7-5" class="hljs-ln-code"><a></a>        <span class="fu">SUM</span>(amount) <span class="kw">AS</span> daily_total,</span>
 <span id="cb7-6" class="hljs-ln-code"><a></a>        <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> txn_count</span>
-<span id="cb7-7" class="hljs-ln-code"><a></a>    <span class="kw">FROM</span> sales <span class="kw">GROUP</span> <span class="kw">BY</span> <span class="dv">1</span>, <span class="dv">2</span></span>
-<span id="cb7-8" class="hljs-ln-code"><a></a>),</span>
-<span id="cb7-9" class="hljs-ln-code"><a></a>ranked <span class="kw">AS</span> (</span>
-<span id="cb7-10" class="hljs-ln-code"><a></a>    <span class="kw">SELECT</span> <span class="op">*</span>,</span>
-<span id="cb7-11" class="hljs-ln-code"><a></a>        <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
-<span id="cb7-12" class="hljs-ln-code"><a></a>            <span class="kw">PARTITION</span> <span class="kw">BY</span> customer_id</span>
-<span id="cb7-13" class="hljs-ln-code"><a></a>            <span class="kw">ORDER</span> <span class="kw">BY</span> daily_total <span class="kw">DESC</span></span>
-<span id="cb7-14" class="hljs-ln-code"><a></a>        ) <span class="kw">AS</span> rn,</span>
-<span id="cb7-15" class="hljs-ln-code"><a></a>        <span class="fu">LAG</span>(daily_total) <span class="kw">OVER</span> (</span>
-<span id="cb7-16" class="hljs-ln-code"><a></a>            <span class="kw">PARTITION</span> <span class="kw">BY</span> customer_id</span>
-<span id="cb7-17" class="hljs-ln-code"><a></a>            <span class="kw">ORDER</span> <span class="kw">BY</span> sale_day</span>
-<span id="cb7-18" class="hljs-ln-code"><a></a>        ) <span class="kw">AS</span> prev_day_total</span>
-<span id="cb7-19" class="hljs-ln-code"><a></a>    <span class="kw">FROM</span> daily_sales</span>
-<span id="cb7-20" class="hljs-ln-code"><a></a>)</span>
-<span id="cb7-21" class="hljs-ln-code"><a></a><span class="kw">SELECT</span> customer_id, sale_day, daily_total,</span>
-<span id="cb7-22" class="hljs-ln-code"><a></a>    prev_day_total,</span>
-<span id="cb7-23" class="hljs-ln-code"><a></a>    <span class="fu">ROUND</span>((daily_total <span class="op">-</span> prev_day_total)</span>
-<span id="cb7-24" class="hljs-ln-code"><a></a>          <span class="op">/</span> prev_day_total <span class="op">*</span> <span class="dv">100</span>, <span class="dv">2</span>) <span class="kw">AS</span> pct_change</span>
-<span id="cb7-25" class="hljs-ln-code"><a></a><span class="kw">FROM</span> ranked <span class="kw">WHERE</span> rn <span class="op">&lt;=</span> <span class="dv">5</span>;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb7-7" class="hljs-ln-code"><a></a>    <span class="kw">FROM</span> sales</span>
+<span id="cb7-8" class="hljs-ln-code"><a></a>    <span class="kw">WHERE</span> status <span class="op">=</span> <span class="st">'COMPLETED'</span></span>
+<span id="cb7-9" class="hljs-ln-code"><a></a>    <span class="kw">GROUP</span> <span class="kw">BY</span> <span class="dv">1</span>, <span class="dv">2</span></span>
+<span id="cb7-10" class="hljs-ln-code"><a></a>),</span>
+<span id="cb7-11" class="hljs-ln-code"><a></a>ranked <span class="kw">AS</span> (</span>
+<span id="cb7-12" class="hljs-ln-code"><a></a>    <span class="kw">SELECT</span> <span class="op">*</span>,</span>
+<span id="cb7-13" class="hljs-ln-code"><a></a>        <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb7-14" class="hljs-ln-code"><a></a>            <span class="kw">PARTITION</span> <span class="kw">BY</span> customer_id</span>
+<span id="cb7-15" class="hljs-ln-code"><a></a>            <span class="kw">ORDER</span> <span class="kw">BY</span> daily_total <span class="kw">DESC</span></span>
+<span id="cb7-16" class="hljs-ln-code"><a></a>        ) <span class="kw">AS</span> rn,</span>
+<span id="cb7-17" class="hljs-ln-code"><a></a>        <span class="fu">LAG</span>(daily_total) <span class="kw">OVER</span> (</span>
+<span id="cb7-18" class="hljs-ln-code"><a></a>            <span class="kw">PARTITION</span> <span class="kw">BY</span> customer_id</span>
+<span id="cb7-19" class="hljs-ln-code"><a></a>            <span class="kw">ORDER</span> <span class="kw">BY</span> sale_day</span>
+<span id="cb7-20" class="hljs-ln-code"><a></a>        ) <span class="kw">AS</span> prev_day_total</span>
+<span id="cb7-21" class="hljs-ln-code"><a></a>    <span class="kw">FROM</span> daily_sales</span>
+<span id="cb7-22" class="hljs-ln-code"><a></a>)</span>
+<span id="cb7-23" class="hljs-ln-code"><a></a><span class="kw">SELECT</span> customer_id, sale_day, daily_total,</span>
+<span id="cb7-24" class="hljs-ln-code"><a></a>    prev_day_total,</span>
+<span id="cb7-25" class="hljs-ln-code"><a></a>    <span class="fu">ROUND</span>((daily_total <span class="op">-</span> prev_day_total)</span>
+<span id="cb7-26" class="hljs-ln-code"><a></a>          <span class="op">/</span> prev_day_total <span class="op">*</span> <span class="dv">100</span>, <span class="dv">2</span>) <span class="kw">AS</span> pct_change</span>
+<span id="cb7-27" class="hljs-ln-code"><a></a><span class="kw">FROM</span> ranked <span class="kw">WHERE</span> rn <span class="op">&lt;=</span> <span class="dv">5</span></span>
+<span id="cb7-28" class="hljs-ln-code"><a></a><span class="kw">ORDER</span> <span class="kw">BY</span> customer_id, rn</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
 <section id="section-4" class="slide level2" data-background-color="#2563eb">
 <h2></h2>
@@ -732,7 +735,7 @@ Mauro Loprete
 <h3>Lo más importante</h3>
 <p><span style="color: #FFA166; font-size: 1.5em;"><strong>Construí algo.</strong></span></p>
 <p><span style="font-size: 0.9em;">Agarrá un dataset público, armá un pipeline de punta a punta,</span> <span style="font-size: 0.9em;">deployalo, rompelo, arreglalo.</span></p>
-<p><span style="color: #94a3b8; font-size: 0.85em;">Eso vale más que 10 certificaciones.</span></p>
+<p><span style="color: #94a3b8; font-size: 0.85em;">Eso vale más que 10 cursos.</span></p>
 </section>
 </section>
 <section id="links-y-recursos" class="slide level2">
