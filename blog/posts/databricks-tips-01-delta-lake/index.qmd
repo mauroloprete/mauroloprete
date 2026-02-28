@@ -75,8 +75,14 @@ Lo que nadie te dice: **VACUUM no borra los archivos de log** (delta log). Si ne
 -- Ver cuánto ocupa el log
 DESCRIBE DETAIL catalog.schema.events;
 
--- El checkpoint automático ocurre cada 10 commits
--- Podés forzar un checkpoint y después limpiar logs viejos
+-- Forzar checkpoint (compacta el JSON log en Parquet)
+-- Ocurre automáticamente cada 10 commits, pero podés forzarlo:
+SET spark.databricks.delta.checkpoint.partSize = 1;
+OPTIMIZE catalog.schema.events;
+
+-- Configurar retención del log (default 30 días)
+ALTER TABLE catalog.schema.events
+SET TBLPROPERTIES (delta.logRetentionDuration = 'interval 30 days');
 ```
 
 **En producción**: automatizá VACUUM con un job semanal, nunca con retención menor a la ventana de time travel que necesites.
