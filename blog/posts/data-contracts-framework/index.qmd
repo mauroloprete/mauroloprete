@@ -1,7 +1,7 @@
 ---
 title: "Data Contracts: cómo diseñar un framework desde cero"
-author: "Mauro Loprete"
-date: "2026-04-07"
+author: "Spark de Ideas"
+date: "2026-04-14"
 categories: [Data Architecture, Data Engineering, Podcast]
 description: "Qué son los Data Contracts, por qué los necesitás, y cómo implementé un framework en producción con Databricks y PySpark."
 draft: true
@@ -113,8 +113,8 @@ class ColumnContract:
     type: str
     nullable: bool = True
     unique: bool = False
-    checks: List[str] = None
-    allowed_values: List[str] = None
+    checks: Optional[List[str]] = None
+    allowed_values: Optional[List[str]] = None
     pattern: Optional[str] = None
 
 @dataclass
@@ -234,6 +234,17 @@ def validate_quality(
 ### 4. Integración en el pipeline
 
 ```python
+class ContractViolation(Exception):
+    """Excepción para violaciones de Data Contracts."""
+    pass
+
+def alert_team(owner: str, failures: list):
+    """Notifica al equipo dueño del contrato sobre las fallas de calidad."""
+    # Implementar según tu stack: Slack webhook, email, PagerDuty, etc.
+    for f in failures:
+        print(f"[ALERT → {owner}] {f['rule']}: valor={f['value']}, "
+              f"threshold={f['threshold']}")
+
 def ingest_with_contract(
     spark,
     source_df: DataFrame,
@@ -308,8 +319,6 @@ def clean_transactions():
 
 - [Data Contracts (Andrew Jones)](https://datacontract.com/) — referencia de la comunidad
 - [DLT Expectations (Databricks)](https://docs.databricks.com/en/delta-live-tables/expectations.html) — documentación oficial
-- [Episodio del podcast](https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w) — implementación paso a paso
-
 ---
 
 *Próxima semana: Data Mesh en la práctica — lo que funciona y lo que no.*

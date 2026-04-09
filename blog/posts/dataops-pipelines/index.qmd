@@ -1,23 +1,206 @@
 ---
-title: "DataOps: cómo llevar tus pipelines al siguiente nivel"
-author: "Mauro Loprete"
+title: "DataOps: como llevar tus pipelines al siguiente nivel"
+author: "Spark de Ideas"
 date: "2025-09-01"
 categories: [Podcast, Data Engineering, DataOps]
-description: "Resumen del episodio sobre DataOps, su diferencia con DevOps y las tendencias Gartner 2024."
+description: "Que es DataOps de verdad, en que se diferencia de DevOps, los tres pilares (automatizacion, observabilidad, colaboracion) y errores comunes que veo en produccion."
 ---
 
-En este episodio exploro qué es DataOps, por qué no es simplemente "DevOps para datos", y cómo puede transformar la forma en que construimos y mantenemos pipelines de datos.
+En este episodio del podcast hablo sobre DataOps: que es, por que no es simplemente "DevOps para datos", y como puede transformar la forma en que construimos y mantenemos pipelines. Aca va una version expandida con ejemplos concretos y opiniones basadas en lo que vi funcionando (y fallando) en produccion.
 
-## Temas del episodio
+{{< fa podcast >}} [Escuchar el episodio en Spotify](https://open.spotify.com/episode/7wyLHHZroEG7JZ8YH2K9h0)
 
-- **Qué es DataOps**: más allá del buzzword, una definición práctica.
-- **DataOps vs DevOps**: comparten principios pero los problemas son distintos. Los datos tienen estado, esquemas cambiantes y dependencias que el software tradicional no tiene.
-- **Qué problemas resuelve**: reducir tiempo de entrega, mejorar calidad de datos, hacer pipelines más confiables.
-- **Mindset necesario**: automatización, monitoreo continuo, colaboración entre equipos.
-- **Tendencias Gartner 2024**: hacia dónde va la industria en observabilidad y calidad de datos.
+## Que es DataOps (de verdad)
 
-## Lecturas recomendadas
+DataOps es la aplicacion de principios de ingenieria de software --- automatizacion, testing, CI/CD, monitoreo --- al ciclo de vida de los datos. Pero ojo: no es comprar una herramienta ni instalar Airflow y declarar victoria.
 
-En el episodio menciono tres libros que voy a ir cubriendo en próximos capítulos, enfocados en observabilidad y monitoreo de calidad de datos.
+Una definicion practica: **DataOps es un conjunto de practicas que buscan reducir el tiempo entre que un cambio en un pipeline se escribe y llega a produccion de forma confiable, testeada y observable.**
 
-[Escuchar en Spotify](https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w)
+Si tu proceso para deployar un pipeline es "abrir un notebook en produccion y correrlo a mano", no estas haciendo DataOps. Si tu unica forma de saber que un pipeline fallo es que alguien te avisa por Slack, tampoco.
+
+## DataOps vs DevOps: primos, no gemelos
+
+DevOps y DataOps comparten principios (automatizacion, feedback rapido, colaboracion entre equipos). Pero los datos tienen problemas que el software tradicional no tiene:
+
+| Dimension | DevOps | DataOps |
+|---|---|---|
+| Que se versiona | Codigo fuente | Codigo + datos + schemas + configs |
+| Estado | Stateless (idealmente) | Stateful siempre --- los datos persisten |
+| Testing | Unit tests, integration tests | Todo lo anterior + calidad de datos, freshness, volumen |
+| Falla tipica | "No compila" | "Compila perfecto, pero los datos estan mal" |
+| Schema | API contracts fijos | Schema drift constante --- las fuentes cambian sin avisar |
+| Dependencias | Entre servicios | Entre datasets, con temporalidad y orden de ejecucion |
+
+La diferencia clave: **en software, si el test pasa, el codigo funciona. En datos, el test puede pasar y los datos pueden seguir estando mal.** Un pipeline de ingesta puede correr sin errores y traer filas duplicadas, campos vacios, o datos de hace tres dias porque la fuente se colgo.
+
+## Los tres pilares de DataOps
+
+### 1. Automatizacion
+
+Si haces algo mas de dos veces a mano, automatizalo. Esto incluye:
+
+**CI/CD para pipelines.** Cada cambio en un pipeline deberia pasar por un proceso automatizado antes de llegar a produccion. Ejemplo con GitHub Actions y Databricks Asset Bundles:
+
+```yaml
+# .github/workflows/deploy-pipeline.yml
+name: Deploy Pipeline
+on:
+  push:
+    branches: [main]
+    paths: ['pipelines/**']
+
+jobs:
+  validate-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate bundle
+        run: databricks bundle validate
+        env:
+          DATABRICKS_HOST: ${{ secrets.DBX_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DBX_TOKEN }}
+
+      - name: Run tests
+        run: databricks bundle run test_pipeline --no-wait
+
+      - name: Deploy to production
+        if: success()
+        run: databricks bundle deploy --target prod
+```
+
+**Tests automatizados de calidad de datos.** No alcanza con testear que el pipeline no tire excepcion. Hay que testear los datos. Ejemplo con un test en PySpark:
+
+```python
+from pyspark.sql import functions as F
+
+def test_no_duplicates(df, key_columns):
+    """Valida que no haya duplicados por clave primaria."""
+    total = df.count()
+    distinct = df.select(key_columns).distinct().count()
+    assert total == distinct, (
+        f"Duplicados detectados: {total} filas, "
+        f"{distinct} distintas por {key_columns}"
+    )
+
+def test_freshness(df, date_col, max_hours=24):
+    """Valida que los datos no tengan mas de N horas de atraso."""
+    latest = df.agg(F.max(date_col)).collect()[0][0]
+    from datetime import datetime, timedelta
+    threshold = datetime.now() - timedelta(hours=max_hours)
+    assert latest >= threshold, (
+        f"Datos desactualizados: ultimo registro {latest}, "
+        f"threshold {threshold}"
+    )
+```
+
+**Validacion de schema.** Si usas dbt, esto es nativo:
+
+```yaml
+# models/staging/stg_transactions.yml
+models:
+  - name: stg_transactions
+    columns:
+      - name: transaction_id
+        tests:
+          - not_null
+          - unique
+      - name: amount
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000000
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['completed', 'pending', 'failed']
+```
+
+### 2. Monitoreo y observabilidad
+
+Automatizar sin monitorear es como manejar con los ojos cerrados. Los cuatro tipos de monitoreo que necesitas:
+
+- **Calidad de datos**: nulos inesperados, duplicados, valores fuera de rango, schema drift
+- **Freshness / SLAs**: los datos llegan a tiempo? la tabla Silver se actualizo antes de las 8 AM?
+- **Performance**: latencia del pipeline, tiempo de ejecucion, volumen procesado por batch
+- **Costo**: cuantos DBUs consumiste, cuanto compute estas quemando en OPTIMIZE innecesarios
+
+No necesitas una herramienta cara para arrancar. Un check basico en tu pipeline ya es monitoreo:
+
+```python
+import logging
+
+logger = logging.getLogger("pipeline_monitor")
+
+def monitor_pipeline_run(df, table_name, expected_min_rows=1000):
+    """Monitoreo basico post-ejecucion."""
+    row_count = df.count()
+    null_pct = (
+        df.select(
+            [F.sum(F.col(c).isNull().cast("int")).alias(c)
+             for c in df.columns]
+        ).collect()[0]
+    )
+
+    logger.info(f"[{table_name}] Filas procesadas: {row_count}")
+
+    if row_count < expected_min_rows:
+        logger.warning(
+            f"[{table_name}] Volumen bajo: {row_count} filas "
+            f"(esperado >= {expected_min_rows})"
+        )
+
+    for col_name, null_count in zip(df.columns, null_pct):
+        pct = (null_count / row_count * 100) if row_count > 0 else 0
+        if pct > 10:
+            logger.warning(
+                f"[{table_name}] Alta nulidad en {col_name}: {pct:.1f}%"
+            )
+```
+
+### 3. Colaboracion
+
+Este es el pilar que mas se ignora. DataOps no es solo tooling --- es como los equipos trabajan juntos.
+
+**Data Contracts entre equipos.** El equipo de backend no puede cambiar el tipo de una columna sin avisarte. Necesitas un contrato formal. Escribi un post entero sobre esto (ver links abajo).
+
+**Documentacion como codigo.** Si la documentacion esta en un Confluence que nadie actualiza, no sirve. La documentacion deberia vivir junto al codigo (como los `.yml` de dbt o los comentarios en los modelos).
+
+**Linaje compartido.** Todos los equipos deberian poder ver de donde vienen los datos, por donde pasan, y quien los consume. Unity Catalog en Databricks te da esto gratis si lo configuras bien.
+
+## Niveles de madurez en DataOps
+
+| Nivel | Nombre | Caracteristicas |
+|---|---|---|
+| 0 | Manual | Pipelines se corren a mano, no hay tests, no hay CI/CD. "Funciona en mi notebook." |
+| 1 | CI basico | El codigo esta en Git, hay algun proceso de deploy, pero los tests son manuales o no existen. |
+| 2 | Testing automatizado | Tests de calidad de datos en el pipeline, validacion de schema, CI/CD completo. Los errores se detectan antes de produccion. |
+| 3 | Observabilidad completa | Monitoreo de freshness, SLAs, costos, data contracts entre equipos, alertas automaticas, linaje end-to-end. |
+
+La mayoria de los equipos que conozco estan entre el nivel 0 y el 1. Llegar al nivel 2 ya es un salto enorme. El nivel 3 es donde queres estar, pero requiere no solo herramientas sino un cambio cultural.
+
+## Errores comunes
+
+**"Hacemos DataOps porque usamos Airflow."** No. Airflow es un orquestador, no una practica. Podes tener Airflow y seguir deployando a mano, sin tests, sin monitoreo. La herramienta no es la practica.
+
+**Confundir CI/CD con DataOps.** CI/CD es una parte de DataOps (automatizacion), pero si no tenes monitoreo ni colaboracion, tenes un tercio del puzzle.
+
+**Automatizar sin testear.** El peor escenario: un pipeline que se deployea automaticamente a produccion, sin tests de calidad, y rompe datos en silencio. Automatizaste el desastre.
+
+**Ignorar el costo.** DataOps tambien es eficiencia. Si tu pipeline corre un `OPTIMIZE` completo en una tabla de 10 TB todos los dias sin predicado, estas quemando plata. El monitoreo de costos es parte de la observabilidad.
+
+## Links
+
+- {{< fa podcast >}} [Episodio en Spotify](https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w)
+- {{< fa book >}} [Fundamentals of Data Engineering (Reis & Housley)](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/) --- cubre DataOps como disciplina
+- {{< fa book >}} [Data Pipelines Pocket Reference (Densmore)](https://www.oreilly.com/library/view/data-pipelines-pocket/9781492087823/) --- patrones practicos de CI/CD para datos
+- {{< fa link >}} [DataOps Manifesto](https://dataopsmanifesto.org/) --- los 18 principios originales
+- {{< fa code-branch >}} [Databricks Asset Bundles docs](https://docs.databricks.com/en/dev-tools/bundles/index.html) --- CI/CD nativo para Databricks
+
+---
+
+*Proximo episodio: Data Contracts --- como disenar un framework desde cero.*

@@ -1,24 +1,108 @@
 ---
 title: "Fundamentals of Data Engineering: las bases que todo ingeniero de datos necesita conocer"
-author: "Mauro Loprete"
+author: "Spark de Ideas"
 date: "2025-08-26"
 categories: [Podcast, Data Engineering, Book Review]
-description: "Resumen del episodio sobre el libro Fundamentals of Data Engineering de Joe Reis y Matt Housley."
+description: "Review del libro Fundamentals of Data Engineering de Joe Reis y Matt Housley (O'Reilly, 2da ed.). El ciclo de vida del dato, arquitecturas clave, undercurrents y que cambio en esta edicion."
 ---
 
-En este episodio repaso los conceptos fundamentales del libro *Fundamentals of Data Engineering* de Joe Reis y Matt Housley, una lectura obligatoria para cualquier persona que trabaje o quiera trabajar en ingeniería de datos.
+Si tuvieras que recomendar *un solo libro* a alguien que arranca en ingenieria de datos, este es. **Fundamentals of Data Engineering** de Joe Reis y Matt Housley (O'Reilly, 2da edicion) no te ensena una herramienta puntual: te da el mapa completo de la disciplina. Es el libro que define el vocabulario comun que la industria necesitaba.
 
-## Temas del episodio
+En este post te comparto un resumen profundo del libro, lo que mas me resono y por que creo que deberia ser lectura obligatoria.
 
-- **Ingeniería de datos vs desarrollo de software tradicional**: qué cambia, qué se mantiene, y por qué es una disciplina propia.
-- **Ciclo de vida del dato**: generación, almacenamiento, ingestión, transformación y consumo.
-- **Arquitecturas comunes**: Lambda, Kappa, Data Mesh, Medallion. Cuándo usar cada una y sus trade-offs.
-- **Gobernanza y observabilidad**: por qué no son opcionales y cómo integrarlas desde el día uno.
-- **Transformación cloud**: cómo el paso a la nube cambió las reglas del juego.
-- **DataOps**: adaptación de prácticas DevOps al mundo de datos.
+## {{< fa book >}} Por que importa este libro
 
-## Por qué leer este libro
+Antes de *Fundamentals*, la ingenieria de datos se aprendia a los golpes. Cada equipo reinventaba definiciones, cada vendor te vendia su stack como *la* solucion, y no existia un framework comun para pensar el problema de punta a punta.
 
-Es el libro que me hubiese gustado tener cuando arranqué. No se mete en una tecnología puntual, sino que te da el mapa general para entender cómo encajan todas las piezas.
+Reis y Housley lograron algo dificil: escribir un libro que no envejece con la tecnologia. En vez de atarse a Spark, Kafka o Snowflake, proponen un modelo mental que aplica sin importar que herramientas uses. Si manana aparece una nueva base de datos o un nuevo motor de procesamiento, el ciclo de vida del dato sigue siendo el mismo.
 
-[Escuchar en Spotify](https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w)
+## {{< fa arrows-spin >}} El ciclo de vida del dato
+
+El corazon del libro es el **Data Engineering Lifecycle**, un framework de cinco etapas que describe como fluyen los datos desde que nacen hasta que generan valor:
+
+### 1. Generacion
+
+Aca es donde nacen los datos: aplicaciones, IoT, APIs, bases transaccionales, eventos de usuario. Lo clave no es solo *que* se genera, sino *como* lo genera el sistema fuente. Preguntas que tenes que hacerte: esta fuente es confiable? Puedo asumir un schema estable? Que pasa si el schema cambia sin aviso?
+
+### 2. Almacenamiento
+
+No existe una solucion unica. Object storage, data warehouses, data lakes, bases columnar, bases key-value: cada una tiene trade-offs de costo, latencia y complejidad. El libro insiste en que la decision de almacenamiento *no es independiente* del resto del ciclo: afecta directamente como vas a ingestar y transformar.
+
+### 3. Ingestion
+
+Mover datos de A a B parece simple hasta que no lo es. Batch vs streaming, push vs pull, CDC vs full load. Reis y Housley dedican un capitulo entero a las trampas: que hacer cuando la fuente es lenta, cuando los datos llegan desordenados, cuando necesitas exactamente-una-vez (y por que eso es mas dificil de lo que parece).
+
+### 4. Transformacion
+
+Desde un `SELECT` simple hasta pipelines de feature engineering con decenas de pasos. La transformacion es donde los datos crudos se convierten en algo util. El libro cubre el espectro completo: SQL transforms, dbt-style ELT, transformaciones en streaming, y el eterno debate batch vs micro-batch.
+
+### 5. Serving
+
+El final del ciclo: poner los datos donde los necesitan. Dashboards para analistas, APIs para aplicaciones, feature stores para modelos de ML, datasets para data scientists. Aca el libro hace una distincion importante: serving no es solo *entregar* datos, es entregarlos con la calidad, latencia y formato que cada consumidor necesita.
+
+## {{< fa building >}} Arquitecturas: cual usar y cuando
+
+El libro cubre las cuatro arquitecturas mas relevantes hoy. Aca va un resumen con una tabla comparativa:
+
+**Lambda**: dos caminos paralelos, uno batch y uno real-time, que convergen en una capa de serving. Fue la primera respuesta seria al problema de combinar datos historicos con datos frescos. El problema: mantener dos pipelines con logica duplicada es caro y fragil. Usala solo si tenes requerimientos muy distintos de latencia para historico vs real-time y no podes unificar.
+
+**Kappa**: simplifica Lambda usando *un solo* pipeline de streaming que procesa todo. Los datos se persisten en un log inmutable (tipo Kafka) y se reprocesan si hace falta. Elegante en teoria, pero en la practica requiere infraestructura de streaming madura y no siempre es cost-effective para workloads puramente batch.
+
+**Medallion (Bronze / Silver / Gold)**: la arquitectura que popularizo Databricks. Los datos entran crudos a Bronze, se limpian en Silver y se modelan para consumo en Gold. Es simple de entender, facil de implementar y escala bien. Si arrancas un proyecto greenfield hoy, probablemente sea tu mejor punto de partida.
+
+**Data Mesh**: no es una arquitectura tecnica sino un modelo organizacional. Cada dominio de negocio es dueno de sus datos y los expone como *data products*. Requiere madurez organizacional alta y una plataforma self-service solida por debajo. No es para todos, pero resuelve problemas reales en organizaciones grandes donde el equipo central de datos es cuello de botella.
+
+### Tabla comparativa
+
+| Arquitectura | Complejidad | Mejor para | Riesgo principal |
+|---|---|---|---|
+| Lambda | Alta | Combinar batch + real-time con requisitos distintos | Logica duplicada, mantenimiento doble |
+| Kappa | Media-Alta | Pipelines unificados sobre streaming | Costo de infra streaming, reprocesamiento pesado |
+| Medallion | Baja-Media | Data lakes / lakehouses modernos | Puede volverse rigida sin buena gobernanza |
+| Data Mesh | Alta (organizacional) | Empresas grandes con multiples dominios | Requiere madurez, plataforma self-service |
+
+## {{< fa water >}} Los undercurrents: lo que sostiene todo
+
+Reis y Housley introducen el concepto de **undercurrents** (corrientes subterraneas): seis areas transversales que atraviesan *todas* las etapas del ciclo de vida. Si ignoras cualquiera de ellas, tu pipeline va a funcionar... hasta que no.
+
+- **Security**: no es un feature que agregas al final. Encriptacion, control de acceso, principio de minimo privilegio: todo tiene que estar desde el diseno. Un data breach borra anos de trabajo en segundos.
+
+- **Data Management**: calidad de datos, linaje, catalogos, metadata. Sin data management, tus pipelines producen datos que nadie confia. Y datos que nadie confia son datos que nadie usa.
+
+- **DataOps**: la adaptacion de DevOps al mundo de datos. CI/CD para pipelines, testing automatizado, observabilidad, alertas. Si tu pipeline se rompe a las 3 AM y nadie se entera hasta las 10, tenes un problema de DataOps.
+
+- **Data Architecture**: las decisiones de diseno de alto nivel. Como se conectan los sistemas, donde vive cada dato, que contratos existen entre equipos. Una mala arquitectura no se arregla con mejor codigo.
+
+- **Orchestration**: coordinar dependencias entre pipelines, manejar reintentos, gestionar estado. Airflow, Prefect, Dagster, Databricks Workflows: la herramienta importa menos que entender *que* necesitas orquestar y *por que*.
+
+- **Software Engineering**: escribir buen codigo, testear, versionar, documentar. Que trabajes con datos no te exime de las buenas practicas de ingenieria de software. El libro es enfatico: un data engineer es, ante todo, un ingeniero.
+
+::: {.callout-tip}
+## Consejo
+Si tenes que priorizar, arranca por DataOps y Data Management. Son las dos areas donde mas retorno vas a ver con menor inversion inicial.
+:::
+
+## {{< fa code-compare >}} Que cambio en la 2da edicion
+
+La segunda edicion no es un parche cosmético. Hay cambios de fondo que reflejan como evoluciono la industria entre 2022 y 2024:
+
+- **Streaming-first**: la primera edicion trataba streaming como un caso avanzado. La segunda lo presenta como una opcion de primera clase. El mensaje es claro: si tu herramienta soporta streaming, al menos evalua si lo necesitas antes de asumir que batch alcanza.
+
+- **Cloud-native por default**: se nota que los autores dejaron de asumir que alguien arranca on-premise. Los ejemplos, patrones y recomendaciones asumen que estas en la nube (o en camino).
+
+- **Gobernanza como pilar**: Unity Catalog, Purview, Collibra, open-source governance: la segunda edicion le da a la gobernanza el peso que merece. Ya no es un capitulo opcional sino parte integral del lifecycle.
+
+- **Lakehouse como arquitectura de referencia**: la convergencia de data lake + data warehouse aparece con mucha mas fuerza. El concepto de lakehouse paso de ser marketing a ser la recomendacion practica.
+
+## {{< fa comments >}} Mi opinion personal
+
+Lo que mas me resono del libro es la insistencia en que **la tecnologia es lo que menos importa**. Suena contradictorio viniendo de un libro tecnico, pero es exacto: las herramientas cambian cada dos anos, los principios no. Si entendes bien el ciclo de vida y los undercurrents, podes adaptarte a cualquier stack.
+
+Lo que le agregaria: mas ejemplos concretos de decision-making. El libro es excelente explicando *que* son las cosas, pero a veces le falta el "y en la practica, cuando tengo que elegir entre X e Y, como decido?". Casos reales de empresas con trade-offs explicitos harian que el contenido baje a tierra mas rapido.
+
+**Quien deberia leerlo**: cualquier persona que trabaje con datos. Si sos data engineer junior, es tu biblia. Si sos senior, te ordena ideas que ya tenes sueltas. Si sos data scientist, analytics engineer o incluso product manager en un equipo de datos, te va a dar contexto que te falta para entender por que las cosas son como son.
+
+## {{< fa link >}} Links
+
+- {{< fa book >}} [Fundamentals of Data Engineering, 2nd Edition — O'Reilly](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/)
+- {{< fa headphones >}} [Escuchar el episodio en Spotify](https://open.spotify.com/episode/30ad7lO8tRqMMHJy3i776u)
