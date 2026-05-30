@@ -102,6 +102,16 @@ Eso es todo lo que necesitás saber para entender el resto del post.
 
 En vez de usar el runtime por defecto, DCS te permite arrancar tu compute con una **imagen Docker propia**. Vos definís las dependencias exactas, las bakeás en la imagen, y Databricks la usa como entorno de ejecución.
 
+Pero ojo: vos **no metés Spark en la imagen**. Lo que pasa internamente cuando lanzás un cluster con DCS es esto ([fuente](https://learn.microsoft.com/en-us/azure/databricks/compute/custom-containers)):
+
+1. Se adquieren VMs del cloud provider
+2. Se descarga tu imagen Docker del registry
+3. Databricks crea un contenedor a partir de tu imagen
+4. **El código del Databricks Runtime (Spark, JVM, dbutils) se copia dentro del contenedor**
+5. Se ejecutan los init scripts (si hay)
+
+Es decir, Databricks inyecta Spark en tu contenedor al arrancar. Por eso ignora `CMD` y `ENTRYPOINT` — necesita controlar el proceso de inicio. Vos solo ponés las dependencias, ellos ponen el runtime.
+
 ```{r}
 #| echo: false
 #| warning: false
