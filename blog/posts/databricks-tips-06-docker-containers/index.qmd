@@ -230,8 +230,34 @@ Hay dos formas: UI y API/CLI.
 
 **Desde la API (para automatizar):**
 
-```json
-{
+El endpoint es `POST /api/2.0/clusters/create` ([referencia](https://docs.databricks.com/api/workspace/clusters/create)):
+
+```bash
+curl -X POST "https://<tu-workspace>.cloud.databricks.com/api/2.0/clusters/create" \
+  -H "Authorization: Bearer $DATABRICKS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cluster_name": "prod-golden-container",
+    "spark_version": "16.4.x-scala2.12",
+    "docker_image": {
+      "url": "mi-ecr.amazonaws.com/dbx-golden:v2.1.0",
+      "basic_auth": {
+        "username": "{{secrets/docker/user}}",
+        "password": "{{secrets/docker/pass}}"
+      }
+    },
+    "node_type_id": "i3.xlarge",
+    "autoscale": {
+      "min_workers": 1,
+      "max_workers": 4
+    }
+  }'
+```
+
+O con la **Databricks CLI**:
+
+```bash
+databricks clusters create --json '{
   "cluster_name": "prod-golden-container",
   "spark_version": "16.4.x-scala2.12",
   "docker_image": {
@@ -246,7 +272,7 @@ Hay dos formas: UI y API/CLI.
     "min_workers": 1,
     "max_workers": 4
   }
-}
+}'
 ```
 
 **Tip**: usá **Databricks Secrets** para las credenciales del registry. Nunca hardcodees usuarios y passwords en la config del cluster.
