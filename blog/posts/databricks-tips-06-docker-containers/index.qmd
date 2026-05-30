@@ -1,0 +1,598 @@
+---
+title: "Databricks Tips #7: Docker en Databricks — contenedores custom para entornos que no se rompen"
+author: "Spark de Ideas"
+date: "2026-05-30"
+image: cover.png
+draft: false
+categories: [Databricks Tips, Data Engineering, Delta Lake]
+description: "Databricks Container Services, imágenes custom, golden containers, CI/CD con Docker y los errores que te van a hacer perder horas."
+---
+
+{{< fa flask >}} **[Laboratorio práctico](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/docker-containers)** — Dockerfile + notebook para probar DCS en Databricks Free Edition.
+
+---
+
+Séptima entrega de **Databricks Tips**. Sí, Databricks Runtime ya te da un entorno curado con Spark, pandas, MLflow y todo lo estándar pre-instalado. Entonces, ¿para qué Docker? El problema aparece cuando necesitás algo que el runtime **no trae**: librerías de sistema como GDAL o compiladores de C, versiones específicas que chocan con las del runtime, o un entorno bloqueado que no cambie entre releases de DBR. Ahí es donde Databricks Container Services entra en juego.
+
+## Docker en 2 minutos (para los que nunca lo usaron)
+
+Si ya sabés qué es Docker, saltá a la siguiente sección. Si no, acá va la versión corta.
+
+Imaginate que tenés una receta de cocina. Podés darle la receta a alguien y esperar que tenga los mismos ingredientes, el mismo horno y la misma temperatura... o podés darle **la cocina entera empaquetada** con todo adentro. Docker es eso: empaquetás tu código + dependencias + configuración en una **imagen** que corre igual en cualquier máquina.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3.5
+#| fig-align: center
+
+library(ggplot2)
+
+# --- Sin Docker ---
+sin <- data.frame(
+  x     = c(1, 3.2, 5.4),
+  y     = rep(2.8, 3),
+  label = c("Tu laptop", "Server de staging", "Server de prod"),
+  sub   = c("Python 3.11\npandas 2.2\nUbuntu 22", "Python 3.9\npandas 2.1\nDebian 11", "Python 3.10\npandas 2.0\nAmazon Linux"),
+  color = c("#dc2626", "#dc2626", "#dc2626")
+)
+
+# --- Con Docker ---
+con <- data.frame(
+  x     = c(1, 3.2, 5.4),
+  y     = rep(0.8, 3),
+  label = c("Tu laptop", "Server de staging", "Server de prod"),
+  sub   = c("Python 3.11\npandas 2.2\nUbuntu 22", "Python 3.11\npandas 2.2\nUbuntu 22", "Python 3.11\npandas 2.2\nUbuntu 22"),
+  color = c("#0d9488", "#0d9488", "#0d9488")
+)
+
+ggplot() +
+  # Title sin Docker
+  annotate("text", x = 3.2, y = 3.8, label = "SIN DOCKER — cada máquina es diferente",
+           fontface = "bold", size = 3.5, color = "#dc2626") +
+  # Title con Docker
+  annotate("text", x = 3.2, y = 1.8, label = "CON DOCKER — misma imagen, mismo resultado",
+           fontface = "bold", size = 3.5, color = "#0d9488") +
+
+  # Sin Docker
+  geom_tile(data = sin, aes(x = x, y = y, fill = color),
+            width = 1.8, height = 0.8, color = NA, show.legend = FALSE) +
+  geom_text(data = sin, aes(x = x, y = y + 0.15, label = label),
+            color = "white", size = 2.8, fontface = "bold") +
+  geom_text(data = sin, aes(x = x, y = y - 0.55, label = sub),
+            color = "#94a3b8", size = 2, lineheight = 0.85) +
+
+  # Divider
+  annotate("segment", x = -0.2, xend = 6.6, y = 2.05, yend = 2.05,
+           color = "#e2e8f0", linewidth = 0.5, linetype = "dashed") +
+
+  # Con Docker
+  geom_tile(data = con, aes(x = x, y = y, fill = color),
+            width = 1.8, height = 0.8, color = NA, show.legend = FALSE) +
+  geom_text(data = con, aes(x = x, y = y + 0.15, label = label),
+            color = "white", size = 2.8, fontface = "bold") +
+  geom_text(data = con, aes(x = x, y = y - 0.55, label = sub),
+            color = "#64748b", size = 2, lineheight = 0.85) +
+
+  scale_fill_identity() +
+  coord_cartesian(xlim = c(-0.3, 6.7), ylim = c(-0.1, 4.2)) +
+  theme_void() +
+  theme(plot.margin = margin(5, 10, 10, 10))
+```
+
+Los conceptos clave:
+
+- **Imagen**: el paquete con todo adentro (OS + librerías + config). Se construye con un `Dockerfile`.
+- **Container**: una instancia corriendo de esa imagen. Podés tener muchos containers de la misma imagen.
+- **Registry**: donde guardás las imágenes (Docker Hub, Amazon ECR, Azure ACR). Es como un "GitHub para imágenes Docker".
+- **Dockerfile**: la receta para construir la imagen. Cada línea `RUN` agrega algo al entorno.
+
+```dockerfile
+# Ejemplo básico de Dockerfile
+FROM python:3.11-slim          # Partís de una imagen base
+RUN pip install pandas==2.2.3  # Instalás dependencias
+COPY mi_script.py /app/        # Copiás tu código
+```
+
+Eso es todo lo que necesitás saber para entender el resto del post.
+
+## Qué es Databricks Container Services (DCS)
+
+En vez de usar el runtime por defecto, DCS te permite arrancar tu compute con una **imagen Docker propia**. Vos definís las dependencias exactas, las bakeás en la imagen, y Databricks la usa como entorno de ejecución.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3
+#| fig-align: center
+
+library(ggplot2)
+
+nodes <- data.frame(
+  x     = c(1, 3, 5, 7),
+  y     = rep(1, 4),
+  label = c("docker build", "docker push", "cluster config", "launch"),
+  sub   = c("Tu imagen\ncon deps exactas", "Registry\n(ECR / ACR)", "Databricks apunta\na la imagen", "Tu código corre\nen tu container"),
+  color = c("#7c3aed", "#2563eb", "#0d9488", "#ea580c")
+)
+
+arrows <- data.frame(
+  x    = c(1.7, 3.7, 5.7),
+  xend = c(2.3, 4.3, 6.3),
+  y    = rep(1, 3),
+  yend = rep(1, 3)
+)
+
+ggplot() +
+  geom_tile(data = nodes, aes(x = x, y = y, fill = color),
+            width = 1.3, height = 0.7, color = NA, show.legend = FALSE) +
+  geom_text(data = nodes, aes(x = x, y = y + 0.05, label = label),
+            color = "white", size = 3.2, fontface = "bold") +
+  geom_text(data = nodes, aes(x = x, y = y - 0.55, label = sub),
+            color = "#64748b", size = 2.4, lineheight = 0.9) +
+  geom_segment(data = arrows, aes(x = x, xend = xend, y = y, yend = yend),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.6) +
+  scale_fill_identity() +
+  coord_cartesian(xlim = c(0, 8), ylim = c(-0.2, 1.8)) +
+  theme_void() +
+  theme(plot.margin = margin(5, 10, 15, 10))
+```
+
+**Lo nuevo (2025-2026)**: DCS ahora soporta **Standard Compute** (shared clusters con aislamiento). Antes solo funcionaba en Dedicated Compute. Esto cambia todo, porque ahora podés tener un entorno Docker compartido sin necesidad de un cluster por persona.
+
+## 0. Habilitar DCS (prerequisito)
+
+Antes de hacer cualquier cosa, un **workspace admin** tiene que habilitar Container Services. Si no lo hacés, el tab Docker no aparece al crear compute.
+
+**En AWS**: Settings → Advanced → Container Services → Enabled.
+
+**En Azure** (no hay toggle en la UI): se hace por CLI:
+
+```bash
+# Habilitar DCS en Azure Databricks
+databricks workspace-conf set-status --json '{"enableDcs": "true"}' --profile <tu-profile>
+
+# Verificar que quedó habilitado (tiene que devolver "true")
+databricks workspace-conf get-status enableDcs --profile <tu-profile>
+# Respuesta esperada:
+# {
+#   "enableDcs": "true"
+# }
+```
+
+El `set-status` no devuelve output si funciona — eso es normal. Verificá siempre con el `get-status`.
+
+**Para Standard Compute (Beta)**: además del paso anterior, ir a Settings → Previews → activar "DCS for Standard Compute".
+
+**Importante**: después de habilitar, el tab Docker solo aparece si elegís un **access mode compatible**:
+
+- **Single User** o **No Isolation Shared** → aparece el tab Docker
+- **Shared** o **Standard** → no aparece (salvo la beta con DBR 18.3+)
+- **Serverless** → no soportado
+
+Si habilitaste todo y seguís sin ver el tab, verificá que tu workspace sea **Premium tier**.
+
+## 1. El golden container: inmutabilidad en producción
+
+El caso de uso más potente de DCS es el **golden container**: una imagen Docker que pasa CI/CD, se escanea por seguridad, y se deploya como el único entorno autorizado para producción.
+
+```dockerfile
+# golden.Dockerfile
+FROM databricksruntime/standard:16.4-LTS
+
+# Dependencias fijas — NUNCA usar pip install sin versiones
+RUN /databricks/python3/bin/pip install --no-cache-dir \
+    pandas==2.2.3 \
+    scikit-learn==1.5.2 \
+    great-expectations==1.3.0 \
+    delta-spark==3.3.0
+
+# Librerías de sistema que pip no puede instalar
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgdal-dev \
+    libgeos-dev \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+```bash
+# Build + push
+docker build -f golden.Dockerfile -t mi-ecr.amazonaws.com/dbx-golden:v2.1.0 .
+docker push mi-ecr.amazonaws.com/dbx-golden:v2.1.0
+```
+
+**La regla de oro**: nunca uses tags `:latest` en producción. Siempre versioná tus imágenes. Si alguien pushea un `:latest` nuevo y tu cluster se reinicia, tu job se rompe.
+
+## 2. Configurar el cluster con Docker
+
+Hay dos formas: UI y API/CLI.
+
+**Desde la UI:**
+
+1. Crear nuevo compute → Advanced Options → Docker tab
+2. Seleccionar "Use your own Docker container"
+3. Ingresar la URL de la imagen
+4. Configurar autenticación (si tu registry es privado)
+
+**Desde la API (para automatizar):**
+
+```json
+{
+  "cluster_name": "prod-golden-container",
+  "spark_version": "16.4.x-scala2.12",
+  "docker_image": {
+    "url": "mi-ecr.amazonaws.com/dbx-golden:v2.1.0",
+    "basic_auth": {
+      "username": "{{secrets/docker/user}}",
+      "password": "{{secrets/docker/pass}}"
+    }
+  },
+  "node_type_id": "i3.xlarge",
+  "autoscale": {
+    "min_workers": 1,
+    "max_workers": 4
+  }
+}
+```
+
+**Tip**: usá **Databricks Secrets** para las credenciales del registry. Nunca hardcodees usuarios y passwords en la config del cluster.
+
+## 3. Dedicated vs Standard Compute: cuándo usar cada uno
+
+Con la llegada de DCS para Standard Compute, ahora tenés dos opciones:
+
+| | Dedicated Compute | Standard Compute (Beta) |
+|---|---|---|
+| **Imagen base** | `databricksruntime/standard:16.x` | `databricksruntime/environment:v5-standard` |
+| **DBR mínimo** | Varía | 18.3+ |
+| **Init scripts** | Modifican Python | **NO** modifican Python |
+| **Instancias ARM** | No soportado | Soportado (Graviton) |
+| **Aislamiento** | Single user / No isolation | Standard (con aislamiento) |
+| **Libraries UI** | Soportado | **No** soportado |
+
+**Mi recomendación:**
+
+- Usá **Dedicated** si necesitás init scripts que modifiquen el entorno Python o si tu DBR es anterior a 18.3.
+- Usá **Standard** si querés compartir un cluster entre varios usuarios con entorno Docker unificado.
+
+## 4. El error más común: instalar paquetes en el path equivocado
+
+Esto te va a pasar, te lo garantizo. Construís tu imagen, todo verde en local, lanzás el cluster y... tus notebooks no encuentran las librerías.
+
+```dockerfile
+# MALO — instala en el Python del sistema
+RUN pip install pandas==2.2.3
+
+# MALO — crea un virtualenv separado
+RUN python -m venv /opt/myenv && /opt/myenv/bin/pip install pandas==2.2.3
+
+# BIEN — usa el Python de Databricks
+RUN /databricks/python3/bin/pip install pandas==2.2.3
+```
+
+Los notebooks y jobs de Databricks usan `/databricks/python3` como intérprete. Si instalás paquetes en otro path, no los van a encontrar.
+
+## 5. Caso de uso real: pipeline geoespacial con GDAL + Prophet
+
+Donde DCS se vuelve indispensable es cuando necesitás librerías de sistema que **no se pueden instalar con pip**. Un ejemplo real: un pipeline que cruza datos de delivery con geometrías de zonas y predice demanda por área.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 4.5
+#| fig-align: center
+
+library(ggplot2)
+
+# --- Sin Docker (init scripts frágiles) ---
+sin_nodes <- data.frame(
+  x     = c(1, 3.5, 6, 8.5),
+  y     = rep(3.2, 4),
+  label = c("Cluster\narranca", "Init script\napt-get install", "pip install\ngeopandas prophet", "Job\nejecuta"),
+  color = c("#e2e8f0", "#dc2626", "#dc2626", "#e2e8f0"),
+  text_color = c("#475569", "#ffffff", "#ffffff", "#475569")
+)
+
+sin_arrows <- data.frame(
+  x    = c(1.75, 4.25, 6.75),
+  xend = c(2.75, 5.25, 7.75),
+  y    = rep(3.2, 3),
+  yend = rep(3.2, 3)
+)
+
+# --- Con Docker (golden container) ---
+con_nodes <- data.frame(
+  x     = c(1, 3.5, 6),
+  y     = rep(0.8, 3),
+  label = c("CI/CD\nbuild + test", "Cluster arranca\ncon imagen", "Job\nejecuta"),
+  color = c("#0d9488", "#2563eb", "#0d9488"),
+  text_color = c("#ffffff", "#ffffff", "#ffffff")
+)
+
+con_arrows <- data.frame(
+  x    = c(1.75, 4.25),
+  xend = c(2.75, 5.25),
+  y    = rep(0.8, 2),
+  yend = rep(0.8, 2)
+)
+
+# Annotations
+con_labels <- data.frame(
+  x     = c(1, 3.5, 6),
+  y     = rep(0.0, 3),
+  label = c("GDAL, GEOS, Prophet\npre-instalados", "Sin init scripts\n~2 min arranque", "Mismo entorno\ndev = prod")
+)
+
+ggplot() +
+  # Titles
+  annotate("text", x = 4.75, y = 4.2, label = "SIN DOCKER  (init scripts)",
+           fontface = "bold", size = 4, color = "#dc2626") +
+  annotate("text", x = 3.5, y = 1.8, label = "CON DOCKER  (golden container)",
+           fontface = "bold", size = 4, color = "#0d9488") +
+
+  # Sin Docker nodes
+  geom_tile(data = sin_nodes, aes(x = x, y = y, fill = color),
+            width = 1.4, height = 0.7, color = NA, show.legend = FALSE) +
+  geom_text(data = sin_nodes, aes(x = x, y = y, label = label, color = text_color),
+            size = 2.6, fontface = "bold", lineheight = 0.85, show.legend = FALSE) +
+  geom_segment(data = sin_arrows, aes(x = x, xend = xend, y = y, yend = yend),
+               arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.5) +
+
+  # Annotation: "falla 1 de cada 5 veces"
+  annotate("label", x = 4.75, y = 2.6, label = "~8 min arranque\nfalla 1 de cada 5",
+           size = 2.3, color = "#dc2626", fill = "#fef2f2",
+           label.size = 0, fontface = "italic") +
+
+  # Divider
+  annotate("segment", x = 0, xend = 9.5, y = 2.15, yend = 2.15,
+           color = "#e2e8f0", linewidth = 0.5, linetype = "dashed") +
+
+  # Con Docker nodes
+  geom_tile(data = con_nodes, aes(x = x, y = y, fill = color),
+            width = 1.4, height = 0.7, color = NA, show.legend = FALSE) +
+  geom_text(data = con_nodes, aes(x = x, y = y, label = label, color = text_color),
+            size = 2.6, fontface = "bold", lineheight = 0.85, show.legend = FALSE) +
+  geom_segment(data = con_arrows, aes(x = x, xend = xend, y = y, yend = yend),
+               arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.5) +
+
+  # Sub-labels
+  geom_text(data = con_labels, aes(x = x, y = y, label = label),
+            size = 2.2, color = "#64748b", lineheight = 0.85) +
+
+  scale_fill_identity() +
+  scale_color_identity() +
+  coord_cartesian(xlim = c(-0.2, 9.7), ylim = c(-0.6, 4.5)) +
+  theme_void() +
+  theme(plot.margin = margin(5, 10, 10, 10))
+```
+
+El Dockerfile para este caso:
+
+```dockerfile
+FROM databricksruntime/standard:16.4-LTS
+
+# Librerías de sistema para geoespacial
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    gdal-bin \
+    && rm -rf /var/lib/apt/lists/*
+
+# Stack geoespacial + forecasting
+RUN /databricks/python3/bin/pip install --no-cache-dir \
+    geopandas==1.0.1 \
+    shapely==2.0.6 \
+    fiona==1.10.1 \
+    prophet==1.1.6 \
+    pystan==3.10.0
+
+# Validar que GDAL se linkea bien (esto falla silenciosamente si no)
+RUN /databricks/python3/bin/python -c "from osgeo import gdal; print(f'GDAL {gdal.__version__}')"
+```
+
+**Sin Docker**, este setup requiere un init script de ~40 líneas que instala `apt` packages + compila dependencias de C. Tarda ~8 minutos en cada arranque del cluster y falla 1 de cada 5 veces por timeouts de `apt-get`. **Con Docker**, las dependencias ya están bakeadas: el cluster arranca en ~2 minutos y nunca falla por dependencias.
+
+El notebook queda limpio:
+
+```python
+# El notebook solo tiene lógica de negocio — cero setup
+import geopandas as gpd
+from prophet import Prophet
+
+# Leer zonas de delivery desde Unity Catalog
+zonas = spark.table("prod.geo.zonas_delivery").toPandas()
+geo_zonas = gpd.GeoDataFrame(zonas, geometry=gpd.points_from_xy(zonas.lng, zonas.lat))
+
+# Forecast por zona
+for zona_id in geo_zonas["zona_id"].unique():
+    historico = spark.table("prod.demand.historico") \
+        .filter(f"zona_id = '{zona_id}'") \
+        .select("ds", "y").toPandas()
+
+    modelo = Prophet(yearly_seasonality=True, weekly_seasonality=True)
+    modelo.fit(historico)
+    futuro = modelo.make_future_dataframe(periods=30)
+    forecast = modelo.predict(futuro)
+
+    # Guardar predicciones como Delta table
+    spark.createDataFrame(forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]]) \
+        .withColumn("zona_id", lit(zona_id)) \
+        .write.mode("append") \
+        .saveAsTable("prod.demand.forecast_por_zona")
+```
+
+## 6. CI/CD: Docker como pieza central del deploy
+
+Donde DCS realmente brilla es cuando lo integrás con tu pipeline de CI/CD. En vez de instalar dependencias en cada arranque (init scripts), las bakeás en la imagen y las testeás antes de llegar a producción:
+
+```yaml
+# .github/workflows/docker-dbx.yml
+name: Build & Push Golden Container
+
+on:
+  push:
+    paths:
+      - 'docker/golden.Dockerfile'
+      - 'docker/requirements.txt'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build -f docker/golden.Dockerfile \
+            -t ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} .
+
+      - name: Test — verificar que los imports funcionan
+        run: |
+          docker run --rm ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} \
+            /databricks/python3/bin/python -c "
+              import pandas; import sklearn; import great_expectations
+              print('All imports OK')
+            "
+
+      - name: Push to ECR
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          docker push ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }}
+
+      - name: Tag como latest-stable
+        run: |
+          docker tag ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} \
+                     ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable
+          docker push ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 8
+#| fig-height: 4
+#| fig-align: center
+
+library(ggplot2)
+
+steps <- data.frame(
+  x     = rep(1, 5),
+  y     = c(5, 4, 3, 2, 1),
+  label = c(
+    "PR con cambio en Dockerfile",
+    "CI: build + test imports + scan seguridad",
+    "Push a registry con tag = commit SHA",
+    "Actualizar cluster config con nueva imagen",
+    "Producción usa imagen testeada y escaneada"
+  ),
+  color = c("#7c3aed", "#2563eb", "#2563eb", "#0d9488", "#0d9488"),
+  icon  = c("1", "2", "3", "4", "5")
+)
+
+arrows <- data.frame(
+  x = rep(1, 4), xend = rep(1, 4),
+  y = c(4.65, 3.65, 2.65, 1.65),
+  yend = c(4.35, 3.35, 2.35, 1.35)
+)
+
+ggplot() +
+  # Step boxes
+  geom_tile(data = steps, aes(x = x, y = y, fill = color),
+            width = 4.5, height = 0.55, color = NA, show.legend = FALSE) +
+  geom_text(data = steps, aes(x = x, y = y, label = label),
+            color = "white", size = 3, fontface = "bold") +
+
+  # Step numbers
+  geom_point(data = steps, aes(x = x - 2.05, y = y), color = "white", size = 5) +
+  geom_text(data = steps, aes(x = x - 2.05, y = y, label = icon),
+            color = "#1e293b", size = 2.5, fontface = "bold") +
+
+  # Arrows
+  geom_segment(data = arrows, aes(x = x, xend = xend, y = y, yend = yend),
+               arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.5) +
+
+  scale_fill_identity() +
+  coord_cartesian(xlim = c(-1.5, 3.5), ylim = c(0.5, 5.5)) +
+  theme_void() +
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+## 7. Gotchas que te van a hacer perder horas
+
+Acá van las trampas que nadie te cuenta en la documentación:
+
+**Docker Hub rate limits**: si lanzás muchos clusters en poco tiempo (autoescalado agresivo, pools grandes), Docker Hub te va a bloquear. Solución: usá un registry en la misma región y cloud que tu workspace (ECR en AWS, ACR en Azure).
+
+**Init scripts en Standard Compute**: en Dedicated, los init scripts pueden instalar paquetes Python. En Standard, **no**. Todo tiene que estar en la imagen Docker. Si venís de usar init scripts para dependencias, tenés que migrar todo al Dockerfile.
+
+**Instrucciones de Docker ignoradas**: Databricks ignora `CMD`, `ENTRYPOINT`, `USER`, `EXPOSE` y `HEALTHCHECK`. No perdás tiempo configurándolas.
+
+**No hay DBR for ML**: DCS no es compatible con Databricks Runtime for Machine Learning. Si necesitás TensorFlow o PyTorch con GPU, tenés que instalarlos vos en la imagen, incluyendo CUDA y cuDNN.
+
+**El tab Docker no aparece**: verificá tres cosas: (1) que DCS esté habilitado (en Azure solo por CLI), (2) que el access mode sea Single User o No Isolation Shared, y (3) que tu workspace sea Premium tier. Si falta alguno de los tres, el tab no aparece y no te dice por qué.
+
+## 8. Cuándo NO usar Docker en Databricks
+
+DCS no es para todos. **No lo uses si**:
+
+- Tu equipo es chico y las dependencias son simples (un `requirements.txt` con 5 librerías)
+- No tenés un pipeline de CI/CD para construir y testear imágenes
+- Necesitás instalar librerías rápidamente para experimentar (los init scripts o las cluster libraries son más ágiles para exploración)
+- Usás Databricks Runtime for ML y no querés reconstruir todo el stack de GPU
+
+**Usalo cuando**:
+
+- Necesitás reproducibilidad garantizada entre ambientes (dev/staging/prod usan la misma imagen)
+- Tenés dependencias de sistema (apt packages, librerías C) que no se pueden instalar con pip
+- Querés un entorno bloqueado y aprobado por seguridad
+- Tu equipo es grande y los init scripts se volvieron inmantenibles
+
+## Checklist de DCS
+
+| Paso | Pregunta | Si no lo hacés... |
+|---|---|---|
+| Habilitación | DCS está habilitado en tu workspace? (CLI en Azure) | El tab Docker no aparece |
+| Access mode | Estás usando Single User o No Isolation Shared? | El tab Docker no aparece |
+| Imagen base | Estás extendiendo la imagen oficial de Databricks? | Posibles incompatibilidades con el runtime |
+| Path de Python | Instalás en `/databricks/python3`? | Notebooks no encuentran tus libs |
+| Versionado | Usás tags con versión (no `:latest`)? | Builds no reproducibles |
+| Registry | Tu registry está en la misma región/cloud? | Arranques lentos + rate limits |
+| CI/CD | Testeás los imports antes de pushear? | Clusters que arrancan pero fallan al ejecutar |
+| Secrets | Las credenciales del registry están en Databricks Secrets? | Credenciales expuestas en config |
+
+## Referencias
+
+- [DCS para Dedicated Compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/custom-containers) — documentación oficial, cómo construir imágenes, configurar clusters y autenticación.
+- [DCS para Standard Compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/custom-containers-standard) — la beta nueva con Spark Connect y soporte para shared compute.
+- [DCS en GPU compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/gpu#databricks-container-services-on-gpu) — contenedores custom con GPU para deep learning.
+- [Databricks CLI — workspace-conf](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/cli/reference/workspace-conf-commands) — referencia del comando para habilitar DCS por CLI en Azure.
+- [Databricks Secrets — Azure](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/) — para guardar credenciales del registry de forma segura.
+- [Init scripts — Azure](https://learn.microsoft.com/en-us/azure/databricks/init-scripts/) — scripts de inicialización y cómo interactúan con DCS.
+- [Imágenes base de Databricks — Docker Hub](https://hub.docker.com/u/databricksruntime) — las imágenes oficiales que deberías extender.
+- [Dockerfiles de ejemplo — GitHub](https://github.com/databricks/containers) — los Dockerfiles que usa Databricks internamente para construir sus imágenes base.
+
+## Otros posts de la serie
+
+Si te sirvió este post, mirá los anteriores de **Databricks Tips**:
+
+- [**Tips #1**: Databricks Asset Bundles](../databricks-asset-bundles-advanced/) — patrones avanzados de DABs, variables complejas, deploy multi-target.
+- [**Tips #2**: Delta Lake](../databricks-tips-01-delta-lake/) — Liquid Clustering, OPTIMIZE, VACUUM, y las 7 cosas que ojalá te hubieran dicho antes.
+- [**Tips #3**: Unity Catalog](../databricks-tips-02-unity-catalog/) — modelo de gobernanza, GRANTS heredados, row/column security.
+- [**Tips #4**: Structured Streaming](../databricks-tips-03-structured-streaming/) — watermarks, triggers, y las trampas del micro-batch.
+- [**Tips #5**: MLflow + Unity Catalog](../databricks-tips-04-mlflow-unity-catalog/) — del experimento al modelo en producción.
+- [**Tips #6**: Feature Engineering](../databricks-tips-05-feature-engineering/) — Feature Store, point-in-time lookups, online features.
+
+---
+
+*Próxima semana: Lakeflow Declarative Pipelines (ex-DLT) — expectations, materialized views y serverless compute.*
