@@ -1,0 +1,599 @@
+---
+title: "Databricks Tips #8: Jobs & Workflows — streaming y triggers que arrancan solos"
+author: "Spark de Ideas"
+date: "2026-06-09"
+draft: false
+categories: [Databricks Tips, Data Engineering, Streaming]
+description: "File arrival triggers, table update triggers, Trigger.AvailableNow, Job Clusters y las limitaciones que no están en el tutorial."
+---
+
+{{< fa flask >}} **[Laboratorio práctico](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/jobs-workflows)** — AutoLoader + AvailableNow + microbatch bronze→silver con CDF. Ejecutable en Databricks Free Edition.
+
+---
+
+Databricks tiene cuatro formas de disparar un Job automáticamente. Dos de ellas — **file arrival** y **table update** — son event-driven y te permiten armar pipelines de streaming sin dejar un cluster corriendo 24/7. Pero tienen limitaciones que no están en el tutorial de 5 minutos.
+
+En este post vamos a ver cómo funcionan, cuándo usarlos, y los errores que te van a hacer perder horas.
+
+---
+
+## Jobs en 2 minutos
+
+Un **Job** en Databricks es una unidad de ejecución programada. Pensalo como un cron job con esteroides: puede tener múltiples **Tasks** (notebooks, scripts Python, SQL, JARs, pipelines DLT), cada una con sus dependencias, y todo orquestado como un DAG.
+
+La diferencia clave con un notebook interactivo:
+
+| | Notebook interactivo | Job |
+|---|---|---|
+| **Compute** | All-Purpose Cluster (siempre prendido) | Job Cluster (se prende y se apaga) |
+| **Ejecución** | Manual, ad-hoc | Automática, programada o event-driven |
+| **Costo** | Pagás mientras esté prendido | Pagás solo lo que usás |
+| **Uso** | Exploración, desarrollo | Producción |
+
+La analogía: un notebook interactivo es como dejar la cocina prendida todo el día *por si querés cocinar*. Un Job es como prender la hornalla solo cuando tenés los ingredientes listos.
+
+## Los 4 triggers
+
+Databricks ofrece cuatro tipos de trigger para disparar Jobs automáticamente:
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 4
+#| fig-align: center
+
+library(ggplot2)
+
+triggers <- data.frame(
+  x = c(1, 3, 5, 7),
+  y = c(1, 1, 1, 1),
+  label = c("Scheduled", "File Arrival", "Table Update", "Continuous"),
+  sublabel = c("Cada X minutos/horas", "Archivos nuevos\nen Volume/Storage", "Tabla Delta\nse actualiza", "Siempre corriendo\n(restart automático)"),
+  color = c("#64748b", "#FFA166", "#593196", "#0d9488"),
+  tipo = c("Time-based", "Event-driven", "Event-driven", "Always-on")
+)
+
+arrows <- data.frame(
+  x = c(1.7, 3.7, 5.7),
+  xend = c(2.3, 4.3, 6.3),
+  y = c(1, 1, 1),
+  yend = c(1, 1, 1)
+)
+
+ggplot() +
+  geom_tile(data = triggers, aes(x = x, y = y, fill = color),
+            width = 1.5, height = 1.4, color = NA, show.legend = FALSE) +
+  geom_text(data = triggers, aes(x = x, y = y + 0.25, label = label),
+            color = "white", size = 3.5, fontface = "bold") +
+  geom_text(data = triggers, aes(x = x, y = y - 0.15, label = sublabel),
+            color = "#e2e8f0", size = 2.5, lineheight = 0.9) +
+  geom_label(data = triggers, aes(x = x, y = y - 0.95, label = tipo),
+             fill = "#f1f5f9", color = "#475569", size = 2.3,
+             label.padding = unit(0.15, "lines"), label.size = 0) +
+  geom_segment(data = arrows, aes(x = x, xend = xend, y = y, yend = yend),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.5) +
+  scale_fill_identity() +
+  coord_cartesian(xlim = c(-0.2, 8.2), ylim = c(-0.3, 1.9)) +
+  theme_void() +
+  theme(plot.margin = margin(5, 10, 5, 10))
+```
+
+| Trigger | Dispara cuando... | Latencia típica | Costo compute |
+|---|---|---|---|
+| **Scheduled** | Pasa el tiempo configurado (cron) | Fija (según schedule) | Bajo si es esporádico |
+| **File Arrival** | Llegan archivos nuevos a un Volume o external location | ~1 min (con file events) | Solo cuando hay datos |
+| **Table Update** | Una tabla Delta/Iceberg se actualiza | ~1 min (con file events) | Solo cuando hay datos |
+| **Continuous** | Siempre (restart automático al terminar) | Sub-60 seg | Alto (cluster siempre vivo) |
+
+Los dos que nos interesan hoy son **File Arrival** y **Table Update**: event-driven, eficientes, y con trampas que no son obvias.
+
+## Job Clusters: por qué siempre en producción
+
+Antes de meternos con triggers, hay que hablar de **dónde corre** tu Job. Porque si usás un trigger event-driven con un All-Purpose Cluster... estás tirando plata.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3.5
+#| fig-align: center
+
+library(ggplot2)
+
+# Timeline comparison
+timeline <- data.frame(
+  tipo = rep(c("All-Purpose Cluster", "Job Cluster"), each = 4),
+  fase = rep(c("Idle", "Ejecutando", "Idle", "Ejecutando"), 2),
+  xmin = c(0, 2, 3, 6, 0, 2, 3, 6),
+  xmax = c(2, 3, 6, 7, 0, 3, 3, 7),
+  color = c("#dc2626", "#0d9488", "#dc2626", "#0d9488",
+            "#e2e8f0", "#0d9488", "#e2e8f0", "#0d9488"),
+  y = rep(c(2, 1), each = 4)
+)
+
+# Filtrar segmentos con ancho 0
+timeline <- timeline[timeline$xmin != timeline$xmax, ]
+
+labels_data <- data.frame(
+  x = c(-0.8, -0.8),
+  y = c(2, 1),
+  label = c("All-Purpose", "Job Cluster")
+)
+
+cost_labels <- data.frame(
+  x = c(8.5, 8.5),
+  y = c(2, 1),
+  label = c("$$$$", "$"),
+  color = c("#dc2626", "#0d9488")
+)
+
+ggplot() +
+  geom_rect(data = timeline,
+            aes(xmin = xmin, xmax = xmax, ymin = y - 0.3, ymax = y + 0.3, fill = color),
+            color = NA, show.legend = FALSE) +
+  geom_text(data = labels_data, aes(x = x, y = y, label = label),
+            color = "#1e293b", size = 3, fontface = "bold", hjust = 1) +
+  geom_text(data = cost_labels, aes(x = x, y = y, label = label, color = color),
+            size = 3.5, fontface = "bold", show.legend = FALSE) +
+  annotate("text", x = 1, y = 2, label = "idle\n(pagando)", color = "white", size = 2.3, lineheight = 0.9) +
+  annotate("text", x = 2.5, y = 2, label = "run", color = "white", size = 2.3) +
+  annotate("text", x = 4.5, y = 2, label = "idle\n(pagando)", color = "white", size = 2.3, lineheight = 0.9) +
+  annotate("text", x = 6.5, y = 2, label = "run", color = "white", size = 2.3) +
+  annotate("text", x = 2.5, y = 1, label = "run", color = "white", size = 2.3) +
+  annotate("text", x = 6.5, y = 1, label = "run", color = "white", size = 2.3) +
+  annotate("text", x = 1, y = 1, label = "apagado", color = "#94a3b8", size = 2.3) +
+  annotate("text", x = 4.5, y = 1, label = "apagado", color = "#94a3b8", size = 2.3) +
+  scale_fill_identity() +
+  scale_color_identity() +
+  coord_cartesian(xlim = c(-2, 9.5), ylim = c(0.3, 2.7)) +
+  theme_void() +
+  theme(plot.margin = margin(10, 10, 10, 10))
+```
+
+**Job Cluster** = se crea cuando el Job arranca, se destruye cuando termina. Pagás solo por el tiempo de ejecución.
+
+**All-Purpose Cluster** = está siempre prendido (o con auto-termination). Pagás todo el tiempo que esté vivo, ejecutes o no.
+
+Para pipelines event-driven, la cuenta es simple:
+
+- Si tus datos llegan cada 3 horas → el Job Cluster corre ~15 min por run → pagás ~1 hora/día
+- Con All-Purpose → pagás 24 horas/día (o lo que dure antes del auto-terminate, y después tarda en re-encender)
+
+**Regla**: en producción, siempre Job Cluster. All-Purpose es para desarrollo interactivo.
+
+::: {.callout-tip}
+## Tip: Instance Pools
+
+Si el startup del Job Cluster te parece lento (~5 min), usá [Instance Pools](https://learn.microsoft.com/en-us/azure/databricks/compute/pool-index). Mantienen VMs pre-calentadas y reducen el startup a ~1-2 min.
+:::
+
+## File Arrival Trigger
+
+El file arrival trigger monitorea un **Volume de Unity Catalog** o una **external location** y dispara tu Job cuando detecta archivos nuevos. Chequea cada ~1 minuto (best effort).
+
+### Configuración
+
+1. En **Jobs & Pipelines**, seleccioná tu Job
+2. En **Schedules & Triggers** → **Add trigger** → **File arrival**
+3. En **Storage location**, ingresá la ruta del Volume:
+
+```
+/Volumes/mi_catalogo/mi_schema/mi_volume/bronze/
+```
+
+4. Configurá las opciones avanzadas:
+   - **Minimum time between triggers** (segundos): tiempo mínimo entre runs. Si llegan archivos durante este período, se acumulan y disparan un solo run al finalizar.
+   - **Wait after last change** (segundos): espera X segundos después del último archivo nuevo. Si llega otro archivo, resetea el timer. Útil cuando los archivos llegan en batches.
+
+5. Click en **Test connection** para validar → **Save**
+
+### Monitoreo recursivo
+
+El trigger monitorea **todos los subdirectorios** de la ruta configurada. Si configurás `/Volumes/catalog/schema/volume/bronze/`, también detecta archivos en:
+
+```
+/Volumes/catalog/schema/volume/bronze/2026/06/
+/Volumes/catalog/schema/volume/bronze/2026/06/09/
+/Volumes/catalog/schema/volume/bronze/clientes/
+```
+
+### File events
+
+Para mejor performance, habilitá **file events** en la external location. Sin file events, Databricks hace listing de archivos (polling). Con file events, usa notificaciones del cloud provider (Azure Event Grid, AWS S3 Events) — la detección baja de minutos a **segundos**.
+
+::: {.callout-important}
+## Importante: habilitá file events
+
+Sin file events habilitados, tenés un límite de **50 triggers por workspace** y **10.000 archivos** por path monitoreado. Con file events, estos límites desaparecen. Habilitarlos es un one-time setup en la external location.
+:::
+
+## Limitaciones del File Arrival Trigger
+
+Acá es donde la documentación se pone interesante. Estas son las trampas:
+
+| Limitación | Con file events | Sin file events |
+|---|---|---|
+| **Archivos por path** | Sin límite | Máx 10.000 |
+| **Triggers por workspace** | Sin límite documentado | Máx 50 |
+| **Overwrites** | No disparan | No disparan |
+| **Detección** | Segundos | ~1 min (best effort) |
+
+### Las que duelen
+
+**1. Overwrites no disparan runs.** Si sobreescribís un archivo con el mismo nombre, el trigger no se entera. Esto es by design, no un bug. Si tu proceso upstream hace `PUT` sobre el mismo archivo, necesitás otra estrategia (nombres con timestamp, o table update trigger sobre la tabla destino).
+
+**2. Timeout por cambios ajenos al subpath.** Con file events habilitados, si configurás el trigger en un subpath de una external location (ej: `/bronze/clientes/`), cambios en *otros* subpaths de la misma external location (ej: `/bronze/ventas/`, `/bronze/productos/`) pueden generar metadatos que el trigger necesita procesar. En entornos con muchos cambios, esto puede causar **timeout y estado de error**.
+
+**Solución**: creá un Volume dedicado de Unity Catalog que apunte específicamente al directorio que querés monitorear. Así aislás el trigger del ruido.
+
+**3. Paths fantasma en S3/GCS.** Si el directorio configurado no existe o fue borrado en S3 o GCS, el trigger **sigue evaluando sin error**. No falla, no te notifica — simplemente no encuentra archivos y no dispara runs. En Azure (ADLS), sí da error.
+
+**4. ADLS y `FlushWithClose`.** En Azure, file events escucha el evento `FlushWithClose` para detectar archivos nuevos. Algunas APIs de Azure no emiten este evento, lo que puede **retrasar la detección**. Si tus archivos llegan por una API que no emite `FlushWithClose`, vas a tener que investigar el [modo de notificación clásico](https://learn.microsoft.com/en-us/azure/databricks/ingestion/cloud-object-storage/auto-loader/file-notification-mode#classic-file-notifications).
+
+## Table Update Trigger
+
+El table update trigger monitorea **tablas de Unity Catalog** y dispara tu Job cuando detecta cambios (inserts, updates, merges, deletes).
+
+### Tablas soportadas
+
+- Delta managed tables (Unity Catalog)
+- Iceberg managed tables (Unity Catalog)
+- External tables backed by Delta Lake
+- Materialized views
+- Streaming tables
+- Views y metric views de UC (con restricciones — ver limitaciones)
+- Delta Sharing tables y system tables (Beta)
+
+### Configuración
+
+1. En **Jobs & Pipelines**, seleccioná tu Job
+2. **Add trigger** → **Table update**
+3. Agregá las tablas a monitorear (hasta 10)
+4. Si seleccionás más de una, elegí el modo:
+   - **Any table is updated**: dispara cuando *cualquiera* cambia
+   - **All tables are updated**: dispara cuando *todas* cambiaron
+5. Opciones avanzadas (mismo patrón que file arrival):
+   - **Minimum time between triggers**
+   - **Wait after last change**
+6. **Test trigger** → **Save**
+
+### Parámetros dinámicos
+
+Cuando usás table update triggers, Databricks inyecta parámetros que podés usar en tu notebook:
+
+```python
+# Qué tablas se actualizaron (JSON list)
+updated = dbutils.widgets.get("job.trigger.table_update.updated_tables")
+
+# Timestamp del último commit que disparó el trigger
+ts = dbutils.widgets.get(
+    "job.trigger.table_update.mi_catalogo.mi_schema.mi_tabla.commit_timestamp.iso_datetime"
+)
+
+# Versión del último commit
+version = dbutils.widgets.get(
+    "job.trigger.table_update.mi_catalogo.mi_schema.mi_tabla.version"
+)
+```
+
+Estos parámetros te permiten hacer procesamiento incremental inteligente: solo procesás lo que cambió desde la última ejecución.
+
+## Limitaciones del Table Update Trigger
+
+| Limitación | Detalle |
+|---|---|
+| **Tablas por trigger** | Máx 10 |
+| **Views** | Las dependencias cuentan como tablas. View con 11 tablas dependientes = no se puede usar |
+| **Views dependientes** | Máx 10 views dependientes por view monitoreada |
+| **False positives en views** | Cambios filtrados por la view **igual disparan** el job |
+| **Sin file events** | Máx 1.000 jobs con table update trigger por workspace |
+| **Delta Sharing** | Solo Databricks-to-Databricks (Beta). Open sharing no soportado |
+
+### La trampa de las views
+
+Si monitoreás una **view** que filtra por `WHERE region = 'LATAM'`, y alguien actualiza filas con `region = 'EU'`... **el trigger se dispara igual**. Databricks monitorea las tablas subyacentes, no el resultado de la view. Tu Job va a correr innecesariamente.
+
+Y peor: si tu view depende de 6 tablas, y agregás otra view que depende de 5 tablas al mismo trigger, ya estás en 11 — y el trigger falla.
+
+**Tip**: usá tablas directamente en el trigger, no views. Es más predecible.
+
+## `Trigger.AvailableNow` — el trigger que te falta
+
+Cuando combinás un trigger event-driven con un Job, necesitás que tu código de streaming **procese todo lo pendiente y termine**. Si usás `Trigger.ProcessingTime("10 seconds")`, tu stream queda corriendo indefinidamente y el Job nunca termina (y el Job Cluster nunca se apaga).
+
+`Trigger.AvailableNow` es la solución:
+
+```python
+(spark.readStream
+    .format("cloudFiles")
+    .option("cloudFiles.format", "json")
+    .option("cloudFiles.schemaLocation", checkpoint_path)
+    .load(source_path)
+    .writeStream
+    .option("checkpointLocation", checkpoint_path)
+    .trigger(availableNow=True)    # <-- procesa todo y termina
+    .toTable("catalog.schema.mi_tabla_bronze")
+)
+```
+
+### Comparativa
+
+| Trigger | Comportamiento | Job Cluster se apaga? | Serverless? |
+|---|---|---|---|
+| `availableNow=True` | Procesa todo lo pendiente → termina | Sí | Sí |
+| `processingTime="10s"` | Ejecuta micro-batches cada 10s → nunca termina | No | No |
+| `once=True` | Procesa un solo micro-batch → termina | Sí | Sí |
+| `continuous` | Procesamiento continuo, latencia ~1ms | No | No |
+
+`Trigger.Once` está deprecado: solo procesa **un micro-batch**, no todo lo pendiente. Si llegaron 10.000 archivos, `once=True` procesa un batch y deja el resto para la próxima ejecución. `AvailableNow` procesa **todo**.
+
+### Por qué `AvailableNow` es perfecto para Jobs
+
+El flujo es:
+
+1. Llegan archivos / se actualiza tabla → trigger dispara
+2. Job Cluster se crea (~2-5 min, o ~1 min con Instance Pools)
+3. Tu notebook ejecuta el stream con `availableNow=True`
+4. Procesa todo lo acumulado desde el último checkpoint
+5. Stream termina → Job Cluster se destruye → dejás de pagar
+
+Esto es **streaming en modo batch eficiente**: tenés las garantías de exactly-once de Structured Streaming (checkpoints), pero sin el costo de un cluster 24/7.
+
+::: {.callout-note}
+## Nota: Serverless
+
+En serverless compute, **solo** `Trigger.AvailableNow` funciona para Structured Streaming. `ProcessingTime` y `Trigger.Continuous` **no están soportados**. Otro motivo más para usar `AvailableNow`.
+:::
+
+## Continuous mode + Streaming
+
+Si necesitás **latencia sub-minuto**, el modo continuous es otra opción. Configurás el Job como **Continuous** y Databricks reinicia automáticamente el run cuando termina (con un delay de < 60 segundos).
+
+```python
+# Con continuous mode, usás AvailableNow
+# El Job Cluster se reinicia automáticamente al terminar
+(spark.readStream
+    .format("delta")
+    .table("catalog.schema.bronze")
+    .writeStream
+    .option("checkpointLocation", checkpoint_path)
+    .trigger(availableNow=True)
+    .toTable("catalog.schema.silver")
+)
+```
+
+El retry usa **exponential backoff**: si el task falla, reintenta con delays crecientes (máximo 3 reintentos por task). Si sigue fallando, cancela el run y arranca uno nuevo.
+
+### Continuous vs AvailableNow + Trigger event-driven
+
+| | Continuous + AvailableNow | File Arrival/Table Update + AvailableNow |
+|---|---|---|
+| **Latencia** | Sub-60 seg (delay entre runs) | 1-5 min (detección + cluster startup) |
+| **Costo** | Alto (cluster siempre vivo*) | Bajo (cluster solo cuando hay datos) |
+| **Complejidad** | Baja (no configurás trigger) | Media (configurás trigger + file events) |
+| **Ideal para** | Streams de alta frecuencia | Datos que llegan esporádicamente |
+
+*\* En continuous mode el cluster está siempre activo porque los runs se reinician automáticamente.*
+
+**Regla práctica**: si tus datos llegan cada 5+ minutos, usá trigger event-driven. Si llegan constantemente (Kafka, IoT), usá continuous o directamente Lakeflow Declarative Pipelines.
+
+## Ejemplo: AutoLoader + File Arrival + AvailableNow
+
+El escenario más común: archivos JSON llegan a un Volume de Unity Catalog, querés ingestarlos en una tabla Delta.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3
+#| fig-align: center
+
+library(ggplot2)
+
+nodes <- data.frame(
+  x = c(1, 3.2, 5.4, 7.6),
+  y = c(1, 1, 1, 1),
+  label = c("Archivos\nllegan al\nVolume", "File Arrival\nTrigger\ndispara", "Job Cluster\n+ AutoLoader\n+ AvailableNow", "Delta\nTable\n(bronze)"),
+  color = c("#64748b", "#FFA166", "#593196", "#0d9488")
+)
+
+arrows <- data.frame(
+  x = c(1.8, 4.0, 6.2),
+  xend = c(2.4, 4.6, 6.8),
+  y = c(1, 1, 1),
+  yend = c(1, 1, 1)
+)
+
+ggplot() +
+  geom_tile(data = nodes, aes(x = x, y = y, fill = color),
+            width = 1.5, height = 1.2, color = NA, show.legend = FALSE) +
+  geom_text(data = nodes, aes(x = x, y = y, label = label),
+            color = "white", size = 2.8, fontface = "bold", lineheight = 0.9) +
+  geom_segment(data = arrows, aes(x = x, xend = xend, y = y, yend = yend),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.6) +
+  scale_fill_identity() +
+  coord_cartesian(xlim = c(-0.2, 8.8), ylim = c(0.1, 1.9)) +
+  theme_void() +
+  theme(plot.margin = margin(5, 10, 5, 10))
+```
+
+### Código del notebook
+
+```python
+# Configuración
+volume_path = "/Volumes/mi_catalogo/mi_schema/bronze/clientes/"
+checkpoint_path = "/Volumes/mi_catalogo/mi_schema/checkpoints/clientes_bronze/"
+target_table = "mi_catalogo.mi_schema.clientes_bronze"
+
+# AutoLoader: descubre archivos nuevos incrementalmente
+(spark.readStream
+    .format("cloudFiles")
+    .option("cloudFiles.format", "json")
+    .option("cloudFiles.schemaLocation", checkpoint_path)
+    .option("cloudFiles.useManagedFileEvents", "true")  # usa file events
+    .option("cloudFiles.inferColumnTypes", "true")
+    .load(volume_path)
+    .writeStream
+    .option("checkpointLocation", checkpoint_path)
+    .option("mergeSchema", "true")   # maneja schema evolution
+    .trigger(availableNow=True)
+    .toTable(target_table)
+)
+```
+
+**¿Qué pasa acá?**
+
+1. El file arrival trigger detecta archivos nuevos en el Volume
+2. Dispara el Job → se crea un Job Cluster
+3. AutoLoader (`cloudFiles`) descubre los archivos nuevos desde el último checkpoint
+4. `availableNow=True` procesa **todo** lo pendiente y termina
+5. El Job Cluster se destruye → dejás de pagar
+
+El checkpoint garantiza **exactly-once**: si el Job falla a mitad, al reiniciar retoma desde donde quedó.
+
+### Variante con `foreachBatch` (lógica custom)
+
+Si necesitás hacer algo más que escribir en una tabla (ej: llamar una API, validar datos, merge):
+
+```python
+def procesar_batch(batch_df, batch_id):
+    # Validaciones
+    df_valido = batch_df.filter("email IS NOT NULL AND cantidad > 0")
+    df_invalido = batch_df.filter("email IS NULL OR cantidad <= 0")
+
+    # Escribir válidos en bronze
+    df_valido.write.mode("append").saveAsTable("catalog.schema.clientes_bronze")
+
+    # Escribir rechazados en quarantine
+    df_invalido.write.mode("append").saveAsTable("catalog.schema.clientes_quarantine")
+
+(spark.readStream
+    .format("cloudFiles")
+    .option("cloudFiles.format", "json")
+    .option("cloudFiles.schemaLocation", checkpoint_path)
+    .option("cloudFiles.useManagedFileEvents", "true")
+    .load(volume_path)
+    .writeStream
+    .foreachBatch(procesar_batch)
+    .option("checkpointLocation", checkpoint_path)
+    .trigger(availableNow=True)
+    .start()
+)
+```
+
+::: {.callout-warning}
+## Ojo con `foreachBatch`
+
+`foreachBatch` da **at-least-once** guarantees, no exactly-once. Si el Job falla y reinicia, puede reprocesar un batch. Diseñá tu lógica para ser idempotente (ej: usá `MERGE` en vez de `INSERT`).
+:::
+
+## Ejemplo: Microbatch con Table Update
+
+Escenario: la tabla `bronze` se actualiza (por el pipeline del ejemplo anterior, o por otro proceso). Querés transformar los datos nuevos y escribirlos en `silver`.
+
+### Paso 1: Habilitar Change Data Feed en la tabla bronze
+
+```sql
+ALTER TABLE mi_catalogo.mi_schema.clientes_bronze
+SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
+```
+
+### Paso 2: Configurar el table update trigger
+
+En el Job de silver, agregá un trigger **Table Update** que monitoree `mi_catalogo.mi_schema.clientes_bronze` con modo **Any table is updated**.
+
+### Paso 3: Notebook de transformación
+
+```python
+checkpoint_path = "/Volumes/mi_catalogo/mi_schema/checkpoints/clientes_silver/"
+
+(spark.readStream
+    .format("delta")
+    .option("readChangeFeed", "true")   # lee solo los cambios (CDF)
+    .table("mi_catalogo.mi_schema.clientes_bronze")
+    .filter("_change_type IN ('insert', 'update_postimage')")
+    .drop("_change_type", "_commit_version", "_commit_timestamp")
+    .withColumn("nombre_upper", F.upper(F.col("nombre")))
+    .withColumn("procesado_at", F.current_timestamp())
+    .writeStream
+    .option("checkpointLocation", checkpoint_path)
+    .trigger(availableNow=True)
+    .toTable("mi_catalogo.mi_schema.clientes_silver")
+)
+```
+
+### Usando los parámetros dinámicos del trigger
+
+Opcionalmente, podés usar los parámetros que Databricks inyecta para logging o auditoría:
+
+```python
+# Qué tablas se actualizaron
+updated_tables = dbutils.widgets.get("job.trigger.table_update.updated_tables")
+print(f"Tablas actualizadas: {updated_tables}")
+
+# Versión del commit que disparó el trigger
+trigger_version = dbutils.widgets.get(
+    "job.trigger.table_update.mi_catalogo.mi_schema.clientes_bronze.version"
+)
+print(f"Procesando desde versión: {trigger_version}")
+```
+
+## Gotchas
+
+**1. El startup del cluster mata la latencia.** Un Job Cluster tarda ~3-5 minutos en arrancar. Si tu trigger detecta datos en 1 minuto pero el cluster tarda 5 en prender, tu latencia real es de 6 minutos. **Solución**: Instance Pools o serverless compute.
+
+**2. File events no habilitados = modo degradado.** Sin file events, estás limitado a 50 triggers y 10.000 archivos. Y la detección es por polling (listing de archivos), no por notificación. Habilitá file events en la external location — es gratis y es un one-time setup.
+
+**3. Overwrites son invisibles.** Si tu proceso upstream sobreescribe archivos en vez de crear nuevos, el file arrival trigger no se entera. Cambiá la estrategia a archivos con timestamp en el nombre, o usá table update trigger sobre la tabla destino.
+
+**4. Views que disparan de más.** Ya lo vimos: si monitoreás una view con table update trigger, cualquier cambio en las tablas subyacentes dispara el job, aunque la view no muestre datos nuevos. Usá tablas directas.
+
+**5. Serverless no soporta `ProcessingTime`.** Si migrás a serverless compute y tu notebook usa `trigger(processingTime="10 seconds")`, va a fallar. Cambialo a `trigger(availableNow=True)`.
+
+**6. No uses All-Purpose Clusters para esto.** Ya lo dijimos, pero vale repetir: si tu trigger dispara 4 veces al día y cada run tarda 15 minutos, con Job Cluster pagás 1 hora. Con All-Purpose pagás 24. La diferencia a fin de mes duele.
+
+## Cuándo NO usar Jobs para streaming
+
+Jobs con triggers event-driven son ideales para **streaming micro-batch**: datos que llegan cada minutos/horas, latencia de minutos es aceptable.
+
+Pero no son la mejor opción siempre:
+
+| Escenario | Mejor opción |
+|---|---|
+| Latencia sub-segundo (Kafka, IoT) | **Lakeflow Declarative Pipelines** (continuous mode) |
+| Pipeline con quality gates y expectations | **Lakeflow Declarative Pipelines** (expectations) |
+| Orquestación cross-workspace o multi-cloud | **Airflow** / orquestador externo |
+| ETL simple y frecuente (cada 5 min) | **Jobs con trigger scheduled** (más simple) |
+
+## Referencias
+
+- [Automating jobs with schedules and triggers — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/jobs/triggers)
+- [Trigger jobs when new files arrive — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/jobs/file-arrival-triggers)
+- [Trigger jobs when source tables are updated — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/jobs/trigger-table-update)
+- [Run jobs continuously — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/jobs/continuous)
+- [Configure Structured Streaming trigger intervals — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/structured-streaming/triggers)
+- [Auto Loader — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/ingestion/cloud-object-storage/auto-loader/)
+- [Use Delta Lake change data feed — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/delta/delta-change-data-feed)
+- [Instance Pools — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/compute/pool-index)
+
+## Otros posts de la serie
+
+Si te sirvió este post, mirá los anteriores de **Databricks Tips**:
+
+- [**Tips #1**: Databricks Asset Bundles](../databricks-asset-bundles-advanced/) — patrones avanzados de DABs, variables complejas, deploy multi-target.
+- [**Tips #2**: Delta Lake](../databricks-tips-01-delta-lake/) — Liquid Clustering, OPTIMIZE, VACUUM, y las 7 cosas que ojalá te hubieran dicho antes.
+- [**Tips #3**: Unity Catalog](../databricks-tips-02-unity-catalog/) — modelo de gobernanza, GRANTS heredados, row/column security.
+- [**Tips #4**: Structured Streaming](../databricks-tips-03-structured-streaming/) — watermarks, ventanas, estado y los problemas que no te cuenta la documentación.
+- [**Tips #5**: MLflow + Unity Catalog](../databricks-tips-04-mlflow-unity-catalog/) — model registry unificado, lineage y deploy desde UC.
+- [**Tips #6**: Feature Engineering](../databricks-tips-05-feature-engineering/) — Feature Store, online tables, point-in-time lookups.
+- [**Tips #7**: Docker en Databricks](../databricks-tips-06-docker-containers/) — DCS, golden containers, CI/CD con imágenes custom.
+
+---
+
+*Próxima semana: SQL Warehouses & Serverless — compute on-demand que escala solo para analytics y BI.*
