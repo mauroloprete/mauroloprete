@@ -670,7 +670,81 @@ Las AI Functions manejan paralelización, retries y scaling internamente. Enviá
 
 ---
 
-## 12. Cuándo NO usar AI Gateway
+## 12. `ucode`: coding agents a través de AI Gateway
+
+[`ucode`](https://github.com/databricks/ucode) es el CLI de Databricks que conecta coding agents con AI Gateway. En vez de configurar API keys por separado para cada herramienta, todos los agentes rutean a través de tu workspace — con las mismas reglas de governance, rate limits y tracking.
+
+### Agentes soportados
+
+| Agente | Comando |
+|---|---|
+| **Claude Code** | `ucode claude` |
+| **Codex** (OpenAI) | `ucode codex` |
+| **Gemini CLI** | `ucode gemini` |
+| **GitHub Copilot CLI** | `ucode copilot` |
+| **OpenCode** | `ucode opencode` |
+| **Pi** | `ucode pi` |
+
+### Instalación
+
+```{#lst-ucode-install .bash lst-cap="Instalar ucode con uv (requiere Python 3.12+)"}
+uv tool install git+https://github.com/databricks/ucode
+```
+
+### Setup
+
+```{#lst-ucode-configure .bash lst-cap="Configurar ucode: workspace, agentes y MCP servers"}
+# Setup interactivo (pregunta workspace y autentica)
+ucode configure
+
+# Configurar agentes específicos
+ucode configure --agents claude,codex
+
+# Multi-workspace
+ucode configure --workspaces https://first.databricks.com,https://second.databricks.com
+
+# Agregar MCP servers de Databricks (SQL, Vector Search, UC Functions)
+ucode configure mcp
+
+# Preview sin aplicar cambios
+ucode configure --dry-run
+```
+
+### Uso
+
+```{#lst-ucode-usage .bash lst-cap="Usar coding agents a través de AI Gateway con ucode"}
+# Lanzar Claude Code
+ucode claude
+
+# Resumir sesión anterior
+ucode claude -r
+
+# Ver estado y modelos configurados
+ucode status
+
+# Ver estadísticas de uso
+ucode usage
+
+# Restaurar configs originales
+ucode revert
+```
+
+### Cómo funciona
+
+1. `ucode configure` te pide la URL de tu workspace y autentica con tus credenciales de Databricks
+2. Modifica los archivos de configuración de cada agente (`~/.claude/settings.json`, `~/.codex/config.toml`, etc.) para rutear a través de AI Gateway
+3. Hace backup de los configs existentes antes de modificar
+4. Todo el tráfico de los coding agents pasa por AI Gateway — con rate limits, usage tracking, cost attribution y guardrails
+
+::: {.callout-tip}
+## Sin API keys separadas
+
+Con `ucode`, no necesitás API keys de OpenAI, Anthropic ni Google para tus coding agents. Todo se autentica con tus credenciales de Databricks y se gobierna desde AI Gateway.
+:::
+
+---
+
+## 13. Cuándo NO usar AI Gateway
 
 | Necesidad | Alternativa |
 |---|---|
