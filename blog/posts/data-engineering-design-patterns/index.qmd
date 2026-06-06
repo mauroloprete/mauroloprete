@@ -27,7 +27,7 @@ Carga completa de la fuente en cada ejecución. Borrás (o sobreescribís) todo 
 
 **Cuándo usarlo**: tablas de referencia chicas (países, monedas, configuraciones), fuentes que no tienen columna de fecha de modificación, o cuando necesitás garantizar consistencia total sin complicarte.
 
-```python
+```{#lst-full-loader .python lst-cap="Full Loader: sobreescritura completa de tabla de dimensiones"}
 # Full Loader en PySpark — sobreescribir tabla de dimensiones
 df_source = (spark.read.format("jdbc")
     .option("url", jdbc_url)
@@ -49,7 +49,7 @@ Solo trae los registros nuevos o modificados desde la última ejecución. Requie
 
 **Cuándo usarlo**: tablas transaccionales que crecen constantemente y tienen una columna `updated_at` o similar. Es el caballo de batalla de la mayoría de los pipelines batch.
 
-```python
+```{#lst-incremental-loader .python lst-cap="Incremental Loader: ingesta por high watermark con PySpark"}
 # Incremental Loader — traer solo registros nuevos
 from pyspark.sql import functions as F
 
@@ -80,7 +80,7 @@ Captura cambios directamente desde el **log de transacciones** de la base de dat
 
 **Cuándo usarlo**: cuando la fuente es una base de datos relacional con alto volumen de cambios, cuando necesitás capturar deletes (que el Incremental Loader no ve), o cuando querés latencia baja sin impactar la fuente.
 
-```sql
+```{#lst-cdc-merge .sql lst-cap="CDC con MERGE en Delta Lake: inserts, updates y deletes"}
 -- CDC con MERGE en Delta Lake
 -- Los eventos CDC llegan con una columna _operation: INSERT, UPDATE, DELETE
 
@@ -115,7 +115,7 @@ Consolida archivos pequeños en archivos más grandes. Si tenés un pipeline de 
 
 **Cuándo usarlo**: siempre que tengas pipelines de streaming o micro-batches que escriban a Delta, Parquet o Iceberg. Es casi obligatorio en producción.
 
-```sql
+```{#lst-compactor .sql lst-cap="Compactor: OPTIMIZE para consolidar archivos pequeños en Delta"}
 -- Compactor en Databricks — OPTIMIZE es la implementación nativa
 -- Compactar toda la tabla
 OPTIMIZE bronze.events;

@@ -12,7 +12,7 @@ Tercera entrega de **Databricks Tips**. Unity Catalog parece simple (catalog.sch
 
 ## El modelo de 3 niveles: más que un namespace
 
-```
+```{#lst-namespace-3lvl lst-cap="Namespace de 3 niveles en Unity Catalog"}
 metastore
   └── catalog          (env o dominio)
        └── schema      (área funcional)
@@ -23,7 +23,7 @@ La primera decisión crítica: **cómo organizar los catalogs**. Hay dos escuela
 
 ### Opción A: catalogs por ambiente
 
-```sql
+```{#lst-catalogs-by-env .sql lst-cap="Opcion A: catalogs organizados por ambiente (dev, staging, prod)"}
 CREATE CATALOG dev;
 CREATE CATALOG staging;
 CREATE CATALOG prod;
@@ -40,7 +40,7 @@ CREATE SCHEMA prod.sales;
 
 ### Opción B: catalogs por dominio
 
-```sql
+```{#lst-catalogs-by-domain .sql lst-cap="Opcion B: catalogs organizados por dominio de negocio"}
 CREATE CATALOG sales;
 CREATE CATALOG finance;
 CREATE CATALOG marketing;
@@ -61,7 +61,7 @@ CREATE SCHEMA sales.gold;
 
 Los permisos en Unity Catalog son **heredables hacia abajo**. Esto es poderoso pero peligroso:
 
-```sql
+```{#lst-grants-schema .sql lst-cap="GRANTS heredados: error comun vs. patron correcto a nivel schema"}
 -- Este GRANT da acceso a TODAS las tablas presentes y FUTURAS del catalog
 GRANT USE CATALOG ON CATALOG prod TO `data-analysts`;
 GRANT USE SCHEMA ON CATALOG prod TO `data-analysts`;
@@ -79,7 +79,7 @@ GRANT SELECT ON SCHEMA prod.gold TO `data-analysts`;
 
 Esto casi nadie lo usa pero es muy potente para cumplir con regulaciones (GDPR, PCI):
 
-```sql
+```{#lst-row-col-security .sql lst-cap="Row y column level security: masking de PII y filtros por region"}
 -- Column masking: ocultar PII
 CREATE FUNCTION prod.security.mask_email(email STRING)
 RETURNS STRING
@@ -111,7 +111,7 @@ Ahora un analista de LATAM hace `SELECT * FROM prod.gold.customers` y solo ve cl
 
 Unity Catalog trackea linaje automáticamente para cualquier operación que pase por Spark. Para aprovecharlo:
 
-```sql
+```{#lst-lineage .sql lst-cap="Linaje automatico: buenas practicas para trazabilidad completa"}
 -- Ver linaje de una tabla (qué tablas la alimentan)
 -- Esto se ve en el UI, pero también vía API:
 -- GET /api/2.1/unity-catalog/lineage/table-lineage
@@ -124,7 +124,7 @@ Unity Catalog trackea linaje automáticamente para cualquier operación que pase
 
 **Tip**: si tenés un pipeline que lee de un path S3 directo, Unity Catalog no puede trackear el linaje. Registrá el path como External Location y External Table:
 
-```sql
+```{#lst-external-location .sql lst-cap="External Location y tabla externa para habilitar linaje en S3"}
 CREATE EXTERNAL LOCATION raw_s3
 URL 's3://my-bucket/raw/'
 WITH (STORAGE CREDENTIAL my_credential);
@@ -138,7 +138,7 @@ LOCATION 's3://my-bucket/raw/events/';
 
 Desde DBR 13.3, Unity Catalog gobierna también archivos (CSV, JSON, modelos, artefactos):
 
-```sql
+```{#lst-volumes .sql lst-cap="Volumes: gestionar archivos no tabulares con gobernanza UC"}
 -- Volume managed: Databricks gestiona el storage
 CREATE VOLUME prod.ml.model_artifacts;
 

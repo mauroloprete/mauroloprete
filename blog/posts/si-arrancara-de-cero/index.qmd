@@ -27,6 +27,7 @@ En este post cuento qué priorizaría hoy si tuviera que volver a empezar en Dat
 #| fig-width: 7
 #| fig-height: 3
 #| fig-align: center
+#| fig-cap: "Pirámide de aprendizaje: Python y SQL como base, Spark, dbt y Databricks como capas superiores."
 
 library(ggplot2)
 
@@ -50,8 +51,10 @@ ggplot(levels) +
             color = "white", size = 3.2, alpha = 0.85) +
   scale_fill_identity() +
   scale_y_continuous(expand = expansion(mult = 0.02)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(2, 2, 2, 2))
+  theme(plot.margin = margin(2, 2, 2, 2),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 No podés aprender Spark sin saber Python. No podés entender dbt sin dominar SQL. Y Databricks sin Spark es como manejar un auto de carrera sin saber frenar.
@@ -66,7 +69,7 @@ No estoy hablando de hacer un `print("Hola mundo")`. Estoy hablando de:
 - **Entornos virtuales y dependencias**: `venv`, `pip`, `pyproject.toml`. Si no sabés manejar dependencias, tu primer proyecto en producción va a ser un desastre.
 - **Testing básico**: `pytest`. No necesitás ser un experto en TDD, pero sí saber testear una función.
 
-```python
+```{#lst-dataclass-product .python lst-cap="Dataclass para modelar un data product con validación"}
 # Lo mínimo que tenés que dominar de Python
 from dataclasses import dataclass
 from typing import List, Optional
@@ -101,7 +104,7 @@ El tema es que Python tiene varias formas de definir clases, y cada una tiene su
 
 **Clase tradicional** — control total, pero mucho boilerplate:
 
-```python
+```{#lst-class-tradicional .python lst-cap="Clase tradicional con boilerplate de __init__, __repr__ y __eq__"}
 class Pipeline:
     def __init__(self, name: str, source: str, target: str, schedule: str = "daily"):
         self.name = name
@@ -123,7 +126,7 @@ Son 12 líneas para algo que debería ser simple. Y si te olvidás del `__eq__`,
 
 **`@dataclass`** — la opción correcta en el 90% de los casos:
 
-```python
+```{#lst-dataclass-pipeline .python lst-cap="Dataclass: misma funcionalidad en 5 líneas, con defaults seguros"}
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -147,7 +150,7 @@ p == Pipeline("ingest_sales", "raw.sales", "silver.sales")  # True
 
 **`@dataclass(frozen=True)`** — cuando el objeto no debería cambiar:
 
-```python
+```{#lst-frozen-dataclass .python lst-cap="Frozen dataclass: objeto inmutable que falla si intentás mutarlo"}
 @dataclass(frozen=True)
 class ConnectionConfig:
     host: str
@@ -170,7 +173,7 @@ Un objeto inmutable es uno que no se puede modificar después de crearlo. Y la p
 
 **El problema de los objetos mutables** es que cualquiera los puede cambiar en cualquier momento, y en un pipeline con muchas funciones eso se convierte en un desastre:
 
-```python
+```{#lst-mutable-problem .python lst-cap="Problema de mutabilidad: una función modifica la config sin aviso"}
 # Objeto MUTABLE — el problema
 @dataclass
 class Config:
@@ -199,7 +202,7 @@ La misma variable `config` ahora apunta a `localhost` en vez de producción. Est
 
 **Con inmutabilidad esto no pasa:**
 
-```python
+```{#lst-immutable-solution .python lst-cap="Solución inmutable: frozen dataclass + replace() para crear copias"}
 @dataclass(frozen=True)
 class Config:
     host: str
@@ -225,7 +228,7 @@ Cada versión es un objeto separado. La original nunca se toca. Esto se llama **
 
 **En data engineering esto aparece todo el tiempo:**
 
-```python
+```{#lst-immutable-real-cases .python lst-cap="Casos reales de inmutabilidad: configs, validaciones y credenciales"}
 # Configuración del pipeline — no debería cambiar durante la ejecución
 @dataclass(frozen=True)
 class PipelineConfig:
@@ -259,7 +262,7 @@ La regla: si dudás, hacelo inmutable. Es más fácil relajar la restricción de
 
 **`NamedTuple`** — cuando querés inmutabilidad + desempaquetado:
 
-```python
+```{#lst-namedtuple .python lst-cap="NamedTuple: inmutable y desempaquetable como tupla"}
 from typing import NamedTuple
 
 class ValidationResult(NamedTuple):
@@ -281,7 +284,7 @@ La diferencia clave con frozen dataclass: las NamedTuples son tuplas de verdad. 
 
 **Pydantic `BaseModel`** — cuando necesitás validación:
 
-```python
+```{#lst-pydantic-basemodel .python lst-cap="Pydantic BaseModel: validación automática al crear el objeto"}
 from pydantic import BaseModel, field_validator
 
 class DataContract(BaseModel):
@@ -346,7 +349,7 @@ Lo que tenés que dominar de verdad:
 - **Aggregations con HAVING y GROUPING SETS**: para reportería real.
 - **Subqueries correlacionadas**: para entender por qué son lentas y cuándo evitarlas.
 
-```python
+```{#lst-gen-sales-data .python lst-cap="Generar dataset de ventas con PySpark para practicar SQL"}
 from pyspark.sql import functions as F
 from datetime import date, timedelta
 import random
@@ -373,7 +376,7 @@ print(f"Filas generadas: {sales_df.count()}")
 sales_df.show(5)
 ```
 
-```sql
+```{#lst-window-functions .sql lst-cap="Window functions: ranking y variación diaria por cliente"}
 %sql
 -- Ventas diarias por cliente con ranking y cambio vs día anterior
 WITH daily_sales AS (
@@ -426,7 +429,7 @@ Acá es donde la cosa se pone interesante. Spark no es "pandas grande" — es un
 - **Broadcast joins**: si una tabla es chica (< 10MB), broadcasteala. La diferencia puede ser de minutos a segundos.
 - **Catalyst optimizer**: Spark optimiza tu query plan. Pero si escribís UDFs en Python, el optimizer no puede ayudarte.
 
-```python
+```{#lst-spark-native-vs-udf .python lst-cap="Spark nativo vs UDF: funciones nativas permiten optimización"}
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
@@ -454,7 +457,7 @@ df = (
 
 Spark tiene dos APIs: **DataFrame** y **Spark SQL**. Internamente son lo mismo — ambos generan el mismo plan de ejecución. Usá la que te resulte más cómoda, pero entendé que:
 
-```python
+```{#lst-df-vs-sql .python lst-cap="DataFrame API y Spark SQL generan el mismo plan de ejecución"}
 # Esto:
 df.filter(F.col("amount") > 100).groupBy("customer_id").agg(F.sum("amount"))
 
@@ -479,7 +482,7 @@ Esto genera mucha confusión. Si tenés una función Python que recibe un DataFr
 
 Una **función wrapper** usa la API nativa de Spark. Spark ve las operaciones, las entiende y las optimiza:
 
-```python
+```{#lst-wrapper-function .python lst-cap="Función wrapper: organiza código pero usa Spark nativo por dentro"}
 # Esto NO es un UDF — usa la API de Spark por dentro
 def add_revenue_flag(df, threshold=1000):
     return df.withColumn(
@@ -496,7 +499,7 @@ Acá Spark sabe exactamente qué estás haciendo. Tu función es solo una forma 
 
 Un **UDF** es cuando le pedís a Spark que ejecute código Python puro **fila por fila**, sacando los datos del motor optimizado y pasándolos por el intérprete de Python:
 
-```python
+```{#lst-udf-real .python lst-cap="UDF real: serializa fila por fila entre JVM y Python"}
 # Esto SÍ es un UDF — Python puro, fila por fila
 @udf(returnType=BooleanType())
 def high_revenue_udf(amount):
@@ -521,6 +524,7 @@ Esa serialización ida y vuelta se llama **serde overhead**, y en un dataset de 
 #| fig-width: 8
 #| fig-height: 3.5
 #| fig-align: center
+#| fig-cap: "Spark nativo vs UDF: el path nativo pasa por Catalyst, el UDF serializa fila por fila entre JVM y Python."
 
 library(ggplot2)
 
@@ -570,8 +574,10 @@ ggplot() +
                arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
                color = "#94a3b8", linewidth = 0.6) +
   coord_cartesian(xlim = c(0.3, 4.7), ylim = c(0.1, 2.55)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(5, 5, 5, 5))
+  theme(plot.margin = margin(5, 5, 5, 5),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 **¿Cuándo sí necesitás un UDF?** Casi nunca. Pero hay casos legítimos:
@@ -581,7 +587,7 @@ ggplot() +
 
 Y si no te queda otra, usá **Pandas UDFs** en vez de UDFs comunes — procesan por batch en vez de fila por fila, y son mucho más rápidos:
 
-```python
+```{#lst-pandas-udf .python lst-cap="Pandas UDF: procesamiento vectorizado por batch, mucho más rápido"}
 from pyspark.sql.functions import pandas_udf
 import pandas as pd
 
@@ -605,7 +611,7 @@ dbt (data build tool) cambió cómo se hacen las transformaciones de datos. La i
 - **Linaje**: sabés exactamente qué modelo depende de qué.
 - **Versionamiento**: todo es código, todo va a Git.
 
-```sql
+```{#lst-dbt-staging .sql lst-cap="Modelo staging en dbt: limpieza y tipado de transacciones"}
 -- models/staging/stg_transactions.sql
 WITH source AS (
     SELECT * FROM {{ source('raw', 'transactions') }}
@@ -625,7 +631,7 @@ cleaned AS (
 SELECT * FROM cleaned
 ```
 
-```yaml
+```{#lst-dbt-schema-yaml .yaml lst-cap="Schema YAML en dbt: tests de not_null, unique y rangos válidos"}
 # models/staging/stg_transactions.yml
 version: 2
 
@@ -653,7 +659,7 @@ models:
 
 dbt funciona nativamente con Databricks via `dbt-databricks`. Los modelos se materializan como tablas Delta en Unity Catalog.
 
-```yaml
+```{#lst-dbt-profile .yaml lst-cap="Perfil dbt-databricks: conexión a Unity Catalog con variables de entorno"}
 # profiles.yml
 my_project:
   target: dev
@@ -696,7 +702,7 @@ Databricks no es solo "Spark en la nube". Es una plataforma de datos completa: c
 
 5. **SQL Warehouses**: para analistas y dashboards. Serverless, escalable, y con cache inteligente.
 
-```sql
+```{#lst-unity-catalog .sql lst-cap="Unity Catalog: crear catalog, tabla con Liquid Clustering y grants"}
 -- Lo que tenés que saber hacer en Databricks desde el día 1
 -- Crear un catalog y schema
 CREATE CATALOG IF NOT EXISTS analytics;
@@ -747,6 +753,7 @@ Los notebooks **NO sirven** para:
 #| fig-width: 6
 #| fig-height: 3
 #| fig-align: center
+#| fig-cap: "Problemas de usar notebooks directamente en producción: sin testing, sin code review, estado compartido."
 
 library(ggplot2)
 
@@ -775,8 +782,10 @@ ggplot(problems) +
                color = "#f87171", linewidth = 0.4, alpha = 0) +
   scale_y_continuous(expand = expansion(mult = 0.02)) +
   coord_cartesian(xlim = c(-0.3, 5.5)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(2, 5, 2, 5))
+  theme(plot.margin = margin(2, 5, 2, 5),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 ### Cómo se hace bien
@@ -790,6 +799,7 @@ El notebook lo usás para **explorar y prototipar**. Cuando la lógica funciona,
 #| fig-width: 8
 #| fig-height: 1.5
 #| fig-align: center
+#| fig-cap: "Flujo correcto: explorar en notebook, extraer a módulo .py, testear, deployar con DABs y archivar el notebook."
 
 library(ggplot2)
 
@@ -812,11 +822,13 @@ ggplot(flow) +
                color = "#94a3b8", linewidth = 0.7) +
   scale_fill_identity() +
   coord_cartesian(ylim = c(-0.5, 0.5)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(2, 2, 2, 2))
+  theme(plot.margin = margin(2, 2, 2, 2),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
-```python
+```{#lst-module-test .python lst-cap="Módulo Python + test: lógica extraída del notebook a producción"}
 # src/transformations/clean_sales.py  ← ESTO va a producción
 def clean_transactions(df):
     """Limpia y valida transacciones del core."""
@@ -839,7 +851,7 @@ def test_clean_removes_nulls(spark):
     assert result.count() == 1
 ```
 
-```yaml
+```{#lst-dab-deploy .yaml lst-cap="Databricks Asset Bundle: deploy del job con CI/CD"}
 # databricks.yml  ← ESTO lo deploya
 resources:
   jobs:
@@ -867,6 +879,7 @@ Si hoy tuviera que arrancar de cero, haría esto:
 #| fig-width: 8
 #| fig-height: 3
 #| fig-align: center
+#| fig-cap: "Roadmap de aprendizaje: Python y SQL primero, luego Spark, dbt, Databricks y especialización."
 
 library(ggplot2)
 
@@ -898,10 +911,12 @@ ggplot(gantt) +
     position = "top", expand = expansion(mult = 0.02)
   ) +
   scale_fill_identity() +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
   theme(
     axis.text.x.top = element_text(size = 9, color = "#64748b", face = "bold"),
-    plot.margin = margin(5, 10, 5, 10)
+    plot.margin = margin(5, 10, 5, 10),
+    plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic")
   )
 ```
 

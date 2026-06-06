@@ -60,6 +60,7 @@ Un SQL Warehouse **no es un cluster general**. Es un endpoint SQL especializado 
 #| fig-width: 9
 #| fig-height: 4.5
 #| fig-align: center
+#| fig-cap: "Comparación de features entre SQL Warehouses: Classic, Pro y Serverless."
 
 library(ggplot2)
 library(dplyr)
@@ -133,11 +134,13 @@ ggplot() +
             size = 3.2, fontface = "bold") +
   scale_color_identity() +
   coord_cartesian(xlim = c(-0.3, 3.7), ylim = c(0.3, 8.2)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
   theme(
     plot.background = element_rect(fill = "#f8fafc", color = "#e2e8f0",
                                    linewidth = 0.5),
-    plot.margin = margin(10, 15, 10, 15)
+    plot.margin = margin(10, 15, 10, 15),
+    plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic")
   )
 ```
 
@@ -386,7 +389,7 @@ Query Federation (o **Lakehouse Federation**) permite ejecutar queries contra fu
 2. Crear un **foreign catalog** que mapea el catálogo remoto
 3. Consultar tablas externas como si fueran locales:
 
-```sql
+```{#lst-query-federation .sql lst-cap="Query Federation: consultar PostgreSQL como tabla local"}
 -- Después de configurar la connection y el foreign catalog
 SELECT *
 FROM postgres_catalog.public.customers
@@ -430,7 +433,7 @@ Las AI Functions permiten aplicar modelos de lenguaje directamente desde SQL. So
 
 ### Ejemplo práctico
 
-```sql
+```{#lst-ai-classify .sql lst-cap="ai_classify: clasificar tickets de soporte por categoría"}
 -- Clasificar tickets de soporte por categoría
 SELECT
   ticket_id,
@@ -440,7 +443,7 @@ FROM soporte.tickets
 WHERE fecha >= '2026-01-01'
 ```
 
-```sql
+```{#lst-ai-extract .sql lst-cap="ai_extract: extraer entidades estructuradas de texto libre"}
 -- Extraer entidades de texto libre
 SELECT
   ai_extract(
@@ -450,7 +453,7 @@ SELECT
 FROM feedback.comentarios
 ```
 
-```sql
+```{#lst-ai-query .sql lst-cap="ai_query: invocar modelo custom del Model Serving desde SQL"}
 -- Query a un modelo custom del Model Serving
 SELECT ai_query(
   'mi_modelo_endpoint',
@@ -516,6 +519,7 @@ Desde el detalle del warehouse en la UI:
 #| fig-width: 9
 #| fig-height: 4
 #| fig-align: center
+#| fig-cap: "Costo mensual estimado de Classic, Pro y Serverless (Small, 8h/día, 22 días). Serverless incluye infra en el DBU."
 
 library(ggplot2)
 
@@ -585,11 +589,13 @@ ggplot() +
            size = 2.3, color = "#9a4e1c", fontface = "italic") +
 
   coord_cartesian(xlim = c(0.5, 6.5), ylim = c(0, 6)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
   theme(
     plot.background = element_rect(fill = "#f8fafc", color = "#e2e8f0",
                                    linewidth = 0.5),
-    plot.margin = margin(10, 15, 10, 15)
+    plot.margin = margin(10, 15, 10, 15),
+    plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic")
   )
 ```
 
@@ -610,7 +616,7 @@ ggplot() +
 
 Implementá tags a nivel de workspace para rastrear costos por equipo:
 
-```json
+```{#lst-cost-tags .json lst-cap="Tags de workspace para cost allocation por equipo"}
 {
   "business_unit": "analytics",
   "project": "dashboard_ventas",

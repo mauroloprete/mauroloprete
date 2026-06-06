@@ -44,6 +44,7 @@ Databricks ofrece cuatro tipos de trigger para disparar Jobs automáticamente:
 #| fig-width: 9
 #| fig-height: 4
 #| fig-align: center
+#| fig-cap: "Cuatro tipos de triggers en Databricks Jobs: Scheduled, File Arrival, Table Update y Continuous."
 
 library(ggplot2)
 
@@ -78,8 +79,10 @@ ggplot() +
                color = "#94a3b8", linewidth = 0.5) +
   scale_fill_identity() +
   coord_cartesian(xlim = c(-0.2, 8.2), ylim = c(-0.3, 1.9)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(5, 10, 5, 10))
+  theme(plot.margin = margin(5, 10, 5, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 | Trigger | Dispara cuando... | Latencia típica | Costo compute |
@@ -102,6 +105,7 @@ Antes de meternos con triggers, hay que hablar de **dónde corre** tu Job. Porqu
 #| fig-width: 9
 #| fig-height: 3.5
 #| fig-align: center
+#| fig-cap: "All-Purpose Cluster vs Job Cluster: el primero paga tiempo idle, el segundo solo paga lo que ejecuta."
 
 library(ggplot2)
 
@@ -151,8 +155,10 @@ ggplot() +
   scale_fill_identity() +
   scale_color_identity() +
   coord_cartesian(xlim = c(-2, 9.5), ylim = c(0.3, 2.7)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(10, 10, 10, 10))
+  theme(plot.margin = margin(10, 10, 10, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 **Job Cluster** = se crea cuando el Job arranca, se destruye cuando termina. Pagás solo por el tiempo de ejecución.
@@ -182,7 +188,7 @@ El file arrival trigger monitorea un **Volume de Unity Catalog** o una **externa
 2. En **Schedules & Triggers** → **Add trigger** → **File arrival**
 3. En **Storage location**, ingresá la ruta del Volume:
 
-```
+```{#lst-volume-path .bash lst-cap="Ruta del Volume para configurar el file arrival trigger"}
 /Volumes/mi_catalogo/mi_schema/mi_volume/bronze/
 ```
 
@@ -196,7 +202,7 @@ El file arrival trigger monitorea un **Volume de Unity Catalog** o una **externa
 
 El trigger monitorea **todos los subdirectorios** de la ruta configurada. Si configurás `/Volumes/catalog/schema/volume/bronze/`, también detecta archivos en:
 
-```
+```{#lst-subdirs .bash lst-cap="Subdirectorios monitoreados recursivamente por el trigger"}
 /Volumes/catalog/schema/volume/bronze/2026/06/
 /Volumes/catalog/schema/volume/bronze/2026/06/09/
 /Volumes/catalog/schema/volume/bronze/clientes/
@@ -266,7 +272,7 @@ El table update trigger monitorea **tablas de Unity Catalog** y dispara tu Job c
 
 Cuando usás table update triggers, Databricks inyecta parámetros que podés usar en tu notebook:
 
-```python
+```{#lst-dynamic-params .python lst-cap="Parámetros dinámicos inyectados por el table update trigger"}
 # Qué tablas se actualizaron (JSON list)
 updated = dbutils.widgets.get("job.trigger.table_update.updated_tables")
 
@@ -308,7 +314,7 @@ Cuando combinás un trigger event-driven con un Job, necesitás que tu código d
 
 `Trigger.AvailableNow` es la solución:
 
-```python
+```{#lst-available-now .python lst-cap="Streaming con Trigger.AvailableNow: procesa todo y termina"}
 (spark.readStream
     .format("cloudFiles")
     .option("cloudFiles.format", "json")
@@ -354,7 +360,7 @@ En serverless compute, **solo** `Trigger.AvailableNow` funciona para Structured 
 
 Si necesitás **latencia sub-minuto**, el modo continuous es otra opción. Configurás el Job como **Continuous** y Databricks reinicia automáticamente el run cuando termina (con un delay de < 60 segundos).
 
-```python
+```{#lst-continuous-mode .python lst-cap="Continuous mode con AvailableNow: restart automático al terminar"}
 # Con continuous mode, usás AvailableNow
 # El Job Cluster se reinicia automáticamente al terminar
 (spark.readStream
@@ -426,7 +432,7 @@ ggplot() +
 
 ### Código del notebook
 
-```python
+```{#lst-autoloader-bronze .python lst-cap="AutoLoader con file events y AvailableNow para ingesta bronze"}
 # Configuración
 volume_path = "/Volumes/mi_catalogo/mi_schema/bronze/clientes/"
 checkpoint_path = "/Volumes/mi_catalogo/mi_schema/checkpoints/clientes_bronze/"
@@ -462,7 +468,7 @@ El checkpoint garantiza **exactly-once**: si el Job falla a mitad, al reiniciar 
 
 Si necesitás hacer algo más que escribir en una tabla (ej: llamar una API, validar datos, merge):
 
-```python
+```{#lst-foreach-batch .python lst-cap="foreachBatch con validación y escritura a bronze y quarantine"}
 def procesar_batch(batch_df, batch_id):
     # Validaciones
     df_valido = batch_df.filter("email IS NOT NULL AND cantidad > 0")
@@ -500,7 +506,7 @@ Escenario: la tabla `bronze` se actualiza (por el pipeline del ejemplo anterior,
 
 ### Paso 1: Habilitar Change Data Feed en la tabla bronze
 
-```sql
+```{#lst-enable-cdf .sql lst-cap="Habilitar Change Data Feed en la tabla bronze"}
 ALTER TABLE mi_catalogo.mi_schema.clientes_bronze
 SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
 ```
@@ -511,7 +517,7 @@ En el Job de silver, agregá un trigger **Table Update** que monitoree `mi_catal
 
 ### Paso 3: Notebook de transformación
 
-```python
+```{#lst-bronze-to-silver .python lst-cap="Transformación bronze a silver con Change Data Feed (CDF)"}
 checkpoint_path = "/Volumes/mi_catalogo/mi_schema/checkpoints/clientes_silver/"
 
 (spark.readStream
@@ -533,7 +539,7 @@ checkpoint_path = "/Volumes/mi_catalogo/mi_schema/checkpoints/clientes_silver/"
 
 Opcionalmente, podés usar los parámetros que Databricks inyecta para logging o auditoría:
 
-```python
+```{#lst-trigger-logging .python lst-cap="Uso de parámetros dinámicos del trigger para logging"}
 # Qué tablas se actualizaron
 updated_tables = dbutils.widgets.get("job.trigger.table_update.updated_tables")
 print(f"Tablas actualizadas: {updated_tables}")

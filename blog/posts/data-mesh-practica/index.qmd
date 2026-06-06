@@ -29,6 +29,7 @@ Los datos son responsabilidad del equipo que los genera, no del equipo central d
 #| fig-width: 8
 #| fig-height: 4
 #| fig-align: center
+#| fig-cap: "Antes vs después: equipo de datos centralizado como cuello de botella vs dominios con ownership de sus Data Products."
 
 library(ggplot2)
 
@@ -88,8 +89,10 @@ ggplot() +
            color = "#e2e8f0", linewidth = 0.5, linetype = "dashed") +
   scale_fill_identity() +
   scale_color_identity() +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(5, 10, 5, 10))
+  theme(plot.margin = margin(5, 10, 5, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 **Lo que funciona**: los equipos de dominio conocen mejor sus datos. Las transformaciones son más correctas.
@@ -100,7 +103,7 @@ ggplot() +
 
 Los datos publicados por un dominio deben tratarse como un producto: con documentación, SLAs, calidad garantizada y un dueño responsable.
 
-```yaml
+```{#lst-data-product .yaml lst-cap="Definición de un Data Product con SLA, schema y consumidores"}
 # Data Product: ventas diarias
 product:
   name: daily_sales
@@ -138,6 +141,7 @@ Un equipo de plataforma provee las herramientas para que los dominios puedan pub
 #| fig-width: 7
 #| fig-height: 3.5
 #| fig-align: center
+#| fig-cap: "Self-Serve Data Platform: la plataforma provee templates, CI/CD, governance y compute a los dominios."
 
 library(ggplot2)
 
@@ -181,8 +185,10 @@ ggplot() +
             size = 4, color = "white", fontface = "bold") +
   scale_fill_identity() +
   coord_cartesian(ylim = c(0, 4)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(5, 10, 5, 10))
+  theme(plot.margin = margin(5, 10, 5, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 **Lo que funciona**: Databricks Asset Bundles + Unity Catalog es una combinación muy buena para esto. Cada dominio tiene su bundle template, deploya con CI/CD, y la gobernanza es centralizada.
@@ -193,7 +199,7 @@ ggplot() +
 
 La gobernanza es global pero la ejecución es local. El equipo de plataforma define las reglas, cada dominio las implementa.
 
-```sql
+```{#lst-governance .sql lst-cap="Gobernanza federada: propiedades de tabla y masking de PII"}
 -- Gobernanza global: reglas definidas por plataforma
 
 -- Todas las tablas Gold deben tener estas propiedades
@@ -215,7 +221,7 @@ ALTER COLUMN email SET MASK platform.security.mask_email;
 
 ### Estructura de catálogos
 
-```sql
+```{#lst-catalogs .sql lst-cap="Estructura de catálogos por dominio en Unity Catalog"}
 -- Un catalog por dominio
 CREATE CATALOG sales;
 CREATE CATALOG marketing;
@@ -235,7 +241,7 @@ GRANT SELECT ON SCHEMA sales.gold TO `data-consumers`;
 
 ### DABs por dominio
 
-```yaml
+```{#lst-dabs-domain .yaml lst-cap="Databricks Asset Bundle configurado por dominio de ventas"}
 # domains/sales/databricks.yml
 bundle:
   name: sales-domain
@@ -267,7 +273,7 @@ resources:
 
 ### Quality Monitors
 
-```sql
+```{#lst-quality-monitor .sql lst-cap="Quality Monitor con métricas custom sobre un Data Product"}
 -- Monitor automático sobre data product
 CREATE OR REPLACE QUALITY MONITOR sales.gold.daily_revenue (
   TIME_SERIES (

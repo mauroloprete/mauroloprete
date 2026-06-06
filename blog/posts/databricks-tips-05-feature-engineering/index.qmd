@@ -14,7 +14,7 @@ Sexta entrega de **Databricks Tips**. Feature Engineering es donde la mayoría d
 
 El error más común en ML no es elegir el modelo equivocado. Es que los features en producción se calculan diferente a como se calcularon en entrenamiento:
 
-```python
+```{#lst-training-skew .python lst-cap="Training-serving skew: data leakage por ventana temporal"}
 # En el notebook (entrenamiento):
 df["avg_purchases_30d"] = df.groupby("customer_id")["amount"] \
     .transform(lambda x: x.rolling(30).mean())
@@ -30,7 +30,7 @@ La solución: **Feature Store con point-in-time correctness**.
 
 ## Feature Store: la fuente de verdad
 
-```python
+```{#lst-feature-table .python lst-cap="Crear Feature Table con timestamp key para point-in-time"}
 from databricks.feature_engineering import FeatureEngineeringClient
 
 fe = FeatureEngineeringClient()
@@ -55,7 +55,7 @@ fe.create_table(
 
 Acá es donde la mayoría la embarran. Si entrenás con features calculados al momento de correr el notebook, estás usando información del futuro:
 
-```python
+```{#lst-pit-lookup .python lst-cap="Point-in-time lookup: evitar data leakage en training set"}
 from databricks.feature_engineering import FeatureLookup
 
 # CORRECTO: point-in-time lookup
@@ -88,7 +88,7 @@ El `timestamp_lookup_key` garantiza que para un evento del 15 de marzo, solo usa
 
 Un patrón que funciona bien en producción:
 
-```python
+```{#lst-pipeline-features .python lst-cap="Pipeline de features: batch diario + streaming en DLT"}
 # 1. Features batch (se calculan diariamente)
 @dlt.table(
     name="customer_features_daily",
@@ -134,7 +134,7 @@ fe.write_table(
 
 Para modelos que sirven predicciones en tiempo real, leer features de Delta (segundos) es muy lento. Necesitás un online store:
 
-```python
+```{#lst-online-store .python lst-cap="Publicar features a Online Store para serving en milisegundos"}
 from databricks.feature_engineering import FeatureEngineeringClient
 
 fe = FeatureEngineeringClient()
@@ -158,7 +158,7 @@ spec = fe.publish_table(
 
 Los features se vuelven stale. Un pipeline que falla silenciosamente produce features viejos y predicciones malas:
 
-```python
+```{#lst-freshness-check .python lst-cap="Monitoreo de freshness: alertar si los features son stale"}
 # Chequear freshness antes de servir
 from datetime import datetime, timedelta
 

@@ -14,7 +14,7 @@ Quinta entrega de **Databricks Tips**. Si estás preparando el ML Professional o
 
 El modelo viejo (Workspace Model Registry) usaba **stages**: `None → Staging → Production → Archived`. El modelo nuevo (Unity Catalog) usa **aliases**:
 
-```python
+```{#lst-registry-uri .python lst-cap="Cambio de Workspace Registry a Unity Catalog Registry"}
 import mlflow
 
 # Viejo (NO usar): workspace registry con stages
@@ -30,7 +30,7 @@ mlflow.set_registry_uri("databricks-uc")
 
 ## Registro de modelos: el workflow completo
 
-```python
+```{#lst-mlflow-tracking .python lst-cap="Entrenamiento con tracking y registro del modelo en Unity Catalog"}
 import mlflow
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import f1_score
@@ -73,7 +73,7 @@ with mlflow.start_run(run_name="gbm_v2") as run:
 
 Olvidate de `transition_model_version_stage()`. Ahora se usan aliases:
 
-```python
+```{#lst-model-aliases .python lst-cap="Aliases de modelos: asignar champion y challenger"}
 from mlflow import MlflowClient
 
 client = MlflowClient()
@@ -115,7 +115,7 @@ Cuando registrás el dataset con `mlflow.log_input()`, Unity Catalog conecta la 
 - "Si cambio la tabla `gold.features`, ¿qué modelos se ven afectados?" → linaje inverso
 - "¿Con qué versión de los datos se entrenó el modelo v3?" → metadata del run
 
-```python
+```{#lst-linaje-datasets .python lst-cap="Consultar linaje: datasets usados para entrenar un modelo"}
 # Ver los inputs de un modelo
 run = client.get_run(run_id)
 for input_data in run.inputs.dataset_inputs:
@@ -128,7 +128,7 @@ for input_data in run.inputs.dataset_inputs:
 
 Una vez que tenés el modelo registrado, servirlo es configuración:
 
-```python
+```{#lst-model-serving .python lst-cap="Configurar Model Serving endpoint con A/B testing"}
 import requests
 
 # Crear endpoint vía API
@@ -171,7 +171,7 @@ ab_config = {
 
 **AI Gateway** agrega rate limiting, logging y guardrails encima del endpoint:
 
-```python
+```{#lst-ai-gateway .python lst-cap="AI Gateway: logging automático de inferencias"}
 # Todas las llamadas al endpoint se logean automáticamente
 # en una tabla de inference logs para monitoreo
 ```
@@ -180,7 +180,7 @@ ab_config = {
 
 El Feature Store de Databricks está integrado con Unity Catalog:
 
-```python
+```{#lst-feature-store .python lst-cap="Feature Store: crear tabla y entrenar con feature lookups"}
 from databricks.feature_engineering import FeatureEngineeringClient
 
 fe = FeatureEngineeringClient()

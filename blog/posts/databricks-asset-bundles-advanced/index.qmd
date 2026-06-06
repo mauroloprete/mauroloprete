@@ -19,7 +19,7 @@ Acá comparto los casos que me hubiese gustado conocer antes.
 
 La mayoría de los ejemplos muestran variables simples (`my_cluster_id: "abc123"`). Pero DABs soporta **variables tipadas como `complex`**, lo que permite pasar objetos YAML completos como variable:
 
-```yaml
+```{#lst-complex-var .yaml lst-cap="Variable complex: configuración de cluster reutilizable en DABs"}
 variables:
   cluster_config:
     description: "Configuración del cluster reutilizable"
@@ -55,7 +55,7 @@ Esto te permite definir un cluster una vez y reutilizarlo en múltiples jobs sin
 
 Uno de los features menos conocidos. En vez de hardcodear IDs de clusters, warehouses o policies, usás `lookup` y DABs resuelve el ID por nombre en deploy time:
 
-```yaml
+```{#lst-lookups .yaml lst-cap="Lookups: resolver IDs de recursos por nombre en deploy time"}
 variables:
   shared_cluster:
     description: "Cluster compartido del equipo"
@@ -89,7 +89,7 @@ Tipos soportados para lookup: `alert`, `cluster_policy`, `cluster`, `dashboard`,
 
 Cuando empaquetás tu código como wheel para deployar en un job, el problema clásico es tener que bumpar la versión en `setup.py` cada vez. DABs resuelve esto con `dynamic_version`:
 
-```yaml
+```{#lst-artifacts-whl .yaml lst-cap="Artifacts: empaquetar wheels con versión dinámica"}
 bundle:
   name: my-etl-pipeline
 
@@ -129,7 +129,7 @@ Con `dynamic_version: true` no necesitás tocar `pyproject.toml` en cada deploy.
 
 En equipos grandes, un solo `databricks.yml` se vuelve inmanejable. El patrón que mejor funciona es un monorepo donde cada dominio tiene su propia configuración y un `databricks.yml` raíz los incluye:
 
-```
+```{#lst-monorepo-structure lst-cap="Estructura de monorepo con un bundle por dominio"}
 project/
 ├── databricks.yml              # Bundle raíz
 ├── shared/
@@ -147,7 +147,7 @@ project/
 │       └── src/
 ```
 
-```yaml
+```{#lst-bundle-root .yaml lst-cap="Bundle raíz: includes, variables y targets por ambiente"}
 # databricks.yml
 bundle:
   name: data-platform
@@ -185,7 +185,7 @@ targets:
         level: CAN_VIEW
 ```
 
-```yaml
+```{#lst-shared-cluster .yaml lst-cap="Cluster compartido con autoscale definido como variable complex"}
 # shared/clusters.yml
 variables:
   shared_cluster:
@@ -200,7 +200,7 @@ variables:
         spark.databricks.delta.optimizeWrite.enabled: true
 ```
 
-```yaml
+```{#lst-domain-resource .yaml lst-cap="Recurso de dominio: job de ingesta con schedule y cluster compartido"}
 # domains/ingestion/resources.yml
 resources:
   jobs:
@@ -220,7 +220,7 @@ resources:
 
 Más allá de `mode: development` y `mode: production`, podés usar `presets` para control granular:
 
-```yaml
+```{#lst-presets .yaml lst-cap="Presets: control granular de prefijos, triggers y tags por target"}
 targets:
   dev:
     mode: development
@@ -259,7 +259,7 @@ La prioridad es: **configuración del recurso > presets > mode defaults**. Si un
 
 En producción, nunca deberías deployar como tu usuario personal. El patrón correcto:
 
-```yaml
+```{#lst-run-as-prod .yaml lst-cap="Patrón de producción: run_as con service principal y permisos"}
 targets:
   prod:
     mode: production
@@ -293,7 +293,7 @@ DABs valida en `mode: production` que:
 
 El workflow completo para CI/CD con DABs:
 
-```yaml
+```{#lst-cicd-github .yaml lst-cap="CI/CD con GitHub Actions: validar y deployar DABs automáticamente"}
 # .github/workflows/deploy.yml
 name: Deploy DAB
 
@@ -341,7 +341,7 @@ jobs:
 
 Por defecto DABs sincroniza todo el directorio. Controlá qué archivos suben al workspace:
 
-```yaml
+```{#lst-sync-patterns .yaml lst-cap="Sync patterns: controlar qué archivos se suben al workspace"}
 sync:
   include:
     - "src/**/*.py"
@@ -369,7 +369,7 @@ Las variables se resuelven en este orden (la primera que tenga valor gana):
 
 Esto permite que el CI/CD inyecte valores vía `BUNDLE_VAR_*` sin tocar el YAML:
 
-```bash
+```{#lst-bundle-var-env .bash lst-cap="Inyectar variables de entorno BUNDLE_VAR en deploy de CI/CD"}
 export BUNDLE_VAR_cluster_config='{"num_workers": 20}'
 export BUNDLE_VAR_environment=prod
 databricks bundle deploy --target prod

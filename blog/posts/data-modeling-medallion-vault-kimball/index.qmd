@@ -73,7 +73,7 @@ erDiagram
 
 ### En Databricks
 
-```sql
+```{#lst-kimball-ddl .sql lst-cap="Kimball en Databricks: fact table y dimensión con SCD Type 2"}
 -- Fact table
 CREATE TABLE gold.fact_sales (
   sale_id BIGINT,
@@ -166,7 +166,7 @@ erDiagram
 
 ### En Databricks
 
-```sql
+```{#lst-vault-ddl .sql lst-cap="Data Vault en Databricks: Hub, Satellite y Link en Delta"}
 -- Hub
 CREATE TABLE vault.hub_customer (
   customer_hk STRING,  -- hash de business key
@@ -212,6 +212,7 @@ El enfoque que popularizó Databricks. No es un modelo de datos en el sentido de
 #| fig-width: 7
 #| fig-height: 1.5
 #| fig-align: center
+#| fig-cap: "Arquitectura Medallion: Bronze (datos raw), Silver (limpieza y validación), Gold (modelos de negocio)."
 
 library(ggplot2)
 
@@ -238,8 +239,10 @@ ggplot(med) +
   scale_fill_identity() +
   scale_color_identity() +
   coord_cartesian(ylim = c(-0.55, 0.55)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(2, 2, 2, 2))
+  theme(plot.margin = margin(2, 2, 2, 2),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 ### El punto clave que muchos no ven
@@ -259,7 +262,7 @@ ggplot(med) +
 
 ### En Databricks
 
-```sql
+```{#lst-medallion-ddl .sql lst-cap="Medallion en Databricks: tablas Bronze, Silver y Gold en Delta"}
 -- Bronze: dato crudo
 CREATE TABLE bronze.raw_transactions (
   _ingest_timestamp TIMESTAMP DEFAULT current_timestamp(),
@@ -309,7 +312,7 @@ No son mutuamente excluyentes. El patrón que mejor funciona en la práctica:
 
 **Medallion como arquitectura de capas + Kimball en Gold para consumo.**
 
-```
+```{#lst-pattern-recommended lst-cap="Patrón recomendado: Medallion + Kimball en Gold"}
 Fuentes → Bronze (raw) → Silver (clean) → Gold (Kimball star schema)
 ```
 
@@ -317,7 +320,7 @@ Si estás en un contexto enterprise con 50+ fuentes y requerimientos de auditor�
 
 **Medallion + Data Vault en Silver + Kimball en Gold.**
 
-```
+```{#lst-pattern-enterprise lst-cap="Patrón enterprise: Data Vault en Silver + Kimball en Gold"}
 Fuentes → Bronze (raw) → Silver (Data Vault) → Gold (Kimball)
 ```
 
@@ -325,7 +328,7 @@ Y si estás en un equipo chico haciendo un MVP:
 
 **Medallion con Gold plano. Sin ceremonias.**
 
-```
+```{#lst-pattern-mvp lst-cap="Patrón MVP: Medallion con Gold plano sin modelado formal"}
 Fuentes → Bronze → Silver → Gold (tablas agregadas simples)
 ```
 

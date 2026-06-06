@@ -14,7 +14,7 @@ Cuarta entrega de **Databricks Tips**. Structured Streaming en Databricks parece
 
 El trigger define **cuándo** se ejecuta cada micro-batch. Elegir mal sale caro:
 
-```python
+```{#lst-trigger-modes .python lst-cap="Trigger modes: processingTime vs availableNow según latencia"}
 # MALO en producción: procesa continuamente, consume cluster 24/7
 df.writeStream \
   .trigger(processingTime="0 seconds") \
@@ -53,7 +53,7 @@ df.writeStream \
 
 Sin watermark, Spark mantiene **todo** el estado en memoria para joins y aggregations. Con tablas grandes, esto explota:
 
-```python
+```{#lst-watermark .python lst-cap="Watermark: limitar el estado en memoria para aggregations"}
 from pyspark.sql.functions import window, col
 
 # Sin watermark: el estado crece infinitamente
@@ -80,7 +80,7 @@ events \
 
 `spark.readStream.format("cloudFiles")` es el Auto Loader. Es superior a `spark.readStream.format("parquet")` por varias razones:
 
-```python
+```{#lst-auto-loader .python lst-cap="Auto Loader vs file source: schema evolution y exactly-once"}
 # MALO: file source básico
 df = (spark.readStream
   .format("parquet")
@@ -112,7 +112,7 @@ df.writeStream \
 - **Rescue column**: columnas que no matchean el schema van a `_rescued_data` en vez de fallar.
 - **Exactly-once**: el checkpoint garantiza que nunca procesás un archivo dos veces.
 
-```python
+```{#lst-rescue-column .python lst-cap="Rescue column: capturar datos que no matchean el schema"}
 # Habilitar rescue column para datos sucios
 df = (spark.readStream
   .format("cloudFiles")
@@ -126,7 +126,7 @@ df = (spark.readStream
 
 Cuando necesitás lógica que no se puede expresar en streaming puro (upserts, llamadas a APIs, multi-table writes):
 
-```python
+```{#lst-foreach-batch .python lst-cap="foreachBatch con MERGE: upsert idempotente en streaming"}
 def upsert_to_delta(batch_df, batch_id):
     from delta.tables import DeltaTable
 
@@ -152,7 +152,7 @@ def upsert_to_delta(batch_df, batch_id):
 
 ## Monitoreo: qué mirar en producción
 
-```python
+```{#lst-stream-monitor .python lst-cap="StreamingQueryListener: monitorear batches y detectar lag"}
 # Query listener para métricas
 from pyspark.sql.streaming import StreamingQueryListener
 

@@ -27,6 +27,7 @@ Imaginate que tenés una receta de cocina. Podés darle la receta a alguien y es
 #| fig-width: 9
 #| fig-height: 3.5
 #| fig-align: center
+#| fig-cap: "Sin Docker cada máquina tiene versiones distintas; con Docker, misma imagen y mismo resultado en todos los entornos."
 
 library(ggplot2)
 
@@ -78,8 +79,10 @@ ggplot() +
 
   scale_fill_identity() +
   coord_cartesian(xlim = c(-0.3, 6.7), ylim = c(-0.1, 4.2)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(5, 10, 10, 10))
+  theme(plot.margin = margin(5, 10, 10, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 Los conceptos clave:
@@ -89,7 +92,7 @@ Los conceptos clave:
 - **Registry**: donde guardás las imágenes (Docker Hub, Amazon ECR, Azure ACR). Es como un "GitHub para imágenes Docker".
 - **Dockerfile**: la receta para construir la imagen. Cada línea `RUN` agrega algo al entorno.
 
-```dockerfile
+```{#lst-dockerfile-basico .dockerfile lst-cap="Dockerfile básico: imagen base, dependencias y código"}
 # Ejemplo básico de Dockerfile
 FROM python:3.11-slim          # Partís de una imagen base
 RUN pip install pandas==2.2.3  # Instalás dependencias
@@ -119,6 +122,7 @@ Es decir, Databricks inyecta Spark en tu contenedor al arrancar. Por eso ignora 
 #| fig-width: 9
 #| fig-height: 3
 #| fig-align: center
+#| fig-cap: "Flujo de Databricks Container Services: build de la imagen, push al registry, configuración del cluster y launch."
 
 library(ggplot2)
 
@@ -149,8 +153,10 @@ ggplot() +
                color = "#94a3b8", linewidth = 0.6) +
   scale_fill_identity() +
   coord_cartesian(xlim = c(0, 8), ylim = c(-0.2, 1.8)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
   theme_void() +
-  theme(plot.margin = margin(5, 10, 15, 10))
+  theme(plot.margin = margin(5, 10, 15, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
 **Lo nuevo (2025-2026)**: DCS ahora soporta **Standard Compute** (shared clusters con aislamiento). Antes solo funcionaba en Dedicated Compute. Esto cambia todo, porque ahora podés tener un entorno Docker compartido sin necesidad de un cluster por persona.
@@ -163,7 +169,7 @@ Antes de hacer cualquier cosa, un **workspace admin** tiene que habilitar Contai
 
 **En Azure** (no hay toggle en la UI): se hace por CLI:
 
-```bash
+```{#lst-habilitar-dcs .bash lst-cap="Habilitar y verificar DCS en Azure vía Databricks CLI"}
 # Habilitar DCS en Azure Databricks
 databricks workspace-conf set-status --json '{"enableDcs": "true"}' --profile <tu-profile>
 
@@ -191,7 +197,7 @@ Si habilitaste todo y seguís sin ver el tab, verificá que tu workspace sea **P
 
 El caso de uso más potente de DCS es el **golden container**: una imagen Docker que pasa CI/CD, se escanea por seguridad, y se deploya como el único entorno autorizado para producción.
 
-```dockerfile
+```{#lst-golden-container .dockerfile lst-cap="Golden container: dependencias fijas y librerías de sistema"}
 # golden.Dockerfile
 FROM databricksruntime/standard:16.4-LTS
 
@@ -209,7 +215,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 ```
 
-```bash
+```{#lst-build-push .bash lst-cap="Build y push de la imagen golden al registry"}
 # Build + push
 docker build -f golden.Dockerfile -t mi-ecr.amazonaws.com/dbx-golden:v2.1.0 .
 docker push mi-ecr.amazonaws.com/dbx-golden:v2.1.0
@@ -232,7 +238,7 @@ Hay dos formas: UI y API/CLI.
 
 El endpoint es `POST /api/2.0/clusters/create` ([referencia](https://docs.databricks.com/api/workspace/clusters/create)):
 
-```bash
+```{#lst-cluster-api .bash lst-cap="Crear cluster con imagen Docker vía REST API"}
 curl -X POST "https://<tu-workspace>.cloud.databricks.com/api/2.0/clusters/create" \
   -H "Authorization: Bearer $DATABRICKS_TOKEN" \
   -H "Content-Type: application/json" \
@@ -256,7 +262,7 @@ curl -X POST "https://<tu-workspace>.cloud.databricks.com/api/2.0/clusters/creat
 
 O con la **Databricks CLI**:
 
-```bash
+```{#lst-cluster-cli .bash lst-cap="Crear cluster con imagen Docker vía Databricks CLI"}
 databricks clusters create --json '{
   "cluster_name": "prod-golden-container",
   "spark_version": "16.4.x-scala2.12",
@@ -299,7 +305,7 @@ Con la llegada de DCS para Standard Compute, ahora tenés dos opciones:
 
 Esto te va a pasar, te lo garantizo. Construís tu imagen, todo verde en local, lanzás el cluster y... tus notebooks no encuentran las librerías.
 
-```dockerfile
+```{#lst-python-path .dockerfile lst-cap="Error frecuente: instalar paquetes en el path correcto"}
 # MALO — instala en el Python del sistema
 RUN pip install pandas==2.2.3
 
@@ -412,7 +418,7 @@ ggplot() +
 
 El Dockerfile para este caso:
 
-```dockerfile
+```{#lst-dockerfile-geo .dockerfile lst-cap="Dockerfile geoespacial: GDAL, GeoPandas y Prophet"}
 FROM databricksruntime/standard:16.4-LTS
 
 # Librerías de sistema para geoespacial
@@ -439,7 +445,7 @@ RUN /databricks/python3/bin/python -c "from osgeo import gdal; print(f'GDAL {gda
 
 El notebook queda limpio:
 
-```python
+```{#lst-pipeline-geo .python lst-cap="Pipeline geoespacial: forecast de demanda por zona con Prophet"}
 # El notebook solo tiene lógica de negocio — cero setup
 import geopandas as gpd
 from prophet import Prophet
@@ -470,7 +476,7 @@ for zona_id in geo_zonas["zona_id"].unique():
 
 Donde DCS realmente brilla es cuando lo integrás con tu pipeline de CI/CD. En vez de instalar dependencias en cada arranque (init scripts), las bakeás en la imagen y las testeás antes de llegar a producción:
 
-```yaml
+```{#lst-cicd-workflow .yaml lst-cap="GitHub Actions: CI/CD para build, test y push del golden container"}
 # .github/workflows/docker-dbx.yml
 name: Build & Push Golden Container
 

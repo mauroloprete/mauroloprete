@@ -37,7 +37,7 @@ Un Data Contract es un acuerdo formal entre el **productor** de datos (quien gen
 
 ## Anatomía de un Data Contract
 
-```yaml
+```{#lst-contract-yaml .yaml lst-cap="Definición YAML de un Data Contract con schema, SLAs y reglas de calidad"}
 # contracts/transactions.yml
 contract:
   name: transactions
@@ -103,7 +103,7 @@ contract:
 
 ### 1. Parser del contrato
 
-```python
+```{#lst-parser .python lst-cap="Parser de contratos YAML a dataclasses de Python"}
 import yaml
 from dataclasses import dataclass
 from typing import List, Optional
@@ -156,7 +156,7 @@ class DataContract:
 
 ### 2. Validador de schema
 
-```python
+```{#lst-schema-validator .python lst-cap="Validador de schema: compara DataFrame contra el contrato"}
 from pyspark.sql import DataFrame
 from pyspark.sql.types import *
 
@@ -204,7 +204,7 @@ def validate_schema(df: DataFrame, contract: DataContract) -> List[str]:
 
 ### 3. Validador de calidad
 
-```python
+```{#lst-quality-validator .python lst-cap="Validador de calidad: ejecuta reglas SQL y reporta violaciones"}
 def validate_quality(
     spark,
     table_name: str,
@@ -234,7 +234,7 @@ def validate_quality(
 
 ### 4. Integración en el pipeline
 
-```python
+```{#lst-ingest-pipeline .python lst-cap="Pipeline de ingesta con validación de contrato integrada"}
 class ContractViolation(Exception):
     """Excepción para violaciones de Data Contracts."""
     pass
@@ -284,7 +284,7 @@ def ingest_with_contract(
 | **Hard** | Pipeline se detiene, dato no entra | Fuentes críticas (core bancario, pagos) |
 | **Soft** | Se loguea warning, dato entra igual | Fuentes externas, datos no críticos |
 
-```python
+```{#lst-hard-vs-soft .python lst-cap="Hard contract vs Soft contract: fallar o enviar a cuarentena"}
 # Hard contract: falla y para
 if schema_errors:
     raise ContractViolation(...)
@@ -300,7 +300,7 @@ if schema_errors:
 
 Si usás DLT / Lakeflow Declarative Pipelines, podés expresar los contracts como expectations:
 
-```python
+```{#lst-dlt-expectations .python lst-cap="Data Contracts como DLT Expectations en Databricks"}
 import dlt
 
 @dlt.table(name="silver_transactions")
