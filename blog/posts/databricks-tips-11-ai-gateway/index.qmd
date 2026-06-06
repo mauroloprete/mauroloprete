@@ -1,0 +1,729 @@
+---
+title: "Databricks Tips #11: Unity AI Gateway — governance centralizada para LLMs en producción"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-06-30"
+draft: true
+categories: [Databricks Tips, Data Engineering, MLOps]
+description: "Rate limiting, guardrails, usage tracking, cost attribution, fallbacks y traffic splitting. Todo lo que necesitás para gobernar LLMs en tu organización."
+image: cover.png
+---
+
+Tu equipo tiene 5 endpoints de LLMs en producción. Marketing usa GPT para clasificar tickets, el equipo legal usa Claude para resumir contratos, data science tiene un modelo fine-tuned para NER. Nadie sabe cuánto está gastando cada uno, no hay límites de uso, y si un modelo externo se cae... bueno, se cae.
+
+**Unity AI Gateway** es la capa de governance que falta: un punto central para controlar acceso, costos, calidad y resiliencia de *todo* el tráfico de LLMs en tu organización.
+
+::: callout-note
+## TL;DR
+
+- **Un endpoint, múltiples modelos**: ruteo, fallbacks y traffic splitting transparentes.
+- **Rate limiting** por endpoint, usuario o grupo — gratis.
+- **Guardrails** con LLMs como evaluadores: PII, contenido unsafe, jailbreak, alucinaciones y custom.
+- **Usage tracking** en `system.ai_gateway.usage` con tokens, latencia y tags de costo.
+- **Cost attribution** por equipo, proyecto y modelo vía `system.billing.usage`.
+- **API OpenAI-compatible**: cambiás la `base_url` y listo.
+:::
+
+---
+
+## 0. Qué es AI Gateway
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 4
+#| fig-align: center
+#| fig-cap: "Unity AI Gateway: capa de governance entre los consumidores y los modelos de LLM."
+
+library(ggplot2)
+
+ggplot() +
+  # Fondo
+  annotate("rect", xmin = -0.5, xmax = 10.5, ymin = -0.2, ymax = 4.5,
+           fill = "#f8fafc", color = NA) +
+
+  # Consumidores (izquierda)
+  annotate("rect", xmin = 0, xmax = 2, ymin = 3.2, ymax = 3.8,
+           fill = "#64748b", color = "#475569", linewidth = 0.3) +
+  annotate("text", x = 1, y = 3.5, label = "Agentes",
+           color = "white", size = 2.8, fontface = "bold") +
+  annotate("rect", xmin = 0, xmax = 2, ymin = 2.2, ymax = 2.8,
+           fill = "#64748b", color = "#475569", linewidth = 0.3) +
+  annotate("text", x = 1, y = 2.5, label = "Notebooks",
+           color = "white", size = 2.8, fontface = "bold") +
+  annotate("rect", xmin = 0, xmax = 2, ymin = 1.2, ymax = 1.8,
+           fill = "#64748b", color = "#475569", linewidth = 0.3) +
+  annotate("text", x = 1, y = 1.5, label = "SQL (ai_query)",
+           color = "white", size = 2.8, fontface = "bold") +
+  annotate("rect", xmin = 0, xmax = 2, ymin = 0.2, ymax = 0.8,
+           fill = "#64748b", color = "#475569", linewidth = 0.3) +
+  annotate("text", x = 1, y = 0.5, label = "Apps",
+           color = "white", size = 2.8, fontface = "bold") +
+
+  # Flechas a Gateway
+  annotate("segment", x = 2.1, xend = 3.4, y = 3.5, yend = 2.2,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#cbd5e1", linewidth = 0.4) +
+  annotate("segment", x = 2.1, xend = 3.4, y = 2.5, yend = 2.1,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#cbd5e1", linewidth = 0.4) +
+  annotate("segment", x = 2.1, xend = 3.4, y = 1.5, yend = 1.9,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#cbd5e1", linewidth = 0.4) +
+  annotate("segment", x = 2.1, xend = 3.4, y = 0.5, yend = 1.8,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#cbd5e1", linewidth = 0.4) +
+
+  # Gateway (centro)
+  annotate("rect", xmin = 3.5, xmax = 6.5, ymin = 0.5, ymax = 3.5,
+           fill = "#FFA166", color = "#e8854a", linewidth = 0.5) +
+  annotate("text", x = 5, y = 3, label = "Unity AI Gateway",
+           color = "#7c2d12", size = 4, fontface = "bold") +
+  annotate("text", x = 5, y = 2.3,
+           label = "Rate Limits\nGuardrails\nUsage Tracking\nFallbacks",
+           color = "#7c2d12", size = 2.5, lineheight = 1) +
+
+  # Flechas a modelos
+  annotate("segment", x = 6.6, xend = 7.4, y = 2.8, yend = 3.5,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#cbd5e1", linewidth = 0.4) +
+  annotate("segment", x = 6.6, xend = 7.4, y = 2, yend = 2,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#cbd5e1", linewidth = 0.4) +
+  annotate("segment", x = 6.6, xend = 7.4, y = 1.2, yend = 0.5,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#cbd5e1", linewidth = 0.4) +
+
+  # Modelos (derecha)
+  annotate("rect", xmin = 7.5, xmax = 10, ymin = 3.2, ymax = 3.8,
+           fill = "#1e293b", color = "#0f172a", linewidth = 0.3) +
+  annotate("text", x = 8.75, y = 3.5, label = "OpenAI / GPT",
+           color = "white", size = 2.8, fontface = "bold") +
+  annotate("rect", xmin = 7.5, xmax = 10, ymin = 1.7, ymax = 2.3,
+           fill = "#1e293b", color = "#0f172a", linewidth = 0.3) +
+  annotate("text", x = 8.75, y = 2, label = "Anthropic / Claude",
+           color = "white", size = 2.8, fontface = "bold") +
+  annotate("rect", xmin = 7.5, xmax = 10, ymin = 0.2, ymax = 0.8,
+           fill = "#1e293b", color = "#0f172a", linewidth = 0.3) +
+  annotate("text", x = 8.75, y = 0.5, label = "Custom / Fine-tuned",
+           color = "white", size = 2.8, fontface = "bold") +
+
+  # Log
+  annotate("segment", x = 5, xend = 5, y = 0.4, yend = -0.1,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#e8854a", linewidth = 0.4) +
+  annotate("label", x = 5, y = -0.15, label = " Delta Tables (logs, usage, inference) ",
+           fill = "#fff7ed", color = "#9a4e1c", size = 2.3,
+           label.size = 0.3, label.r = unit(3, "pt"), fontface = "bold") +
+
+  coord_cartesian(xlim = c(-0.3, 10.3), ylim = c(-0.3, 4.3)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.margin = margin(10, 10, 10, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
+```
+
+AI Gateway es una capa de proxy entre tus consumidores (agentes, notebooks, apps, SQL) y los modelos de LLM (OpenAI, Anthropic, Google, modelos custom). Todo el tráfico pasa por el gateway, que aplica reglas de governance y loguea todo en Delta Tables dentro de Unity Catalog.
+
+**Qué controla:**
+
+- **Quién** puede usar qué modelo (permisos de Unity Catalog)
+- **Cuánto** puede usar cada usuario/grupo (rate limits)
+- **Qué contenido** pasa y qué se bloquea (guardrails)
+- **Cuánto cuesta** cada equipo/proyecto (cost attribution)
+- **Qué pasa si falla** el modelo primario (fallbacks)
+
+---
+
+## 1. API OpenAI-compatible
+
+La clave de AI Gateway es que expone una API compatible con OpenAI. Cualquier SDK que soporte OpenAI funciona cambiando solo la `base_url`:
+
+```{#lst-openai-sdk .python lst-cap="Usar AI Gateway con el SDK de OpenAI: solo cambia base_url y api_key"}
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=DATABRICKS_TOKEN,
+    base_url="https://<workspace>.azuredatabricks.net/ai-gateway/mlflow/v1"
+)
+
+response = client.chat.completions.create(
+    model="databricks-claude-sonnet-4",
+    messages=[{"role": "user", "content": "Qué es Delta Lake?"}],
+    max_tokens=256,
+)
+print(response.choices[0].message.content)
+```
+
+También soporta las APIs nativas de cada proveedor:
+
+```{#lst-anthropic-sdk .python lst-cap="API nativa de Anthropic a través de AI Gateway"}
+import anthropic
+
+client = anthropic.Anthropic(
+    api_key="unused",
+    base_url="https://<workspace>.azuredatabricks.net/ai-gateway/anthropic",
+    default_headers={
+        "Authorization": f"Bearer {DATABRICKS_TOKEN}",
+    },
+)
+
+message = client.messages.create(
+    model="<ai-gateway-endpoint>",
+    max_tokens=256,
+    messages=[{"role": "user", "content": "Qué es Delta Lake?"}],
+)
+```
+
+### Proveedores soportados
+
+| Proveedor | Modelos | Auth |
+|---|---|---|
+| **OpenAI** | GPT-4o, GPT-5, o-series | API key |
+| **Anthropic** | Claude Opus, Sonnet, Haiku | API key |
+| **Google** | Gemini Pro, Flash | Service account |
+| **Meta** | Llama 4, Llama 3.x | Hosted por Databricks |
+| **Amazon Bedrock** | Claude, Cohere, AI21 vía AWS | AWS access key |
+| **Azure OpenAI** | GPT vía Azure | API key o Entra ID |
+| **Custom** | Cualquier proxy OpenAI-compatible | Bearer token |
+
+---
+
+## 2. Rate Limiting
+
+Rate limiting controla cuántos requests o tokens puede consumir cada usuario o grupo.
+
+### Tipos de límites
+
+- **QPM** (Queries Per Minute): requests por minuto
+- **TPM** (Tokens Per Minute): tokens consumidos por minuto
+
+### Niveles
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3
+#| fig-align: center
+#| fig-cap: "Niveles de rate limiting: endpoint (global), default (todos los usuarios) y custom (por usuario/grupo)."
+
+library(ggplot2)
+
+levels <- data.frame(
+  x = c(1, 3.5, 6),
+  y = c(1, 1, 1),
+  label = c("Endpoint", "Default\n(por usuario)", "Custom\n(user/grupo)"),
+  sub = c("Límite global\nSi se excede, TODOS\nquedan bloqueados", "Aplica a todos\nlos usuarios salvo\noverride", "Overrides para\nusuarios, SPs\no grupos"),
+  color = c("#dc2626", "#FFA166", "#593196")
+)
+
+ggplot(levels) +
+  geom_tile(aes(x = x, y = y, fill = color),
+            width = 2.1, height = 1.6, color = NA, show.legend = FALSE) +
+  geom_text(aes(x = x, y = y + 0.35, label = label),
+            color = "white", size = 3.5, fontface = "bold", lineheight = 0.9) +
+  geom_text(aes(x = x, y = y - 0.25, label = sub),
+            color = "#e2e8f0", size = 2.3, lineheight = 0.9) +
+  scale_fill_identity() +
+  coord_cartesian(xlim = c(-0.5, 7.5), ylim = c(-0.1, 2)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.margin = margin(10, 10, 10, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
+```
+
+| Nivel | Comportamiento |
+|---|---|
+| **Endpoint** | Límite global. Si se excede, **todos** los requests se bloquean |
+| **Default (user)** | Aplica a todos los usuarios, salvo override |
+| **Custom** | Override para usuarios individuales, service principals o grupos |
+
+### Reglas clave
+
+- Si un usuario tiene QPM **y** TPM configurados, se aplica el **más restrictivo**
+- Límites de usuario overridean límites de grupo
+- Máximo **20 rate limits** y **5 group-specific limits** por endpoint
+- Requests que exceden el límite reciben **HTTP 429** (Too Many Requests)
+- Rate limiting es **gratis**
+
+::: {.callout-tip}
+## Tip: bursts cortos pueden pasar
+
+La implementación puede permitir bursts cortos porque los requests concurrentes se procesan antes de que se actualice el contador de uso. No diseñes asumiendo enforcement exacto al milisegundo.
+:::
+
+---
+
+## 3. Guardrails: filtrado inteligente de contenido
+
+Los guardrails usan un LLM como evaluador para filtrar contenido en input y/o output. Dos endpoints involucrados: el de inferencia (tu modelo) y el evaluador (el que aplica el guardrail).
+
+### Tipos disponibles
+
+| Guardrail | Acción | Fase | Qué hace |
+|---|---|---|---|
+| **PII redaction** | Sanitize | Input/Output | Reemplaza PII con `[NAME]`, `[EMAIL]`, etc. |
+| **PII blocking** | Block | Input/Output | Bloquea si detecta PII |
+| **Unsafe content** | Block | Input/Output | Hate speech, violencia, self-harm, contenido sexual |
+| **Jailbreak** | Block | Input | Detecta prompt injection, obfuscación Base64, role-playing |
+| **Hallucination** | Block | Output | Hechos fabricados, estadísticas inventadas |
+| **Custom** | Block/Sanitize | Input/Output | Tu propio prompt evaluador (hasta 5.000 chars) |
+
+### Ejemplo de guardrail custom
+
+```{#lst-custom-guardrail .text lst-cap="Prompt de guardrail custom: bloquear preguntas off-topic para un bot de soporte"}
+You are evaluating whether a user message is off-topic for a
+customer support assistant for Databricks.
+
+A message is on-topic if it is about:
+- Databricks features, pricing, or documentation
+- Account, billing, or support issues
+- Data engineering or analytics questions
+
+Flag off-topic messages.
+
+Examples:
+- "How do I configure Unity Catalog?" -> on-topic, do not flag
+- "What's a good recipe for lasagna?" -> off-topic, flag
+```
+
+### Comportamiento
+
+- **Fail-closed**: si el evaluador falla, el request se bloquea (no se puede bypasear por fallas transitorias)
+- **Dry-run mode**: evaluá sin bloquear — útil para testing
+- Requests bloqueados retornan **HTTP 400**
+- Máximo **3 blocking + 1 sanitizing** guardrail por fase (input/output)
+- Timeout: **30 segundos** por guardrail
+
+::: {.callout-warning}
+## Limitaciones de guardrails
+
+- No ven el **system prompt**, turnos anteriores de conversación, tool-call payloads ni imágenes
+- Evaluación de **mensaje único** — no detectan patrones multi-turno
+- No soportados con custom model endpoints
+- Cada llamada de guardrail se cobra como llamada normal al evaluator endpoint
+:::
+
+---
+
+## 4. Usage Tracking
+
+Cada request que pasa por AI Gateway se loguea en la system table `system.ai_gateway.usage`.
+
+### Campos clave
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `endpoint_name` | STRING | Nombre del endpoint |
+| `requester` | STRING | Usuario o service principal |
+| `destination_model` | STRING | Modelo que procesó el request |
+| `input_tokens` | LONG | Tokens de entrada |
+| `output_tokens` | LONG | Tokens de salida |
+| `total_tokens` | LONG | Total tokens |
+| `latency_ms` | LONG | Latencia total |
+| `status_code` | INT | HTTP status |
+| `endpoint_tags` | MAP | Tags del endpoint (team, project) |
+| `request_tags` | MAP | Tags del request individual |
+| `routing_information` | STRUCT | Detalles de fallback attempts |
+
+### Request tags para cost attribution
+
+Podés tagear cada request individual para tracking granular:
+
+```{#lst-request-tags .python lst-cap="Request tags para cost attribution por proyecto y equipo"}
+import json
+
+response = client.chat.completions.create(
+    model="databricks-claude-sonnet-4",
+    messages=[{"role": "user", "content": "Resumí este contrato"}],
+    extra_headers={
+        "Databricks-Ai-Gateway-Request-Tags": json.dumps({
+            "project": "legal-assistant",
+            "team": "legal-ops",
+            "cost_center": "CC-420",
+        })
+    },
+)
+```
+
+### Queries de análisis
+
+```{#lst-usage-by-user .sql lst-cap="Usage tracking: tokens consumidos por usuario en los últimos 30 días"}
+SELECT
+  requester,
+  destination_model,
+  COUNT(*) AS requests,
+  SUM(total_tokens) AS total_tokens
+FROM system.ai_gateway.usage
+WHERE event_time >= current_date() - INTERVAL 30 DAYS
+GROUP BY requester, destination_model
+ORDER BY total_tokens DESC
+```
+
+```{#lst-usage-by-tag .sql lst-cap="Consumo por proyecto usando request tags"}
+SELECT
+  request_tags['project'] AS project,
+  COUNT(*) AS requests,
+  SUM(total_tokens) AS total_tokens
+FROM system.ai_gateway.usage
+WHERE request_tags['project'] IS NOT NULL
+GROUP BY request_tags['project']
+ORDER BY total_tokens DESC
+```
+
+---
+
+## 5. Cost Attribution
+
+AI Gateway enriquece `system.billing.usage` con campos específicos para rastrear cuánto gasta cada equipo:
+
+### Queries de costo
+
+```{#lst-cost-endpoint .sql lst-cap="Costo en DBUs por endpoint en los últimos 30 días"}
+SELECT
+  usage_metadata.ai_gateway_endpoint_name AS endpoint,
+  SUM(usage_quantity) AS dbus
+FROM system.billing.usage
+WHERE billing_origin_product = 'MODEL_SERVING'
+  AND usage_metadata.ai_gateway_endpoint_name IS NOT NULL
+  AND usage_unit = 'DBU'
+  AND usage_date >= current_date() - INTERVAL 30 DAYS
+GROUP BY endpoint
+ORDER BY dbus DESC
+```
+
+```{#lst-cost-model .sql lst-cap="Costo en DBUs por modelo destino"}
+SELECT
+  usage_metadata.ai_gateway_destination_model AS model,
+  SUM(usage_quantity) AS dbus
+FROM system.billing.usage
+WHERE billing_origin_product = 'MODEL_SERVING'
+  AND usage_metadata.ai_gateway_endpoint_name IS NOT NULL
+  AND usage_unit = 'DBU'
+  AND usage_date >= current_date() - INTERVAL 30 DAYS
+GROUP BY model
+ORDER BY dbus DESC
+```
+
+```{#lst-cost-team .sql lst-cap="Costo en DBUs por equipo usando tags de endpoint"}
+SELECT
+  custom_tags['team'] AS team,
+  SUM(usage_quantity) AS dbus
+FROM system.billing.usage
+WHERE billing_origin_product = 'MODEL_SERVING'
+  AND custom_tags['team'] IS NOT NULL
+  AND usage_unit = 'DBU'
+  AND usage_date >= current_date() - INTERVAL 30 DAYS
+GROUP BY team
+ORDER BY dbus DESC
+```
+
+::: {.callout-important}
+## Costos de modelos externos
+
+Los requests a modelos externos (OpenAI, Anthropic directos con tu API key) se cobran por el proveedor y **no aparecen** en `system.billing.usage`. Solo aparecen los costos de DBUs de Databricks. Para tracking completo de modelos externos, usá las inference tables.
+:::
+
+---
+
+## 6. Fallbacks y Traffic Splitting
+
+### Fallbacks
+
+Si el modelo primario falla (429 o 5XX), AI Gateway rutea automáticamente al siguiente modelo en la cadena:
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 2.5
+#| fig-align: center
+#| fig-cap: "Cadena de fallback: si el modelo primario falla con 429/5XX, se intenta el siguiente."
+
+library(ggplot2)
+
+ggplot() +
+  # Modelo 1
+  annotate("rect", xmin = 0.5, xmax = 2.5, ymin = 0.5, ymax = 1.5,
+           fill = "#593196", color = "#4c1d95", linewidth = 0.3) +
+  annotate("text", x = 1.5, y = 1.1, label = "GPT-4o",
+           color = "white", size = 3, fontface = "bold") +
+  annotate("text", x = 1.5, y = 0.8, label = "Primario",
+           color = "#c4b5fd", size = 2.3) +
+  # Flecha 1
+  annotate("segment", x = 2.6, xend = 3.4, y = 1, yend = 1,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#dc2626", linewidth = 0.5) +
+  annotate("text", x = 3, y = 1.3, label = "429/5XX",
+           color = "#dc2626", size = 2, fontface = "bold") +
+  # Modelo 2
+  annotate("rect", xmin = 3.5, xmax = 5.5, ymin = 0.5, ymax = 1.5,
+           fill = "#FFA166", color = "#e8854a", linewidth = 0.3) +
+  annotate("text", x = 4.5, y = 1.1, label = "Claude Sonnet",
+           color = "#7c2d12", size = 3, fontface = "bold") +
+  annotate("text", x = 4.5, y = 0.8, label = "Fallback 1",
+           color = "#9a4e1c", size = 2.3) +
+  # Flecha 2
+  annotate("segment", x = 5.6, xend = 6.4, y = 1, yend = 1,
+           arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
+           color = "#dc2626", linewidth = 0.5) +
+  annotate("text", x = 6, y = 1.3, label = "429/5XX",
+           color = "#dc2626", size = 2, fontface = "bold") +
+  # Modelo 3
+  annotate("rect", xmin = 6.5, xmax = 8.5, ymin = 0.5, ymax = 1.5,
+           fill = "#1e293b", color = "#0f172a", linewidth = 0.3) +
+  annotate("text", x = 7.5, y = 1.1, label = "Llama 4",
+           color = "white", size = 3, fontface = "bold") +
+  annotate("text", x = 7.5, y = 0.8, label = "Fallback 2",
+           color = "#94a3b8", size = 2.3) +
+
+  coord_cartesian(xlim = c(0, 9), ylim = c(0.2, 1.7)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.margin = margin(10, 10, 10, 10),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
+```
+
+- Se activan ante errores **429** (rate limit) o **5XX** (server error)
+- Cada fallback se intenta **una vez**, en orden secuencial
+- Si todos fallan, el request falla y se loguea el último error
+- Los intentos se registran en `routing_information` de la tabla de usage
+
+### Traffic Splitting
+
+Distribuye requests entre múltiples modelos por porcentaje:
+
+| Modelo | Porcentaje | Uso |
+|---|---|---|
+| GPT-4o | 80% | Modelo principal |
+| Claude Sonnet | 20% | A/B testing |
+
+- Los porcentajes deben sumar **100**
+- Máximo **5 destinations** por traffic split
+- Casos de uso: A/B testing, gradual rollout, load balancing entre proveedores
+
+Traffic splitting y fallbacks son independientes: el split determina el modelo primario, los fallbacks aplican si ese modelo falla.
+
+---
+
+## 7. Inference Tables (Payload Logging)
+
+Las inference tables guardan el request y response completo de cada llamada. Útil para auditoría, debugging y fine-tuning.
+
+### Campos clave
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `request` | STRING | JSON raw del request |
+| `response` | STRING | JSON raw de la respuesta |
+| `latency_ms` | LONG | Latencia total |
+| `status_code` | INT | HTTP status |
+| `requester` | STRING | Quién hizo el request |
+| `sampling_fraction` | DOUBLE | Fracción de sampling (1 = todo) |
+
+### Limitaciones
+
+- Solo en **external storage catalogs** (no default storage)
+- Payload máximo: **10 MiB**
+- Entrega **best effort**: los logs generalmente disponibles en minutos, no garantizado
+- Puede no loguear requests con errores 401, 403, 429, 500
+
+---
+
+## 8. External Models: traé tu propia API key
+
+Para usar modelos de proveedores externos con tu propia API key, creás un endpoint de "external model":
+
+```{#lst-external-model .python lst-cap="Crear endpoint de external model con API key de Anthropic"}
+import mlflow.deployments
+
+client = mlflow.deployments.get_deploy_client("databricks")
+
+client.create_endpoint(
+    name="claude-via-gateway",
+    config={
+        "served_entities": [{
+            "external_model": {
+                "name": "claude-sonnet-4-20250514",
+                "provider": "anthropic",
+                "task": "llm/v1/chat",
+                "anthropic_config": {
+                    "anthropic_api_key": "{{secrets/ai/anthropic_key}}"
+                },
+            }
+        }]
+    },
+)
+```
+
+```{#lst-external-bedrock .python lst-cap="External model con Amazon Bedrock"}
+client.create_endpoint(
+    name="bedrock-claude",
+    config={
+        "served_entities": [{
+            "external_model": {
+                "name": "claude-v2",
+                "provider": "amazon-bedrock",
+                "task": "llm/v1/chat",
+                "amazon_bedrock_config": {
+                    "aws_region": "us-east-1",
+                    "aws_access_key_id": "{{secrets/aws/access_key}}",
+                    "aws_secret_access_key": "{{secrets/aws/secret_key}}",
+                    "bedrock_provider": "anthropic",
+                },
+            }
+        }]
+    },
+)
+```
+
+Las credenciales siempre van vía **Databricks Secrets** — nunca en plaintext.
+
+---
+
+## 9. AI Functions desde SQL
+
+AI Gateway potencia las AI Functions que vimos en [Tips #9](../databricks-tips-09-sql-warehouses/). Desde SQL puro:
+
+```{#lst-ai-classify .sql lst-cap="ai_classify: clasificar texto usando LLM desde SQL"}
+SELECT
+  ticket_id,
+  ai_classify(
+    descripcion,
+    ARRAY('bug', 'feature_request', 'billing', 'question')
+  ) AS categoria
+FROM soporte.tickets
+WHERE fecha >= '2026-01-01'
+```
+
+```{#lst-ai-extract .sql lst-cap="ai_extract: extraer entidades estructuradas de texto libre"}
+SELECT ai_extract(
+  comentario,
+  'producto STRING, sentimiento STRING, urgencia STRING'
+) AS entidades
+FROM feedback.comentarios
+```
+
+```{#lst-ai-summarize .sql lst-cap="ai_summarize: resumir texto a escala con batch inference"}
+SELECT
+  contrato_id,
+  ai_summarize(texto_contrato) AS resumen
+FROM legal.contratos
+```
+
+::: {.callout-tip}
+## Batching automático
+
+Las AI Functions manejan paralelización, retries y scaling internamente. Enviá el dataset completo en **una sola query** — Databricks optimiza la ejecución.
+:::
+
+---
+
+## 10. Permisos y autenticación
+
+### Permisos sobre endpoints
+
+| Permiso | Puede hacer |
+|---|---|
+| `CAN MANAGE` | Crear, modificar endpoint y configurar AI Gateway |
+| `CAN QUERY` | Consultar el endpoint (esto es lo que necesitan los usuarios finales) |
+
+### Autenticación del cliente
+
+- **Personal Access Token** (PAT) de Databricks como `api_key`
+- El token se pasa como `Authorization: Bearer <token>`
+
+### Credenciales de external models
+
+- Almacenadas vía **Databricks Secrets** (referencia `{{secrets/scope/key}}`)
+- Se borran automáticamente al eliminar el endpoint
+
+---
+
+## 11. Gotchas
+
+**1. Guardrails no ven el system prompt.** Si configurás un guardrail de jailbreak, no puede evaluar el contexto completo de la conversación — solo ve el mensaje del usuario. Ataques que explotan el system prompt no se detectan.
+
+**2. Un request puede generar múltiples eventos de billing.** Gateway routing + guardrail call + log ingestion = 3 DBU events por un solo request del usuario. Tené esto en cuenta al estimar costos.
+
+**3. Updates al config toman 20-40 segundos.** Rate limit updates hasta 60 segundos. No esperes enforcement instantáneo después de un cambio.
+
+**4. External model costs no aparecen en system.billing.usage.** Los costos de OpenAI/Anthropic directos se cobran por el proveedor. Solo los DBUs de Databricks aparecen en billing. Para tracking completo, usá inference tables + request tags.
+
+**5. `ai_query` con AI Gateway Beta tiene limitaciones.** Solo captura usage tracking. **No** aplica rate limits, guardrails, inference tables ni fallbacks. Para governance completa, usá la API directa.
+
+**6. Máximo 3 blocking + 1 sanitizing guardrail por fase.** Si necesitás más, combiná lógica en un guardrail custom con un prompt más complejo.
+
+**7. Guardrails son single-message.** No detectan patrones a lo largo de una conversación multi-turno. Un atacante sofisticado puede distribuir un jailbreak en múltiples mensajes.
+
+**8. Si el evaluator endpoint pierde acceso al modelo, falla cerrado.** El guardrail bloquea todo el tráfico. Elegí evaluadores confiables y monitoreá su disponibilidad.
+
+**9. Inference tables solo en external storage catalogs.** No podés usar el storage default del workspace. Configurá un external location primero.
+
+**10. No disponible en AWS GovCloud ni Azure Government.** La disponibilidad regional varía — no todos los modelos están en todas las regiones.
+
+---
+
+## 12. Cuándo NO usar AI Gateway
+
+| Necesidad | Alternativa |
+|---|---|
+| **Latencia ultra-baja** (< 50ms overhead) | Llamada directa al proveedor |
+| **Modelos on-premise** sin acceso a internet | Serving endpoint con modelo custom |
+| **Batch inference masivo** sobre tablas | `ai_query()` desde SQL directamente |
+| **Fine-tuning / training** | Foundation Model Training APIs |
+| **Workloads sin Unity Catalog** | No se puede usar AI Gateway |
+
+---
+
+## Qué es gratis y qué no
+
+| Feature | Costo |
+|---|---|
+| **Permisos + Rate limiting** | Gratis |
+| **Fallbacks** | Gratis |
+| **Traffic splitting** | Gratis |
+| **Usage tracking** | Incluido (habilitado por defecto) |
+| **Guardrails** | Se cobra como llamada al evaluator endpoint |
+| **Inference tables** | Se cobra por storage + ingestion |
+| **Modelos hosted (Foundation Model APIs)** | DBUs por token |
+| **Modelos externos** | Cobrados por el proveedor + DBUs de Databricks |
+
+---
+
+## Referencias
+
+- [Unity AI Gateway overview — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/)
+- [Configure AI Gateway endpoints](https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/configure-endpoints-beta)
+- [Rate limits](https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/rate-limits-beta)
+- [Guardrails](https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/guardrails)
+- [Usage tracking](https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/usage-tracking-beta)
+- [Cost observability](https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/cost-observability-beta)
+- [Inference tables](https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/inference-tables-beta)
+- [External models](https://learn.microsoft.com/en-us/azure/databricks/generative-ai/external-models/)
+- [AI Functions](https://learn.microsoft.com/en-us/azure/databricks/large-language-models/ai-functions)
+
+## Otros posts de la serie
+
+Si te sirvió este post, mirá los anteriores de **Databricks Tips**:
+
+- [**Tips #1**: Databricks Asset Bundles](../databricks-asset-bundles-advanced/) — IaC para Databricks
+- [**Tips #2**: Delta Lake](../databricks-tips-01-delta-lake/) — las 7 cosas que te hubiera gustado saber
+- [**Tips #3**: Unity Catalog](../databricks-tips-02-unity-catalog/) — gobernanza que nadie implementa bien
+- [**Tips #4**: Structured Streaming](../databricks-tips-03-structured-streaming/) — watermarks, triggers y micro-batch
+- [**Tips #5**: MLflow + Unity Catalog](../databricks-tips-04-mlflow-unity-catalog/) — del experimento al modelo
+- [**Tips #6**: Feature Engineering](../databricks-tips-05-feature-engineering/) — features que sobreviven a producción
+- [**Tips #7**: Docker en Databricks](../databricks-tips-06-docker-containers/) — contenedores custom
+- [**Tips #8**: Jobs & Workflows](../databricks-tips-08-jobs-workflows/) — streaming y triggers event-driven
+- [**Tips #9**: SQL Warehouses](../databricks-tips-09-sql-warehouses/) — el compute que se prende solo
+- [**Tips #10**: Lakeflow Declarative Pipelines](../databricks-tips-10-lakeflow-declarative-pipelines/) — pipelines declarativos con calidad built-in
+
+---
+
+*Próxima semana: Secrets & Security — manejo de credenciales, RBAC y buenas prácticas de seguridad.*
