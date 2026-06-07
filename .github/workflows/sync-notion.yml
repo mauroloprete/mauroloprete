@@ -1,0 +1,31 @@
+name: Sync blog posts to Notion
+
+on:
+  workflow_run:
+    workflows: ["Deploy Quarto site to Pages"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install notion-client pyyaml
+
+      - name: Sync to Notion
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          SITE_BASE_URL: "https://mauroloprete.github.io/mauroloprete"
+        run: python .github/scripts/sync_blog_to_notion.py

@@ -17,11 +17,16 @@ jobs:
       - name: Check for drafts to publish
         id: check
         run: |
-          python .github/scripts/auto_publish.py
+          python .github/scripts/auto_publish.py | tee /tmp/publish_output.txt
           if git diff --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
+            # Extract published post directories
+            grep "^Published:" /tmp/publish_output.txt \
+              | sed 's|Published: blog/posts/\(.*\)/index.qmd.*|\1|' \
+              | tr '\n' ' ' > /tmp/published_dirs.txt
+            echo "dirs=$(cat /tmp/published_dirs.txt)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit and push
@@ -32,3 +37,17 @@ jobs:
           git add blog/posts/*/index.qmd
           git commit -m "blog: publicar posts programados"
           git push
+
+      - name: Post to LinkedIn
+        if: steps.check.outputs.changed == 'true'
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_ID: ${{ secrets.LINKEDIN_PERSON_ID }}
+        run: |
+          if [ -z "$LINKEDIN_ACCESS_TOKEN" ] || [ -z "$LINKEDIN_PERSON_ID" ]; then
+            echo "LinkedIn secrets not configured, skipping."
+            exit 0
+          fi
+          for dir in ${{ steps.check.outputs.dirs }}; do
+            python .github/scripts/post_to_linkedin.py "blog/posts/$dir"
+          done

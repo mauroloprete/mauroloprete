@@ -18,28 +18,27 @@ Los Data Contracts son la solución a un problema que todos los ingenieros de da
 
 Situación típica en cualquier empresa:
 
-1. El equipo de backend agrega una columna al API
-2. Otro equipo cambia el tipo de un campo de `INT` a `STRING`
-3. Un proveedor externo modifica el formato del CSV que te manda
-4. Tu pipeline de Silver falla a las 3 AM
-5. Te enterás cuando el dashboard del CEO muestra datos vacíos
+1.  El equipo de backend agrega una columna al API
+2.  Otro equipo cambia el tipo de un campo de `INT` a `STRING`
+3.  Un proveedor externo modifica el formato del CSV que te manda
+4.  Tu pipeline de Silver falla a las 3 AM
+5.  Te enterás cuando el dashboard del CEO muestra datos vacíos
 
-**Sin Data Contracts**: te enterás cuando algo se rompe.
-**Con Data Contracts**: te enterás antes de que llegue a producción.
+**Sin Data Contracts**: te enterás cuando algo se rompe. **Con Data Contracts**: te enterás antes de que llegue a producción.
 
 ## Qué es un Data Contract
 
 Un Data Contract es un acuerdo formal entre el **productor** de datos (quien genera o envía datos) y el **consumidor** (quien los procesa). Define:
 
-- **Schema**: qué columnas, qué tipos, qué es nullable
-- **SLAs**: cuándo llegan los datos, con qué frecuencia
-- **Calidad**: reglas de validación (no nulos, rangos, unicidad)
-- **Ownership**: quién es responsable si algo falla
-- **Versionamiento**: cómo se manejan los cambios
+-   **Schema**: qué columnas, qué tipos, qué es nullable
+-   **SLAs**: cuándo llegan los datos, con qué frecuencia
+-   **Calidad**: reglas de validación (no nulos, rangos, unicidad)
+-   **Ownership**: quién es responsable si algo falla
+-   **Versionamiento**: cómo se manejan los cambios
 
 ## Anatomía de un Data Contract
 
-```{#lst-contract-yaml .yaml lst-cap="Definición YAML de un Data Contract con schema, SLAs y reglas de calidad"}
+``` {#lst-contract-yaml .yaml lst-cap="Definición YAML de un Data Contract con schema, SLAs y reglas de calidad"}
 # contracts/transactions.yml
 contract:
   name: transactions
@@ -105,7 +104,7 @@ contract:
 
 ### 1. Parser del contrato
 
-```{#lst-parser .python lst-cap="Parser de contratos YAML a dataclasses de Python"}
+``` {#lst-parser .python lst-cap="Parser de contratos YAML a dataclasses de Python"}
 import yaml
 from dataclasses import dataclass
 from typing import List, Optional
@@ -158,7 +157,7 @@ class DataContract:
 
 ### 2. Validador de schema
 
-```{#lst-schema-validator .python lst-cap="Validador de schema: compara DataFrame contra el contrato"}
+``` {#lst-schema-validator .python lst-cap="Validador de schema: compara DataFrame contra el contrato"}
 from pyspark.sql import DataFrame
 from pyspark.sql.types import *
 
@@ -206,7 +205,7 @@ def validate_schema(df: DataFrame, contract: DataContract) -> List[str]:
 
 ### 3. Validador de calidad
 
-```{#lst-quality-validator .python lst-cap="Validador de calidad: ejecuta reglas SQL y reporta violaciones"}
+``` {#lst-quality-validator .python lst-cap="Validador de calidad: ejecuta reglas SQL y reporta violaciones"}
 def validate_quality(
     spark,
     table_name: str,
@@ -236,7 +235,7 @@ def validate_quality(
 
 ### 4. Integración en el pipeline
 
-```{#lst-ingest-pipeline .python lst-cap="Pipeline de ingesta con validación de contrato integrada"}
+``` {#lst-ingest-pipeline .python lst-cap="Pipeline de ingesta con validación de contrato integrada"}
 class ContractViolation(Exception):
     """Excepción para violaciones de Data Contracts."""
     pass
@@ -282,11 +281,11 @@ def ingest_with_contract(
 ## Hard Contracts vs Soft Contracts
 
 | Tipo | Qué pasa si falla | Cuándo usarlo |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | **Hard** | Pipeline se detiene, dato no entra | Fuentes críticas (core bancario, pagos) |
 | **Soft** | Se loguea warning, dato entra igual | Fuentes externas, datos no críticos |
 
-```{#lst-hard-vs-soft .python lst-cap="Hard contract vs Soft contract: fallar o enviar a cuarentena"}
+``` {#lst-hard-vs-soft .python lst-cap="Hard contract vs Soft contract: fallar o enviar a cuarentena"}
 # Hard contract: falla y para
 if schema_errors:
     raise ContractViolation(...)
@@ -302,7 +301,7 @@ if schema_errors:
 
 Si usás DLT / Lakeflow Declarative Pipelines, podés expresar los contracts como expectations:
 
-```{#lst-dlt-expectations .python lst-cap="Data Contracts como DLT Expectations en Databricks"}
+``` {#lst-dlt-expectations .python lst-cap="Data Contracts como DLT Expectations en Databricks"}
 import dlt
 
 @dlt.table(name="silver_transactions")
@@ -320,8 +319,10 @@ def clean_transactions():
 
 ## Links
 
-- [Data Contracts (Andrew Jones)](https://datacontract.com/) — referencia de la comunidad
-- [DLT Expectations (Databricks)](https://docs.databricks.com/en/delta-live-tables/expectations.html) — documentación oficial
----
+-   [Data Contracts (Andrew Jones)](https://datacontract.com/) — referencia de la comunidad
+
+-   
+
+    ## [DLT Expectations (Databricks)](https://docs.databricks.com/en/delta-live-tables/expectations.html) — documentación oficial
 
 *Próxima semana: Data Mesh en la práctica — lo que funciona y lo que no.*

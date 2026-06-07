@@ -9,11 +9,11 @@ description: "Python, SQL, Spark, dbt, Databricks — el orden importa. Lo que a
 image: cover.png
 ---
 
-::: {.callout-tip}
+::: callout-tip
 ## Material del episodio
 
-- {{< fa display >}} [**Ver las slides de este episodio**](/slides/si-arrancara-de-cero/)
-- {{< fa brands github >}} [**Notebooks para ejecutar en Databricks Free Edition**](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero)
+-   {{< fa display >}} [**Ver las slides de este episodio**](/slides/si-arrancara-de-cero/)
+-   {{< fa brands github >}} [**Notebooks para ejecutar en Databricks Free Edition**](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero)
 :::
 
 Soy Mauro Loprete, Data Engineer en F1RST (Grupo Santander). Tengo las dos certificaciones de Databricks — [Data Engineer Professional](https://credentials.databricks.com/64b8ff9e-7ff0-4213-a4af-4612ecf973a7) y [Associate](https://credentials.databricks.com/4b91b7aa-d440-441a-8ebf-d933cc10ce48) — y estoy yendo por el MVP. Doy clases de Ciencia de Datos y Machine Learning en la [UdelaR](https://www.fcea.edu.uy/), y este podcast es mi forma de compartir lo que fui aprendiendo en el camino.
@@ -65,13 +65,13 @@ No podés aprender Spark sin saber Python. No podés entender dbt sin dominar SQ
 
 No estoy hablando de hacer un `print("Hola mundo")`. Estoy hablando de:
 
-- **Estructuras de datos**: listas, diccionarios, sets, tuplas. El 80% de lo que hacés en data es manipular estructuras.
-- **Funciones y decoradores**: cuando labures con Spark o dbt, vas a necesitar entender cómo se componen las funciones.
-- **Manejo de archivos**: JSON, CSV, YAML, Parquet. En data engineering vivís leyendo y escribiendo archivos.
-- **Entornos virtuales y dependencias**: `venv`, `pip`, `pyproject.toml`. Si no sabés manejar dependencias, tu primer proyecto en producción va a ser un desastre.
-- **Testing básico**: `pytest`. No necesitás ser un experto en TDD, pero sí saber testear una función.
+-   **Estructuras de datos**: listas, diccionarios, sets, tuplas. El 80% de lo que hacés en data es manipular estructuras.
+-   **Funciones y decoradores**: cuando labures con Spark o dbt, vas a necesitar entender cómo se componen las funciones.
+-   **Manejo de archivos**: JSON, CSV, YAML, Parquet. En data engineering vivís leyendo y escribiendo archivos.
+-   **Entornos virtuales y dependencias**: `venv`, `pip`, `pyproject.toml`. Si no sabés manejar dependencias, tu primer proyecto en producción va a ser un desastre.
+-   **Testing básico**: `pytest`. No necesitás ser un experto en TDD, pero sí saber testear una función.
 
-```{#lst-dataclass-product .python lst-cap="Dataclass para modelar un data product con validación"}
+``` {#lst-dataclass-product .python lst-cap="Dataclass para modelar un data product con validación"}
 # Lo mínimo que tenés que dominar de Python
 from dataclasses import dataclass
 from typing import List, Optional
@@ -106,7 +106,7 @@ El tema es que Python tiene varias formas de definir clases, y cada una tiene su
 
 **Clase tradicional** — control total, pero mucho boilerplate:
 
-```{#lst-class-tradicional .python lst-cap="Clase tradicional con boilerplate de __init__, __repr__ y __eq__"}
+``` {#lst-class-tradicional .python lst-cap="Clase tradicional con boilerplate de __init__, __repr__ y __eq__"}
 class Pipeline:
     def __init__(self, name: str, source: str, target: str, schedule: str = "daily"):
         self.name = name
@@ -128,7 +128,7 @@ Son 12 líneas para algo que debería ser simple. Y si te olvidás del `__eq__`,
 
 **`@dataclass`** — la opción correcta en el 90% de los casos:
 
-```{#lst-dataclass-pipeline .python lst-cap="Dataclass: misma funcionalidad en 5 líneas, con defaults seguros"}
+``` {#lst-dataclass-pipeline .python lst-cap="Dataclass: misma funcionalidad en 5 líneas, con defaults seguros"}
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -152,7 +152,7 @@ p == Pipeline("ingest_sales", "raw.sales", "silver.sales")  # True
 
 **`@dataclass(frozen=True)`** — cuando el objeto no debería cambiar:
 
-```{#lst-frozen-dataclass .python lst-cap="Frozen dataclass: objeto inmutable que falla si intentás mutarlo"}
+``` {#lst-frozen-dataclass .python lst-cap="Frozen dataclass: objeto inmutable que falla si intentás mutarlo"}
 @dataclass(frozen=True)
 class ConnectionConfig:
     host: str
@@ -175,7 +175,7 @@ Un objeto inmutable es uno que no se puede modificar después de crearlo. Y la p
 
 **El problema de los objetos mutables** es que cualquiera los puede cambiar en cualquier momento, y en un pipeline con muchas funciones eso se convierte en un desastre:
 
-```{#lst-mutable-problem .python lst-cap="Problema de mutabilidad: una función modifica la config sin aviso"}
+``` {#lst-mutable-problem .python lst-cap="Problema de mutabilidad: una función modifica la config sin aviso"}
 # Objeto MUTABLE — el problema
 @dataclass
 class Config:
@@ -204,7 +204,7 @@ La misma variable `config` ahora apunta a `localhost` en vez de producción. Est
 
 **Con inmutabilidad esto no pasa:**
 
-```{#lst-immutable-solution .python lst-cap="Solución inmutable: frozen dataclass + replace() para crear copias"}
+``` {#lst-immutable-solution .python lst-cap="Solución inmutable: frozen dataclass + replace() para crear copias"}
 @dataclass(frozen=True)
 class Config:
     host: str
@@ -230,7 +230,7 @@ Cada versión es un objeto separado. La original nunca se toca. Esto se llama **
 
 **En data engineering esto aparece todo el tiempo:**
 
-```{#lst-immutable-real-cases .python lst-cap="Casos reales de inmutabilidad: configs, validaciones y credenciales"}
+``` {#lst-immutable-real-cases .python lst-cap="Casos reales de inmutabilidad: configs, validaciones y credenciales"}
 # Configuración del pipeline — no debería cambiar durante la ejecución
 @dataclass(frozen=True)
 class PipelineConfig:
@@ -257,14 +257,14 @@ class Credentials:
 
 **¿Cuándo mutar y cuándo no?**
 
-- **Inmutable** (`frozen=True`): configuraciones, credenciales, resultados, metadatos, cualquier cosa que viaje entre funciones y no deba cambiar
-- **Mutable** (dataclass normal): objetos que acumulan estado durante un proceso, como un logger o un builder que vas armando paso a paso
+-   **Inmutable** (`frozen=True`): configuraciones, credenciales, resultados, metadatos, cualquier cosa que viaje entre funciones y no deba cambiar
+-   **Mutable** (dataclass normal): objetos que acumulan estado durante un proceso, como un logger o un builder que vas armando paso a paso
 
 La regla: si dudás, hacelo inmutable. Es más fácil relajar la restricción después que encontrar un bug por mutación inesperada a las 3 AM.
 
 **`NamedTuple`** — cuando querés inmutabilidad + desempaquetado:
 
-```{#lst-namedtuple .python lst-cap="NamedTuple: inmutable y desempaquetable como tupla"}
+``` {#lst-namedtuple .python lst-cap="NamedTuple: inmutable y desempaquetable como tupla"}
 from typing import NamedTuple
 
 class ValidationResult(NamedTuple):
@@ -286,7 +286,7 @@ La diferencia clave con frozen dataclass: las NamedTuples son tuplas de verdad. 
 
 **Pydantic `BaseModel`** — cuando necesitás validación:
 
-```{#lst-pydantic-basemodel .python lst-cap="Pydantic BaseModel: validación automática al crear el objeto"}
+``` {#lst-pydantic-basemodel .python lst-cap="Pydantic BaseModel: validación automática al crear el objeto"}
 from pydantic import BaseModel, field_validator
 
 class DataContract(BaseModel):
@@ -322,22 +322,22 @@ Pydantic es pesado (es una dependencia externa), pero cuando estás parseando co
 
 **¿Cuándo usar cada una?**
 
-| Situación | Tipo de clase |
-|-----------|--------------|
-| Modelo de datos simple (la mayoría) | `@dataclass` |
-| Configuración que no debe cambiar | `@dataclass(frozen=True)` |
-| Resultado liviano, desempaquetable | `NamedTuple` |
-| Parsing de JSON/YAML con validación | Pydantic `BaseModel` |
-| Lógica de negocio compleja, herencia | Clase tradicional |
-| Solo agrupás datos, nada más | `dict` (en serio, a veces alcanza) |
+| Situación                            | Tipo de clase                      |
+|--------------------------------------|------------------------------------|
+| Modelo de datos simple (la mayoría)  | `@dataclass`                       |
+| Configuración que no debe cambiar    | `@dataclass(frozen=True)`          |
+| Resultado liviano, desempaquetable   | `NamedTuple`                       |
+| Parsing de JSON/YAML con validación  | Pydantic `BaseModel`               |
+| Lógica de negocio compleja, herencia | Clase tradicional                  |
+| Solo agrupás datos, nada más         | `dict` (en serio, a veces alcanza) |
 
 La regla general: arrancá con `@dataclass`. Si necesitás inmutabilidad, ponele `frozen=True`. Si necesitás validación de entrada, usá Pydantic. Si necesitás herencia compleja o control total del ciclo de vida, clase tradicional. Y si es un dato descartable que usás una vez, un `dict` está bien.
 
 ### Recursos que recomiendo
 
-- [Python for Data Engineers](https://realpython.com/) — Real Python es excelente para ir más allá de lo básico
-- [Automate the Boring Stuff](https://automatetheboringstuff.com/) — para perder el miedo a los scripts
-- La documentación oficial de Python es sorprendentemente buena. Leela.
+-   [Python for Data Engineers](https://realpython.com/) — Real Python es excelente para ir más allá de lo básico
+-   [Automate the Boring Stuff](https://automatetheboringstuff.com/) — para perder el miedo a los scripts
+-   La documentación oficial de Python es sorprendentemente buena. Leela.
 
 ## 2. SQL: el lenguaje que nunca muere
 
@@ -345,13 +345,13 @@ SQL tiene más de 50 años y sigue siendo el lenguaje más usado en datos. No im
 
 Lo que tenés que dominar de verdad:
 
-- **Window functions**: `ROW_NUMBER()`, `LAG()`, `LEAD()`, `RANK()`, `SUM() OVER()`. Esto es lo que separa un analista junior de uno senior.
-- **CTEs**: Common Table Expressions. Escribí SQL legible, no queries anidados de 200 líneas.
-- **JOINs**: no solo `INNER` y `LEFT`. Entendé `CROSS`, `ANTI`, `SEMI`. Sabé cuándo un JOIN te multiplica filas.
-- **Aggregations con HAVING y GROUPING SETS**: para reportería real.
-- **Subqueries correlacionadas**: para entender por qué son lentas y cuándo evitarlas.
+-   **Window functions**: `ROW_NUMBER()`, `LAG()`, `LEAD()`, `RANK()`, `SUM() OVER()`. Esto es lo que separa un analista junior de uno senior.
+-   **CTEs**: Common Table Expressions. Escribí SQL legible, no queries anidados de 200 líneas.
+-   **JOINs**: no solo `INNER` y `LEFT`. Entendé `CROSS`, `ANTI`, `SEMI`. Sabé cuándo un JOIN te multiplica filas.
+-   **Aggregations con HAVING y GROUPING SETS**: para reportería real.
+-   **Subqueries correlacionadas**: para entender por qué son lentas y cuándo evitarlas.
 
-```{#lst-gen-sales-data .python lst-cap="Generar dataset de ventas con PySpark para practicar SQL"}
+``` {#lst-gen-sales-data .python lst-cap="Generar dataset de ventas con PySpark para practicar SQL"}
 from pyspark.sql import functions as F
 from datetime import date, timedelta
 import random
@@ -378,7 +378,7 @@ print(f"Filas generadas: {sales_df.count()}")
 sales_df.show(5)
 ```
 
-```{#lst-window-functions .sql lst-cap="Window functions: ranking y variación diaria por cliente"}
+``` {#lst-window-functions .sql lst-cap="Window functions: ranking y variación diaria por cliente"}
 %sql
 -- Ventas diarias por cliente con ranking y cambio vs día anterior
 WITH daily_sales AS (
@@ -425,13 +425,13 @@ Acá es donde la cosa se pone interesante. Spark no es "pandas grande" — es un
 
 ### Lo esencial
 
-- **Lazy evaluation**: Spark no ejecuta nada hasta que hacés una acción (`collect()`, `count()`, `write()`). Las transformaciones se acumulan en un plan.
-- **Particiones**: tus datos están distribuidos en particiones. Si no entendés esto, vas a hacer `coalesce(1)` en un dataset de 500GB y matar el cluster.
-- **Shuffle**: la operación más cara. Cada `JOIN`, `GROUP BY`, `DISTINCT` puede generar un shuffle. Minimizalos.
-- **Broadcast joins**: si una tabla es chica (< 10MB), broadcasteala. La diferencia puede ser de minutos a segundos.
-- **Catalyst optimizer**: Spark optimiza tu query plan. Pero si escribís UDFs en Python, el optimizer no puede ayudarte.
+-   **Lazy evaluation**: Spark no ejecuta nada hasta que hacés una acción (`collect()`, `count()`, `write()`). Las transformaciones se acumulan en un plan.
+-   **Particiones**: tus datos están distribuidos en particiones. Si no entendés esto, vas a hacer `coalesce(1)` en un dataset de 500GB y matar el cluster.
+-   **Shuffle**: la operación más cara. Cada `JOIN`, `GROUP BY`, `DISTINCT` puede generar un shuffle. Minimizalos.
+-   **Broadcast joins**: si una tabla es chica (\< 10MB), broadcasteala. La diferencia puede ser de minutos a segundos.
+-   **Catalyst optimizer**: Spark optimiza tu query plan. Pero si escribís UDFs en Python, el optimizer no puede ayudarte.
 
-```{#lst-spark-native-vs-udf .python lst-cap="Spark nativo vs UDF: funciones nativas permiten optimización"}
+``` {#lst-spark-native-vs-udf .python lst-cap="Spark nativo vs UDF: funciones nativas permiten optimización"}
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
@@ -459,7 +459,7 @@ df = (
 
 Spark tiene dos APIs: **DataFrame** y **Spark SQL**. Internamente son lo mismo — ambos generan el mismo plan de ejecución. Usá la que te resulte más cómoda, pero entendé que:
 
-```{#lst-df-vs-sql .python lst-cap="DataFrame API y Spark SQL generan el mismo plan de ejecución"}
+``` {#lst-df-vs-sql .python lst-cap="DataFrame API y Spark SQL generan el mismo plan de ejecución"}
 # Esto:
 df.filter(F.col("amount") > 100).groupBy("customer_id").agg(F.sum("amount"))
 
@@ -484,7 +484,7 @@ Esto genera mucha confusión. Si tenés una función Python que recibe un DataFr
 
 Una **función wrapper** usa la API nativa de Spark. Spark ve las operaciones, las entiende y las optimiza:
 
-```{#lst-wrapper-function .python lst-cap="Función wrapper: organiza código pero usa Spark nativo por dentro"}
+``` {#lst-wrapper-function .python lst-cap="Función wrapper: organiza código pero usa Spark nativo por dentro"}
 # Esto NO es un UDF — usa la API de Spark por dentro
 def add_revenue_flag(df, threshold=1000):
     return df.withColumn(
@@ -501,7 +501,7 @@ Acá Spark sabe exactamente qué estás haciendo. Tu función es solo una forma 
 
 Un **UDF** es cuando le pedís a Spark que ejecute código Python puro **fila por fila**, sacando los datos del motor optimizado y pasándolos por el intérprete de Python:
 
-```{#lst-udf-real .python lst-cap="UDF real: serializa fila por fila entre JVM y Python"}
+``` {#lst-udf-real .python lst-cap="UDF real: serializa fila por fila entre JVM y Python"}
 # Esto SÍ es un UDF — Python puro, fila por fila
 @udf(returnType=BooleanType())
 def high_revenue_udf(amount):
@@ -512,10 +512,10 @@ result = df.withColumn("high_revenue", high_revenue_udf(F.col("amount")))
 
 ¿Qué pasa internamente con el UDF?
 
-1. Spark serializa cada fila de datos (JVM → Python)
-2. El intérprete de Python ejecuta tu función
-3. El resultado se serializa de vuelta (Python → JVM)
-4. Repetí esto para cada fila del DataFrame
+1.  Spark serializa cada fila de datos (JVM → Python)
+2.  El intérprete de Python ejecuta tu función
+3.  El resultado se serializa de vuelta (Python → JVM)
+4.  Repetí esto para cada fila del DataFrame
 
 Esa serialización ida y vuelta se llama **serde overhead**, y en un dataset de millones de filas es la diferencia entre 3 minutos y 45 minutos.
 
@@ -584,12 +584,12 @@ ggplot() +
 
 **¿Cuándo sí necesitás un UDF?** Casi nunca. Pero hay casos legítimos:
 
-- Lógica que no tiene equivalente en las funciones de Spark (regex custom muy compleja, cálculos matemáticos específicos de tu dominio)
-- Llamar a una librería Python que no existe en Spark (un modelo de ML custom, una librería de geocoding)
+-   Lógica que no tiene equivalente en las funciones de Spark (regex custom muy compleja, cálculos matemáticos específicos de tu dominio)
+-   Llamar a una librería Python que no existe en Spark (un modelo de ML custom, una librería de geocoding)
 
 Y si no te queda otra, usá **Pandas UDFs** en vez de UDFs comunes — procesan por batch en vez de fila por fila, y son mucho más rápidos:
 
-```{#lst-pandas-udf .python lst-cap="Pandas UDF: procesamiento vectorizado por batch, mucho más rápido"}
+``` {#lst-pandas-udf .python lst-cap="Pandas UDF: procesamiento vectorizado por batch, mucho más rápido"}
 from pyspark.sql.functions import pandas_udf
 import pandas as pd
 
@@ -607,13 +607,13 @@ dbt (data build tool) cambió cómo se hacen las transformaciones de datos. La i
 
 ### Por qué importa
 
-- **Modularidad**: cada modelo es un `SELECT`. Se referencian entre sí con `{{ ref('model_name') }}`.
-- **Testing**: tests de schema (`not_null`, `unique`, `relationships`) y tests custom.
-- **Documentación**: se genera automáticamente desde el YAML.
-- **Linaje**: sabés exactamente qué modelo depende de qué.
-- **Versionamiento**: todo es código, todo va a Git.
+-   **Modularidad**: cada modelo es un `SELECT`. Se referencian entre sí con `{{ ref('model_name') }}`.
+-   **Testing**: tests de schema (`not_null`, `unique`, `relationships`) y tests custom.
+-   **Documentación**: se genera automáticamente desde el YAML.
+-   **Linaje**: sabés exactamente qué modelo depende de qué.
+-   **Versionamiento**: todo es código, todo va a Git.
 
-```{#lst-dbt-staging .sql lst-cap="Modelo staging en dbt: limpieza y tipado de transacciones"}
+``` {#lst-dbt-staging .sql lst-cap="Modelo staging en dbt: limpieza y tipado de transacciones"}
 -- models/staging/stg_transactions.sql
 WITH source AS (
     SELECT * FROM {{ source('raw', 'transactions') }}
@@ -633,7 +633,7 @@ cleaned AS (
 SELECT * FROM cleaned
 ```
 
-```{#lst-dbt-schema-yaml .yaml lst-cap="Schema YAML en dbt: tests de not_null, unique y rangos válidos"}
+``` {#lst-dbt-schema-yaml .yaml lst-cap="Schema YAML en dbt: tests de not_null, unique y rangos válidos"}
 # models/staging/stg_transactions.yml
 version: 2
 
@@ -661,7 +661,7 @@ models:
 
 dbt funciona nativamente con Databricks via `dbt-databricks`. Los modelos se materializan como tablas Delta en Unity Catalog.
 
-```{#lst-dbt-profile .yaml lst-cap="Perfil dbt-databricks: conexión a Unity Catalog con variables de entorno"}
+``` {#lst-dbt-profile .yaml lst-cap="Perfil dbt-databricks: conexión a Unity Catalog con variables de entorno"}
 # profiles.yml
 my_project:
   target: dev
@@ -680,7 +680,7 @@ my_project:
 ### Cuándo dbt y cuándo PySpark
 
 | Caso | Herramienta |
-|------|------------|
+|------------------------|-----------------------------------------------|
 | Transformaciones SQL (limpieza, joins, agregaciones) | **dbt** |
 | Lógica compleja con APIs externas | **PySpark** |
 | Machine Learning pipelines | **PySpark + MLflow** |
@@ -694,17 +694,17 @@ Databricks no es solo "Spark en la nube". Es una plataforma de datos completa: c
 
 ### Lo que priorizaría aprender
 
-1. **Unity Catalog**: el modelo de gobernanza de 3 niveles (`catalog.schema.table`). Permisos, linaje, y auditoría. Sin esto, tu lakehouse es un pantano.
+1.  **Unity Catalog**: el modelo de gobernanza de 3 niveles (`catalog.schema.table`). Permisos, linaje, y auditoría. Sin esto, tu lakehouse es un pantano.
 
-2. **Lakeflow Declarative Pipelines (ex-DLT)**: pipelines declarativos con expectations para calidad. Es la forma más simple de armar un pipeline Bronze → Silver → Gold.
+2.  **Lakeflow Declarative Pipelines (ex-DLT)**: pipelines declarativos con expectations para calidad. Es la forma más simple de armar un pipeline Bronze → Silver → Gold.
 
-3. **Databricks Asset Bundles**: infraestructura como código. Jobs, pipelines, permisos — todo en YAML, todo en Git, todo desplegable con CI/CD.
+3.  **Databricks Asset Bundles**: infraestructura como código. Jobs, pipelines, permisos — todo en YAML, todo en Git, todo desplegable con CI/CD.
 
-4. **Workflows**: orquestación nativa. Triggers, dependencias entre tasks, retry policies. No necesitás Airflow para el 90% de los casos.
+4.  **Workflows**: orquestación nativa. Triggers, dependencias entre tasks, retry policies. No necesitás Airflow para el 90% de los casos.
 
-5. **SQL Warehouses**: para analistas y dashboards. Serverless, escalable, y con cache inteligente.
+5.  **SQL Warehouses**: para analistas y dashboards. Serverless, escalable, y con cache inteligente.
 
-```{#lst-unity-catalog .sql lst-cap="Unity Catalog: crear catalog, tabla con Liquid Clustering y grants"}
+``` {#lst-unity-catalog .sql lst-cap="Unity Catalog: crear catalog, tabla con Liquid Clustering y grants"}
 -- Lo que tenés que saber hacer en Databricks desde el día 1
 -- Crear un catalog y schema
 CREATE CATALOG IF NOT EXISTS analytics;
@@ -734,17 +734,17 @@ Esto merece su propia sección porque es el error más común que veo — y el q
 
 Los notebooks son una herramienta **exploratoria**. Sirven para:
 
-- Explorar un dataset nuevo
-- Probar una transformación antes de productivizarla
-- Hacer análisis ad-hoc
-- Prototipar una idea rápida
+-   Explorar un dataset nuevo
+-   Probar una transformación antes de productivizarla
+-   Hacer análisis ad-hoc
+-   Prototipar una idea rápida
 
 Los notebooks **NO sirven** para:
 
-- Pipelines productivos que corren todos los días
-- Código que necesita testing
-- Lógica que otros van a mantener
-- Cualquier cosa que necesite code review en un PR
+-   Pipelines productivos que corren todos los días
+-   Código que necesita testing
+-   Lógica que otros van a mantener
+-   Cualquier cosa que necesite code review en un PR
 
 ### El problema real
 
@@ -830,7 +830,7 @@ ggplot(flow) +
         plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
 ```
 
-```{#lst-module-test .python lst-cap="Módulo Python + test: lógica extraída del notebook a producción"}
+``` {#lst-module-test .python lst-cap="Módulo Python + test: lógica extraída del notebook a producción"}
 # src/transformations/clean_sales.py  ← ESTO va a producción
 def clean_transactions(df):
     """Limpia y valida transacciones del core."""
@@ -853,7 +853,7 @@ def test_clean_removes_nulls(spark):
     assert result.count() == 1
 ```
 
-```{#lst-dab-deploy .yaml lst-cap="Databricks Asset Bundle: deploy del job con CI/CD"}
+``` {#lst-dab-deploy .yaml lst-cap="Databricks Asset Bundle: deploy del job con CI/CD"}
 # databricks.yml  ← ESTO lo deploya
 resources:
   jobs:
@@ -926,18 +926,18 @@ Y lo más importante: **construí algo**. No hagas solo cursos. Agarrá un datas
 
 ## Lo que NO priorizaría
 
-- **Airflow**: Databricks Workflows cubre el 90% de los casos. Airflow es una herramienta increíble pero tiene una curva de aprendizaje alta y un overhead operacional grande. Aprendelo después, si lo necesitás.
-- **Kafka**: a menos que tu empresa haga streaming real (no micro-batch), no lo necesitás al principio. Auto Loader + Structured Streaming resuelve la mayoría de los casos.
-- **Kubernetes**: como DE, no necesitás ser experto en K8s. Sabé lo básico, pero no te metas en ese rabbit hole.
-- **Todos los clouds a la vez**: elegí uno (AWS, Azure, GCP) y dominalo. Los conceptos se transfieren, pero intentar aprender los 3 a la vez es contraproducente.
+-   **Airflow**: Databricks Workflows cubre el 90% de los casos. Airflow es una herramienta increíble pero tiene una curva de aprendizaje alta y un overhead operacional grande. Aprendelo después, si lo necesitás.
+-   **Kafka**: a menos que tu empresa haga streaming real (no micro-batch), no lo necesitás al principio. Auto Loader + Structured Streaming resuelve la mayoría de los casos.
+-   **Kubernetes**: como DE, no necesitás ser experto en K8s. Sabé lo básico, pero no te metas en ese rabbit hole.
+-   **Todos los clouds a la vez**: elegí uno (AWS, Azure, GCP) y dominalo. Los conceptos se transfieren, pero intentar aprender los 3 a la vez es contraproducente.
 
 ## Links
 
-- [Notebooks del episodio](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero) — Python, SQL y Spark para ejecutar en Databricks Free Edition
-- [Fundamentals of Data Engineering (Reis & Housley)](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/) — el mejor libro para arrancar
-- [dbt Learn](https://courses.getdbt.com/) — curso gratuito oficial de dbt
-- [Databricks Academy](https://www.databricks.com/learn) — cursos oficiales, algunos gratuitos
+-   [Notebooks del episodio](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero) — Python, SQL y Spark para ejecutar en Databricks Free Edition
+-   [Fundamentals of Data Engineering (Reis & Housley)](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/) — el mejor libro para arrancar
+-   [dbt Learn](https://courses.getdbt.com/) — curso gratuito oficial de dbt
+-   [Databricks Academy](https://www.databricks.com/learn) — cursos oficiales, algunos gratuitos
 
----
+------------------------------------------------------------------------
 
 *La semana que viene en Databricks Tips: Delta Lake — 7 cosas que ojalá me hubieran dicho antes.*

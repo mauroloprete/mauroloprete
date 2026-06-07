@@ -10,9 +10,9 @@ categories: [Databricks Tips, Data Engineering, Delta Lake]
 description: "Databricks Container Services, imágenes custom, golden containers, CI/CD con Docker y los errores que te van a hacer perder horas."
 ---
 
-{{< fa flask >}} **[Laboratorio práctico](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/docker-containers)** — Dockerfile + notebook para probar DCS en Databricks Free Edition.
+{{< fa flask >}} [**Laboratorio práctico**](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/docker-containers) — Dockerfile + notebook para probar DCS en Databricks Free Edition.
 
----
+------------------------------------------------------------------------
 
 Séptima entrega de **Databricks Tips**. Sí, Databricks Runtime ya te da un entorno curado con Spark, pandas, MLflow y todo lo estándar pre-instalado. Entonces, ¿para qué Docker? El problema aparece cuando necesitás algo que el runtime **no trae**: librerías de sistema como GDAL o compiladores de C, versiones específicas que chocan con las del runtime, o un entorno bloqueado que no cambie entre releases de DBR. Ahí es donde Databricks Container Services entra en juego.
 
@@ -89,12 +89,12 @@ ggplot() +
 
 Los conceptos clave:
 
-- **Imagen**: el paquete con todo adentro (OS + librerías + config). Se construye con un `Dockerfile`.
-- **Container**: una instancia corriendo de esa imagen. Podés tener muchos containers de la misma imagen.
-- **Registry**: donde guardás las imágenes (Docker Hub, Amazon ECR, Azure ACR). Es como un "GitHub para imágenes Docker".
-- **Dockerfile**: la receta para construir la imagen. Cada línea `RUN` agrega algo al entorno.
+-   **Imagen**: el paquete con todo adentro (OS + librerías + config). Se construye con un `Dockerfile`.
+-   **Container**: una instancia corriendo de esa imagen. Podés tener muchos containers de la misma imagen.
+-   **Registry**: donde guardás las imágenes (Docker Hub, Amazon ECR, Azure ACR). Es como un "GitHub para imágenes Docker".
+-   **Dockerfile**: la receta para construir la imagen. Cada línea `RUN` agrega algo al entorno.
 
-```{#lst-dockerfile-basico .dockerfile lst-cap="Dockerfile básico: imagen base, dependencias y código"}
+``` {#lst-dockerfile-basico .dockerfile lst-cap="Dockerfile básico: imagen base, dependencias y código"}
 # Ejemplo básico de Dockerfile
 FROM python:3.11-slim          # Partís de una imagen base
 RUN pip install pandas==2.2.3  # Instalás dependencias
@@ -109,11 +109,11 @@ En vez de usar el runtime por defecto, DCS te permite arrancar tu compute con un
 
 Pero ojo: vos **no metés Spark en la imagen**. Lo que pasa internamente cuando lanzás un cluster con DCS es esto ([fuente](https://learn.microsoft.com/en-us/azure/databricks/compute/custom-containers)):
 
-1. Se adquieren VMs del cloud provider
-2. Se descarga tu imagen Docker del registry
-3. Databricks crea un contenedor a partir de tu imagen
-4. **El código del Databricks Runtime (Spark, JVM, dbutils) se copia dentro del contenedor**
-5. Se ejecutan los init scripts (si hay)
+1.  Se adquieren VMs del cloud provider
+2.  Se descarga tu imagen Docker del registry
+3.  Databricks crea un contenedor a partir de tu imagen
+4.  **El código del Databricks Runtime (Spark, JVM, dbutils) se copia dentro del contenedor**
+5.  Se ejecutan los init scripts (si hay)
 
 Es decir, Databricks inyecta Spark en tu contenedor al arrancar. Por eso ignora `CMD` y `ENTRYPOINT` — necesita controlar el proceso de inicio. Vos solo ponés las dependencias, ellos ponen el runtime.
 
@@ -171,7 +171,7 @@ Antes de hacer cualquier cosa, un **workspace admin** tiene que habilitar Contai
 
 **En Azure** (no hay toggle en la UI): se hace por CLI:
 
-```{#lst-habilitar-dcs .bash lst-cap="Habilitar y verificar DCS en Azure vía Databricks CLI"}
+``` {#lst-habilitar-dcs .bash lst-cap="Habilitar y verificar DCS en Azure vía Databricks CLI"}
 # Habilitar DCS en Azure Databricks
 databricks workspace-conf set-status --json '{"enableDcs": "true"}' --profile <tu-profile>
 
@@ -189,9 +189,9 @@ El `set-status` no devuelve output si funciona — eso es normal. Verificá siem
 
 **Importante**: después de habilitar, el tab Docker solo aparece si elegís un **access mode compatible**:
 
-- **Single User** o **No Isolation Shared** → aparece el tab Docker
-- **Shared** o **Standard** → no aparece (salvo la beta con DBR 18.3+)
-- **Serverless** → no soportado
+-   **Single User** o **No Isolation Shared** → aparece el tab Docker
+-   **Shared** o **Standard** → no aparece (salvo la beta con DBR 18.3+)
+-   **Serverless** → no soportado
 
 Si habilitaste todo y seguís sin ver el tab, verificá que tu workspace sea **Premium tier**.
 
@@ -199,7 +199,7 @@ Si habilitaste todo y seguís sin ver el tab, verificá que tu workspace sea **P
 
 El caso de uso más potente de DCS es el **golden container**: una imagen Docker que pasa CI/CD, se escanea por seguridad, y se deploya como el único entorno autorizado para producción.
 
-```{#lst-golden-container .dockerfile lst-cap="Golden container: dependencias fijas y librerías de sistema"}
+``` {#lst-golden-container .dockerfile lst-cap="Golden container: dependencias fijas y librerías de sistema"}
 # golden.Dockerfile
 FROM databricksruntime/standard:16.4-LTS
 
@@ -217,7 +217,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 ```
 
-```{#lst-build-push .bash lst-cap="Build y push de la imagen golden al registry"}
+``` {#lst-build-push .bash lst-cap="Build y push de la imagen golden al registry"}
 # Build + push
 docker build -f golden.Dockerfile -t mi-ecr.amazonaws.com/dbx-golden:v2.1.0 .
 docker push mi-ecr.amazonaws.com/dbx-golden:v2.1.0
@@ -231,16 +231,16 @@ Hay dos formas: UI y API/CLI.
 
 **Desde la UI:**
 
-1. Crear nuevo compute → Advanced Options → Docker tab
-2. Seleccionar "Use your own Docker container"
-3. Ingresar la URL de la imagen
-4. Configurar autenticación (si tu registry es privado)
+1.  Crear nuevo compute → Advanced Options → Docker tab
+2.  Seleccionar "Use your own Docker container"
+3.  Ingresar la URL de la imagen
+4.  Configurar autenticación (si tu registry es privado)
 
 **Desde la API (para automatizar):**
 
 El endpoint es `POST /api/2.0/clusters/create` ([referencia](https://docs.databricks.com/api/workspace/clusters/create)):
 
-```{#lst-cluster-api .bash lst-cap="Crear cluster con imagen Docker vía REST API"}
+``` {#lst-cluster-api .bash lst-cap="Crear cluster con imagen Docker vía REST API"}
 curl -X POST "https://<tu-workspace>.cloud.databricks.com/api/2.0/clusters/create" \
   -H "Authorization: Bearer $DATABRICKS_TOKEN" \
   -H "Content-Type: application/json" \
@@ -264,7 +264,7 @@ curl -X POST "https://<tu-workspace>.cloud.databricks.com/api/2.0/clusters/creat
 
 O con la **Databricks CLI**:
 
-```{#lst-cluster-cli .bash lst-cap="Crear cluster con imagen Docker vía Databricks CLI"}
+``` {#lst-cluster-cli .bash lst-cap="Crear cluster con imagen Docker vía Databricks CLI"}
 databricks clusters create --json '{
   "cluster_name": "prod-golden-container",
   "spark_version": "16.4.x-scala2.12",
@@ -289,8 +289,8 @@ databricks clusters create --json '{
 
 Con la llegada de DCS para Standard Compute, ahora tenés dos opciones:
 
-| | Dedicated Compute | Standard Compute (Beta) |
-|---|---|---|
+|   | Dedicated Compute | Standard Compute (Beta) |
+|------------------------|------------------------|------------------------|
 | **Imagen base** | `databricksruntime/standard:16.x` | `databricksruntime/environment:v5-standard` |
 | **DBR mínimo** | Varía | 18.3+ |
 | **Init scripts** | Modifican Python | **NO** modifican Python |
@@ -300,14 +300,14 @@ Con la llegada de DCS para Standard Compute, ahora tenés dos opciones:
 
 **Mi recomendación:**
 
-- Usá **Dedicated** si necesitás init scripts que modifiquen el entorno Python o si tu DBR es anterior a 18.3.
-- Usá **Standard** si querés compartir un cluster entre varios usuarios con entorno Docker unificado.
+-   Usá **Dedicated** si necesitás init scripts que modifiquen el entorno Python o si tu DBR es anterior a 18.3.
+-   Usá **Standard** si querés compartir un cluster entre varios usuarios con entorno Docker unificado.
 
 ## 4. El error más común: instalar paquetes en el path equivocado
 
 Esto te va a pasar, te lo garantizo. Construís tu imagen, todo verde en local, lanzás el cluster y... tus notebooks no encuentran las librerías.
 
-```{#lst-python-path .dockerfile lst-cap="Error frecuente: instalar paquetes en el path correcto"}
+``` {#lst-python-path .dockerfile lst-cap="Error frecuente: instalar paquetes en el path correcto"}
 # MALO — instala en el Python del sistema
 RUN pip install pandas==2.2.3
 
@@ -420,7 +420,7 @@ ggplot() +
 
 El Dockerfile para este caso:
 
-```{#lst-dockerfile-geo .dockerfile lst-cap="Dockerfile geoespacial: GDAL, GeoPandas y Prophet"}
+``` {#lst-dockerfile-geo .dockerfile lst-cap="Dockerfile geoespacial: GDAL, GeoPandas y Prophet"}
 FROM databricksruntime/standard:16.4-LTS
 
 # Librerías de sistema para geoespacial
@@ -443,11 +443,11 @@ RUN /databricks/python3/bin/pip install --no-cache-dir \
 RUN /databricks/python3/bin/python -c "from osgeo import gdal; print(f'GDAL {gdal.__version__}')"
 ```
 
-**Sin Docker**, este setup requiere un init script de ~40 líneas que instala `apt` packages + compila dependencias de C. Tarda ~8 minutos en cada arranque del cluster y falla 1 de cada 5 veces por timeouts de `apt-get`. **Con Docker**, las dependencias ya están bakeadas: el cluster arranca en ~2 minutos y nunca falla por dependencias.
+**Sin Docker**, este setup requiere un init script de \~40 líneas que instala `apt` packages + compila dependencias de C. Tarda \~8 minutos en cada arranque del cluster y falla 1 de cada 5 veces por timeouts de `apt-get`. **Con Docker**, las dependencias ya están bakeadas: el cluster arranca en \~2 minutos y nunca falla por dependencias.
 
 El notebook queda limpio:
 
-```{#lst-pipeline-geo .python lst-cap="Pipeline geoespacial: forecast de demanda por zona con Prophet"}
+``` {#lst-pipeline-geo .python lst-cap="Pipeline geoespacial: forecast de demanda por zona con Prophet"}
 # El notebook solo tiene lógica de negocio — cero setup
 import geopandas as gpd
 from prophet import Prophet
@@ -478,7 +478,7 @@ for zona_id in geo_zonas["zona_id"].unique():
 
 Donde DCS realmente brilla es cuando lo integrás con tu pipeline de CI/CD. En vez de instalar dependencias en cada arranque (init scripts), las bakeás en la imagen y las testeás antes de llegar a producción:
 
-```{#lst-cicd-workflow .yaml lst-cap="GitHub Actions: CI/CD para build, test y push del golden container"}
+``` {#lst-cicd-workflow .yaml lst-cap="GitHub Actions: CI/CD para build, test y push del golden container"}
 # .github/workflows/docker-dbx.yml
 name: Build & Push Golden Container
 
@@ -590,22 +590,22 @@ Acá van las trampas que nadie te cuenta en la documentación:
 
 DCS no es para todos. **No lo uses si**:
 
-- Tu equipo es chico y las dependencias son simples (un `requirements.txt` con 5 librerías)
-- No tenés un pipeline de CI/CD para construir y testear imágenes
-- Necesitás instalar librerías rápidamente para experimentar (los init scripts o las cluster libraries son más ágiles para exploración)
-- Usás Databricks Runtime for ML y no querés reconstruir todo el stack de GPU
+-   Tu equipo es chico y las dependencias son simples (un `requirements.txt` con 5 librerías)
+-   No tenés un pipeline de CI/CD para construir y testear imágenes
+-   Necesitás instalar librerías rápidamente para experimentar (los init scripts o las cluster libraries son más ágiles para exploración)
+-   Usás Databricks Runtime for ML y no querés reconstruir todo el stack de GPU
 
 **Usalo cuando**:
 
-- Necesitás reproducibilidad garantizada entre ambientes (dev/staging/prod usan la misma imagen)
-- Tenés dependencias de sistema (apt packages, librerías C) que no se pueden instalar con pip
-- Querés un entorno bloqueado y aprobado por seguridad
-- Tu equipo es grande y los init scripts se volvieron inmantenibles
+-   Necesitás reproducibilidad garantizada entre ambientes (dev/staging/prod usan la misma imagen)
+-   Tenés dependencias de sistema (apt packages, librerías C) que no se pueden instalar con pip
+-   Querés un entorno bloqueado y aprobado por seguridad
+-   Tu equipo es grande y los init scripts se volvieron inmantenibles
 
 ## Checklist de DCS
 
 | Paso | Pregunta | Si no lo hacés... |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | Habilitación | DCS está habilitado en tu workspace? (CLI en Azure) | El tab Docker no aparece |
 | Access mode | Estás usando Single User o No Isolation Shared? | El tab Docker no aparece |
 | Imagen base | Estás extendiendo la imagen oficial de Databricks? | Posibles incompatibilidades con el runtime |
@@ -617,26 +617,26 @@ DCS no es para todos. **No lo uses si**:
 
 ## Referencias
 
-- [DCS para Dedicated Compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/custom-containers) — documentación oficial, cómo construir imágenes, configurar clusters y autenticación.
-- [DCS para Standard Compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/custom-containers-standard) — la beta nueva con Spark Connect y soporte para shared compute.
-- [DCS en GPU compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/gpu#databricks-container-services-on-gpu) — contenedores custom con GPU para deep learning.
-- [Databricks CLI — workspace-conf](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/cli/reference/workspace-conf-commands) — referencia del comando para habilitar DCS por CLI en Azure.
-- [Databricks Secrets — Azure](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/) — para guardar credenciales del registry de forma segura.
-- [Init scripts — Azure](https://learn.microsoft.com/en-us/azure/databricks/init-scripts/) — scripts de inicialización y cómo interactúan con DCS.
-- [Imágenes base de Databricks — Docker Hub](https://hub.docker.com/u/databricksruntime) — las imágenes oficiales que deberías extender.
-- [Dockerfiles de ejemplo — GitHub](https://github.com/databricks/containers) — los Dockerfiles que usa Databricks internamente para construir sus imágenes base.
+-   [DCS para Dedicated Compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/custom-containers) — documentación oficial, cómo construir imágenes, configurar clusters y autenticación.
+-   [DCS para Standard Compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/custom-containers-standard) — la beta nueva con Spark Connect y soporte para shared compute.
+-   [DCS en GPU compute — Azure](https://learn.microsoft.com/en-us/azure/databricks/compute/gpu#databricks-container-services-on-gpu) — contenedores custom con GPU para deep learning.
+-   [Databricks CLI — workspace-conf](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/cli/reference/workspace-conf-commands) — referencia del comando para habilitar DCS por CLI en Azure.
+-   [Databricks Secrets — Azure](https://learn.microsoft.com/en-us/azure/databricks/security/secrets/) — para guardar credenciales del registry de forma segura.
+-   [Init scripts — Azure](https://learn.microsoft.com/en-us/azure/databricks/init-scripts/) — scripts de inicialización y cómo interactúan con DCS.
+-   [Imágenes base de Databricks — Docker Hub](https://hub.docker.com/u/databricksruntime) — las imágenes oficiales que deberías extender.
+-   [Dockerfiles de ejemplo — GitHub](https://github.com/databricks/containers) — los Dockerfiles que usa Databricks internamente para construir sus imágenes base.
 
 ## Otros posts de la serie
 
 Si te sirvió este post, mirá los anteriores de **Databricks Tips**:
 
-- [**Tips #1**: Databricks Asset Bundles](../databricks-asset-bundles-advanced/) — patrones avanzados de DABs, variables complejas, deploy multi-target.
-- [**Tips #2**: Delta Lake](../databricks-tips-01-delta-lake/) — Liquid Clustering, OPTIMIZE, VACUUM, y las 7 cosas que ojalá te hubieran dicho antes.
-- [**Tips #3**: Unity Catalog](../databricks-tips-02-unity-catalog/) — modelo de gobernanza, GRANTS heredados, row/column security.
-- [**Tips #4**: Structured Streaming](../databricks-tips-03-structured-streaming/) — watermarks, triggers, y las trampas del micro-batch.
-- [**Tips #5**: MLflow + Unity Catalog](../databricks-tips-04-mlflow-unity-catalog/) — del experimento al modelo en producción.
-- [**Tips #6**: Feature Engineering](../databricks-tips-05-feature-engineering/) — Feature Store, point-in-time lookups, online features.
+-   [**Tips #1**: Databricks Asset Bundles](../databricks-asset-bundles-advanced/) — patrones avanzados de DABs, variables complejas, deploy multi-target.
+-   [**Tips #2**: Delta Lake](../databricks-tips-01-delta-lake/) — Liquid Clustering, OPTIMIZE, VACUUM, y las 7 cosas que ojalá te hubieran dicho antes.
+-   [**Tips #3**: Unity Catalog](../databricks-tips-02-unity-catalog/) — modelo de gobernanza, GRANTS heredados, row/column security.
+-   [**Tips #4**: Structured Streaming](../databricks-tips-03-structured-streaming/) — watermarks, triggers, y las trampas del micro-batch.
+-   [**Tips #5**: MLflow + Unity Catalog](../databricks-tips-04-mlflow-unity-catalog/) — del experimento al modelo en producción.
+-   [**Tips #6**: Feature Engineering](../databricks-tips-05-feature-engineering/) — Feature Store, point-in-time lookups, online features.
 
----
+------------------------------------------------------------------------
 
 *Próxima semana: Lakeflow Declarative Pipelines (ex-DLT) — expectations, materialized views y serverless compute.*
