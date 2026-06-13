@@ -829,7 +829,7 @@ ggplot() +
 ```
 
 ::: notes
-Esta es la arquitectura completa de Spark de Ideas Bot — mi réplica. 7 recursos, todos en un databricks.yml con engine direct. Arriba: el pipeline de conocimiento — 20 documentos del blog y docs oficiales pasan por el Load Job y se indexan en Vector Search. En el medio: la comunidad usa la Databricks App (Streamlit), que llama al Serving Endpoint con AI Gateway y rate limits. El endpoint consulta Vector Search para RAG. Abajo: Lakebase con PostgreSQL 17 para memoria conversacional — cada usuario tiene su thread_id y la memoria persiste entre sesiones. Todo deployable con un solo comando.
+Esta es la arquitectura completa de Spark de Ideas Bot — mi réplica. 7 recursos, todos en un databricks.yml con engine direct. Arriba: el pipeline de conocimiento — un Job scrapea directamente el blog con BeautifulSoup, genera chunks y los escribe a Delta. Vector Search indexa automáticamente. En el medio: la comunidad usa la Databricks App (Streamlit), que llama al Serving Endpoint con AI Gateway. Abajo: Lakebase con PostgreSQL 17 para memoria conversacional — cada usuario tiene su thread_id y la memoria persiste entre sesiones. Todo deployable con un solo comando.
 :::
 
 ## Estructura del proyecto
@@ -995,11 +995,11 @@ ggplot() +
     # Step 1: Sources
     annotate("rect", xmin = 0, xmax = 2.5, ymin = 2.8, ymax = 3.8,
              fill = "#64748b", color = "#475569", linewidth = 0.4) +
-    annotate("text", x = 1.25, y = 3.5, label = "Blog posts",
+    annotate("text", x = 1.25, y = 3.5, label = "Blog (HTML)",
              color = "white", size = 2.3, fontface = "bold") +
-    annotate("text", x = 1.25, y = 3.15, label = "11 Tips de Databricks",
+    annotate("text", x = 1.25, y = 3.15, label = "Scraping directo",
              color = "#cbd5e1", size = 1.8) +
-    annotate("text", x = 1.25, y = 2.95, label = "+ docs oficiales",
+    annotate("text", x = 1.25, y = 2.95, label = "del sitio publico",
              color = "#cbd5e1", size = 1.8) +
 
     # Arrow 1
@@ -1012,9 +1012,9 @@ ggplot() +
              fill = "#593196", color = "#4c1d95", linewidth = 0.4) +
     annotate("text", x = 4.75, y = 3.52, label = "Load KB Job",
              color = "white", size = 2.3, fontface = "bold") +
-    annotate("text", x = 4.75, y = 3.2, label = "Extrae chunks,",
+    annotate("text", x = 4.75, y = 3.2, label = "BeautifulSoup",
              color = "#c4b5fd", size = 1.8) +
-    annotate("text", x = 4.75, y = 3.0, label = "embeddings, metadata",
+    annotate("text", x = 4.75, y = 3.0, label = "chunks + metadata",
              color = "#c4b5fd", size = 1.8) +
 
     # Arrow 2
@@ -1047,22 +1047,20 @@ ggplot() +
     annotate("text", x = 11.35, y = 2.95, label = "Index",
              color = "#FFA166", size = 1.8) +
 
-    # Example docs (bottom row)
+    # Blog posts list (bottom left)
     annotate("rect", xmin = 0.2, xmax = 3.8, ymin = 0.3, ymax = 2.2,
              fill = "white", color = "#e2e8f0", linewidth = 0.3) +
-    annotate("text", x = 2.0, y = 2.0, label = "Ejemplo: 20 documentos",
+    annotate("text", x = 2.0, y = 2.0, label = "Posts scrapeados",
              color = "#1e293b", size = 2.2, fontface = "bold") +
-    annotate("text", x = 2.0, y = 1.65, label = "Delta Lake: Liquid Clustering",
+    annotate("text", x = 2.0, y = 1.65, label = "Tips #2: Delta Lake",
              color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 1.4, label = "Unity Catalog: permisos",
+    annotate("text", x = 2.0, y = 1.4, label = "Tips #3: Unity Catalog",
              color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 1.15, label = "DABs: CI/CD patterns",
+    annotate("text", x = 2.0, y = 1.15, label = "Tips #8: Jobs & Workflows",
              color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 0.9, label = "Streaming: autoloader",
+    annotate("text", x = 2.0, y = 0.9, label = "Data Contracts Framework",
              color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 0.65, label = "Costos: optimizacion",
-             color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 0.42, label = "...",
+    annotate("text", x = 2.0, y = 0.65, label = paste0("... ", length(list.files("../../blog/posts")), " posts"),
              color = "#94a3b8", size = 2.0, hjust = 0.5) +
 
     # Code snippet (bottom right)
@@ -1072,19 +1070,19 @@ ggplot() +
              label = "# load_knowledge_base.py",
              color = "#94a3b8", size = 1.7, hjust = 0, family = "mono") +
     annotate("text", x = 4.8, y = 1.7,
-             label = 'docs = [{"title": "Liquid Clustering",',
+             label = 'posts = get_post_urls(BLOG_URL)',
              color = "#FFA166", size = 1.7, hjust = 0, family = "mono") +
     annotate("text", x = 4.8, y = 1.45,
-             label = '         "content": "Reemplaza ZORDER...",',
+             label = 'for post in posts:',
              color = "#FFA166", size = 1.7, hjust = 0, family = "mono") +
     annotate("text", x = 4.8, y = 1.2,
-             label = '         "category": "Delta Lake"}]',
+             label = '    content = fetch_post_content(post["url"])',
              color = "#FFA166", size = 1.7, hjust = 0, family = "mono") +
     annotate("text", x = 4.8, y = 0.9,
-             label = 'spark.createDataFrame(docs)',
+             label = '    chunks = chunk_text(content, max=2000)',
              color = "#c4b5fd", size = 1.7, hjust = 0, family = "mono") +
     annotate("text", x = 4.8, y = 0.65,
-             label = '  .write.saveAsTable(f"{catalog}.{schema}.docs")',
+             label = 'spark.createDataFrame(docs).saveAsTable(...)',
              color = "#c4b5fd", size = 1.7, hjust = 0, family = "mono") +
 
     coord_cartesian(xlim = c(-0.2, 12.2), ylim = c(0.1, 4.7)) +
@@ -1093,7 +1091,7 @@ ggplot() +
 ```
 
 ::: notes
-Así se ingesta la base de conocimiento. Los posts del blog (11 Databricks Tips) y documentación oficial se procesan en un Job de Databricks: se extraen chunks con título, contenido, categoría, y fuente. Se escriben a una tabla Delta en Unity Catalog. Vector Search sincroniza automáticamente esa tabla y genera el índice con embeddings. El agente consulta ese índice en runtime para RAG. Todo declarado en el bundle — el job de load y el de refresh son recursos más del databricks.yml.
+Así se ingesta la base de conocimiento. Un Job de Databricks scrapea directamente el blog con requests y BeautifulSoup — va a la URL pública, extrae las URLs de todos los posts, descarga cada uno, y genera chunks de ~2000 caracteres con título, categoría y fuente. Se escriben a una tabla Delta en Unity Catalog. Vector Search sincroniza automáticamente esa tabla y genera el índice con embeddings. Si mañana publico un post nuevo, el job lo levanta solo en el próximo run. Todo declarado en el bundle.
 :::
 
 ## `databricks.yml` — targets {auto-animate="true"}
