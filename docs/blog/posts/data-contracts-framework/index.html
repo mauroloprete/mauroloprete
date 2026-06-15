@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-04-14">
+<meta name="description" content="Qué son los Data Contracts, por qué los necesitás, y cómo implementé un framework en producción con Databricks y PySpark.">
+
+<title>Data Contracts: cómo diseñar un framework desde cero – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Data Contracts: cómo diseñar un framework desde cero – Mauro Loprete">
+<meta property="og:description" content="Qué son los Data Contracts, por qué los necesitás, y cómo implementé un framework en producción con Databricks y PySpark.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/data-contracts-framework/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Data Contracts: cómo diseñar un framework desde cero – Mauro Loprete">
+<meta name="twitter:description" content="Qué son los Data Contracts, por qué los necesitás, y cómo implementé un framework en producción con Databricks y PySpark.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/data-contracts-framework/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#el-problema-real" id="toc-el-problema-real" class="nav-link active" data-scroll-target="#el-problema-real">El problema real</a></li>
+  <li><a href="#qué-es-un-data-contract" id="toc-qué-es-un-data-contract" class="nav-link" data-scroll-target="#qué-es-un-data-contract">Qué es un Data Contract</a></li>
+  <li><a href="#anatomía-de-un-data-contract" id="toc-anatomía-de-un-data-contract" class="nav-link" data-scroll-target="#anatomía-de-un-data-contract">Anatomía de un Data Contract</a></li>
+  <li><a href="#implementación-en-pyspark" id="toc-implementación-en-pyspark" class="nav-link" data-scroll-target="#implementación-en-pyspark">Implementación en PySpark</a>
+  <ul class="collapse">
+  <li><a href="#parser-del-contrato" id="toc-parser-del-contrato" class="nav-link" data-scroll-target="#parser-del-contrato">1. Parser del contrato</a></li>
+  <li><a href="#validador-de-schema" id="toc-validador-de-schema" class="nav-link" data-scroll-target="#validador-de-schema">2. Validador de schema</a></li>
+  <li><a href="#validador-de-calidad" id="toc-validador-de-calidad" class="nav-link" data-scroll-target="#validador-de-calidad">3. Validador de calidad</a></li>
+  <li><a href="#integración-en-el-pipeline" id="toc-integración-en-el-pipeline" class="nav-link" data-scroll-target="#integración-en-el-pipeline">4. Integración en el pipeline</a></li>
+  </ul></li>
+  <li><a href="#hard-contracts-vs-soft-contracts" id="toc-hard-contracts-vs-soft-contracts" class="nav-link" data-scroll-target="#hard-contracts-vs-soft-contracts">Hard Contracts vs Soft Contracts</a></li>
+  <li><a href="#con-databricks-expectations-dlt" id="toc-con-databricks-expectations-dlt" class="nav-link" data-scroll-target="#con-databricks-expectations-dlt">Con Databricks Expectations (DLT)</a></li>
+  <li><a href="#links" id="toc-links" class="nav-link" data-scroll-target="#links">Links</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Data Contracts: cómo diseñar un framework desde cero</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Data Architecture</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Podcast</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Qué son los Data Contracts, por qué los necesitás, y cómo implementé un framework en producción con Databricks y PySpark.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">April 14, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Si alguna vez te rompieron un pipeline porque alguien cambió una columna en la fuente sin avisarte, este post es para vos.</p>
+<p>Los Data Contracts son la solución a un problema que todos los ingenieros de datos enfrentamos: <strong>las fuentes cambian sin aviso y los pipelines se rompen en silencio</strong>.</p>
+<section id="el-problema-real" class="level2">
+<h2 class="anchored" data-anchor-id="el-problema-real">El problema real</h2>
+<p>Situación típica en cualquier empresa:</p>
+<ol type="1">
+<li>El equipo de backend agrega una columna al API</li>
+<li>Otro equipo cambia el tipo de un campo de <code>INT</code> a <code>STRING</code></li>
+<li>Un proveedor externo modifica el formato del CSV que te manda</li>
+<li>Tu pipeline de Silver falla a las 3 AM</li>
+<li>Te enterás cuando el dashboard del CEO muestra datos vacíos</li>
+</ol>
+<p><strong>Sin Data Contracts</strong>: te enterás cuando algo se rompe. <strong>Con Data Contracts</strong>: te enterás antes de que llegue a producción.</p>
+</section>
+<section id="qué-es-un-data-contract" class="level2">
+<h2 class="anchored" data-anchor-id="qué-es-un-data-contract">Qué es un Data Contract</h2>
+<p>Un Data Contract es un acuerdo formal entre el <strong>productor</strong> de datos (quien genera o envía datos) y el <strong>consumidor</strong> (quien los procesa). Define:</p>
+<ul>
+<li><strong>Schema</strong>: qué columnas, qué tipos, qué es nullable</li>
+<li><strong>SLAs</strong>: cuándo llegan los datos, con qué frecuencia</li>
+<li><strong>Calidad</strong>: reglas de validación (no nulos, rangos, unicidad)</li>
+<li><strong>Ownership</strong>: quién es responsable si algo falla</li>
+<li><strong>Versionamiento</strong>: cómo se manejan los cambios</li>
+</ul>
+</section>
+<section id="anatomía-de-un-data-contract" class="level2">
+<h2 class="anchored" data-anchor-id="anatomía-de-un-data-contract">Anatomía de un Data Contract</h2>
+<div id="lst-contract-yaml" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-contract-yaml-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Definición YAML de un Data Contract con schema, SLAs y reglas de calidad
+</figcaption>
+<div aria-describedby="lst-contract-yaml-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-contract-yaml"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-contract-yaml-1"><a href="#lst-contract-yaml-1" aria-hidden="true" tabindex="-1"></a><span class="co"># contracts/transactions.yml</span></span>
+<span id="lst-contract-yaml-2"><a href="#lst-contract-yaml-2" aria-hidden="true" tabindex="-1"></a><span class="fu">contract</span><span class="kw">:</span></span>
+<span id="lst-contract-yaml-3"><a href="#lst-contract-yaml-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> transactions</span></span>
+<span id="lst-contract-yaml-4"><a href="#lst-contract-yaml-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">version</span><span class="kw">:</span><span class="at"> </span><span class="st">"2.1"</span></span>
+<span id="lst-contract-yaml-5"><a href="#lst-contract-yaml-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">owner</span><span class="kw">:</span><span class="at"> backend-team</span></span>
+<span id="lst-contract-yaml-6"><a href="#lst-contract-yaml-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Transacciones de pagos del core bancario"</span></span>
+<span id="lst-contract-yaml-7"><a href="#lst-contract-yaml-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-8"><a href="#lst-contract-yaml-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">sla</span><span class="kw">:</span></span>
+<span id="lst-contract-yaml-9"><a href="#lst-contract-yaml-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">freshness</span><span class="kw">:</span><span class="at"> </span><span class="st">"1 hour"</span></span>
+<span id="lst-contract-yaml-10"><a href="#lst-contract-yaml-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">availability</span><span class="kw">:</span><span class="at"> </span><span class="st">"99.9%"</span></span>
+<span id="lst-contract-yaml-11"><a href="#lst-contract-yaml-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-12"><a href="#lst-contract-yaml-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">schema</span><span class="kw">:</span></span>
+<span id="lst-contract-yaml-13"><a href="#lst-contract-yaml-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> transaction_id</span></span>
+<span id="lst-contract-yaml-14"><a href="#lst-contract-yaml-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> BIGINT</span></span>
+<span id="lst-contract-yaml-15"><a href="#lst-contract-yaml-15" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">nullable</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="lst-contract-yaml-16"><a href="#lst-contract-yaml-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">unique</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="lst-contract-yaml-17"><a href="#lst-contract-yaml-17" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"ID único de la transacción"</span></span>
+<span id="lst-contract-yaml-18"><a href="#lst-contract-yaml-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-19"><a href="#lst-contract-yaml-19" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> customer_id</span></span>
+<span id="lst-contract-yaml-20"><a href="#lst-contract-yaml-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> BIGINT</span></span>
+<span id="lst-contract-yaml-21"><a href="#lst-contract-yaml-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">nullable</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="lst-contract-yaml-22"><a href="#lst-contract-yaml-22" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"FK al cliente"</span></span>
+<span id="lst-contract-yaml-23"><a href="#lst-contract-yaml-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-24"><a href="#lst-contract-yaml-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> amount</span></span>
+<span id="lst-contract-yaml-25"><a href="#lst-contract-yaml-25" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> DECIMAL(18,2)</span></span>
+<span id="lst-contract-yaml-26"><a href="#lst-contract-yaml-26" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">nullable</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="lst-contract-yaml-27"><a href="#lst-contract-yaml-27" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">checks</span><span class="kw">:</span></span>
+<span id="lst-contract-yaml-28"><a href="#lst-contract-yaml-28" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="st">"amount &gt; 0"</span></span>
+<span id="lst-contract-yaml-29"><a href="#lst-contract-yaml-29" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="st">"amount &lt; 1000000"</span></span>
+<span id="lst-contract-yaml-30"><a href="#lst-contract-yaml-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-31"><a href="#lst-contract-yaml-31" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> transaction_date</span></span>
+<span id="lst-contract-yaml-32"><a href="#lst-contract-yaml-32" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> DATE</span></span>
+<span id="lst-contract-yaml-33"><a href="#lst-contract-yaml-33" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">nullable</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="lst-contract-yaml-34"><a href="#lst-contract-yaml-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">checks</span><span class="kw">:</span></span>
+<span id="lst-contract-yaml-35"><a href="#lst-contract-yaml-35" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="st">"transaction_date &gt;= '2020-01-01'"</span></span>
+<span id="lst-contract-yaml-36"><a href="#lst-contract-yaml-36" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="st">"transaction_date &lt;= current_date()"</span></span>
+<span id="lst-contract-yaml-37"><a href="#lst-contract-yaml-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-38"><a href="#lst-contract-yaml-38" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> status</span></span>
+<span id="lst-contract-yaml-39"><a href="#lst-contract-yaml-39" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> STRING</span></span>
+<span id="lst-contract-yaml-40"><a href="#lst-contract-yaml-40" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">nullable</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="lst-contract-yaml-41"><a href="#lst-contract-yaml-41" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">allowed_values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">"completed"</span><span class="kw">,</span><span class="at"> </span><span class="st">"pending"</span><span class="kw">,</span><span class="at"> </span><span class="st">"failed"</span><span class="kw">,</span><span class="at"> </span><span class="st">"reversed"</span><span class="kw">]</span></span>
+<span id="lst-contract-yaml-42"><a href="#lst-contract-yaml-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-43"><a href="#lst-contract-yaml-43" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> currency</span></span>
+<span id="lst-contract-yaml-44"><a href="#lst-contract-yaml-44" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> STRING</span></span>
+<span id="lst-contract-yaml-45"><a href="#lst-contract-yaml-45" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">nullable</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="lst-contract-yaml-46"><a href="#lst-contract-yaml-46" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pattern</span><span class="kw">:</span><span class="at"> </span><span class="st">"^[A-Z]{3}$"</span></span>
+<span id="lst-contract-yaml-47"><a href="#lst-contract-yaml-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-48"><a href="#lst-contract-yaml-48" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">quality_rules</span><span class="kw">:</span></span>
+<span id="lst-contract-yaml-49"><a href="#lst-contract-yaml-49" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> no_duplicates</span></span>
+<span id="lst-contract-yaml-50"><a href="#lst-contract-yaml-50" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">sql</span><span class="kw">:</span><span class="at"> </span><span class="st">"SELECT COUNT(*) - COUNT(DISTINCT transaction_id) FROM {table}"</span></span>
+<span id="lst-contract-yaml-51"><a href="#lst-contract-yaml-51" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">threshold</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
+<span id="lst-contract-yaml-52"><a href="#lst-contract-yaml-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-53"><a href="#lst-contract-yaml-53" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> completeness</span></span>
+<span id="lst-contract-yaml-54"><a href="#lst-contract-yaml-54" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">sql</span><span class="kw">:</span><span class="at"> </span><span class="st">"SELECT COUNT(*) FILTER(WHERE amount IS NULL) / COUNT(*) FROM {table}"</span></span>
+<span id="lst-contract-yaml-55"><a href="#lst-contract-yaml-55" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">threshold</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.01</span><span class="co">  # máximo 1% de nulos</span></span>
+<span id="lst-contract-yaml-56"><a href="#lst-contract-yaml-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-contract-yaml-57"><a href="#lst-contract-yaml-57" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> freshness</span></span>
+<span id="lst-contract-yaml-58"><a href="#lst-contract-yaml-58" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">sql</span><span class="kw">:</span><span class="at"> </span><span class="st">"SELECT DATEDIFF(hour, MAX(transaction_date), current_date()) FROM {table}"</span></span>
+<span id="lst-contract-yaml-59"><a href="#lst-contract-yaml-59" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">threshold</span><span class="kw">:</span><span class="at"> </span><span class="dv">26</span><span class="co">  # máximo 26 horas de atraso</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="implementación-en-pyspark" class="level2">
+<h2 class="anchored" data-anchor-id="implementación-en-pyspark">Implementación en PySpark</h2>
+<section id="parser-del-contrato" class="level3">
+<h3 class="anchored" data-anchor-id="parser-del-contrato">1. Parser del contrato</h3>
+<div id="lst-parser" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-parser-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Parser de contratos YAML a dataclasses de Python
+</figcaption>
+<div aria-describedby="lst-parser-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-parser"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-parser-1"><a href="#lst-parser-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> yaml</span>
+<span id="lst-parser-2"><a href="#lst-parser-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass</span>
+<span id="lst-parser-3"><a href="#lst-parser-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> List, Optional</span>
+<span id="lst-parser-4"><a href="#lst-parser-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-parser-5"><a href="#lst-parser-5" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="lst-parser-6"><a href="#lst-parser-6" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ColumnContract:</span>
+<span id="lst-parser-7"><a href="#lst-parser-7" aria-hidden="true" tabindex="-1"></a>    name: <span class="bu">str</span></span>
+<span id="lst-parser-8"><a href="#lst-parser-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">type</span>: <span class="bu">str</span></span>
+<span id="lst-parser-9"><a href="#lst-parser-9" aria-hidden="true" tabindex="-1"></a>    nullable: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span></span>
+<span id="lst-parser-10"><a href="#lst-parser-10" aria-hidden="true" tabindex="-1"></a>    unique: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span></span>
+<span id="lst-parser-11"><a href="#lst-parser-11" aria-hidden="true" tabindex="-1"></a>    checks: Optional[List[<span class="bu">str</span>]] <span class="op">=</span> <span class="va">None</span></span>
+<span id="lst-parser-12"><a href="#lst-parser-12" aria-hidden="true" tabindex="-1"></a>    allowed_values: Optional[List[<span class="bu">str</span>]] <span class="op">=</span> <span class="va">None</span></span>
+<span id="lst-parser-13"><a href="#lst-parser-13" aria-hidden="true" tabindex="-1"></a>    pattern: Optional[<span class="bu">str</span>] <span class="op">=</span> <span class="va">None</span></span>
+<span id="lst-parser-14"><a href="#lst-parser-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-parser-15"><a href="#lst-parser-15" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="lst-parser-16"><a href="#lst-parser-16" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> QualityRule:</span>
+<span id="lst-parser-17"><a href="#lst-parser-17" aria-hidden="true" tabindex="-1"></a>    name: <span class="bu">str</span></span>
+<span id="lst-parser-18"><a href="#lst-parser-18" aria-hidden="true" tabindex="-1"></a>    sql: <span class="bu">str</span></span>
+<span id="lst-parser-19"><a href="#lst-parser-19" aria-hidden="true" tabindex="-1"></a>    threshold: <span class="bu">float</span></span>
+<span id="lst-parser-20"><a href="#lst-parser-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-parser-21"><a href="#lst-parser-21" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="lst-parser-22"><a href="#lst-parser-22" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> DataContract:</span>
+<span id="lst-parser-23"><a href="#lst-parser-23" aria-hidden="true" tabindex="-1"></a>    name: <span class="bu">str</span></span>
+<span id="lst-parser-24"><a href="#lst-parser-24" aria-hidden="true" tabindex="-1"></a>    version: <span class="bu">str</span></span>
+<span id="lst-parser-25"><a href="#lst-parser-25" aria-hidden="true" tabindex="-1"></a>    owner: <span class="bu">str</span></span>
+<span id="lst-parser-26"><a href="#lst-parser-26" aria-hidden="true" tabindex="-1"></a>    columns: List[ColumnContract]</span>
+<span id="lst-parser-27"><a href="#lst-parser-27" aria-hidden="true" tabindex="-1"></a>    quality_rules: List[QualityRule]</span>
+<span id="lst-parser-28"><a href="#lst-parser-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-parser-29"><a href="#lst-parser-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">@classmethod</span></span>
+<span id="lst-parser-30"><a href="#lst-parser-30" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> from_yaml(cls, path: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="st">"DataContract"</span>:</span>
+<span id="lst-parser-31"><a href="#lst-parser-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">with</span> <span class="bu">open</span>(path) <span class="im">as</span> f:</span>
+<span id="lst-parser-32"><a href="#lst-parser-32" aria-hidden="true" tabindex="-1"></a>            raw <span class="op">=</span> yaml.safe_load(f)[<span class="st">"contract"</span>]</span>
+<span id="lst-parser-33"><a href="#lst-parser-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-parser-34"><a href="#lst-parser-34" aria-hidden="true" tabindex="-1"></a>        columns <span class="op">=</span> [</span>
+<span id="lst-parser-35"><a href="#lst-parser-35" aria-hidden="true" tabindex="-1"></a>            ColumnContract(<span class="op">**</span>col)</span>
+<span id="lst-parser-36"><a href="#lst-parser-36" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> col <span class="kw">in</span> raw[<span class="st">"schema"</span>]</span>
+<span id="lst-parser-37"><a href="#lst-parser-37" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="lst-parser-38"><a href="#lst-parser-38" aria-hidden="true" tabindex="-1"></a>        rules <span class="op">=</span> [</span>
+<span id="lst-parser-39"><a href="#lst-parser-39" aria-hidden="true" tabindex="-1"></a>            QualityRule(<span class="op">**</span>rule)</span>
+<span id="lst-parser-40"><a href="#lst-parser-40" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> rule <span class="kw">in</span> raw.get(<span class="st">"quality_rules"</span>, [])</span>
+<span id="lst-parser-41"><a href="#lst-parser-41" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="lst-parser-42"><a href="#lst-parser-42" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> cls(</span>
+<span id="lst-parser-43"><a href="#lst-parser-43" aria-hidden="true" tabindex="-1"></a>            name<span class="op">=</span>raw[<span class="st">"name"</span>],</span>
+<span id="lst-parser-44"><a href="#lst-parser-44" aria-hidden="true" tabindex="-1"></a>            version<span class="op">=</span>raw[<span class="st">"version"</span>],</span>
+<span id="lst-parser-45"><a href="#lst-parser-45" aria-hidden="true" tabindex="-1"></a>            owner<span class="op">=</span>raw[<span class="st">"owner"</span>],</span>
+<span id="lst-parser-46"><a href="#lst-parser-46" aria-hidden="true" tabindex="-1"></a>            columns<span class="op">=</span>columns,</span>
+<span id="lst-parser-47"><a href="#lst-parser-47" aria-hidden="true" tabindex="-1"></a>            quality_rules<span class="op">=</span>rules</span>
+<span id="lst-parser-48"><a href="#lst-parser-48" aria-hidden="true" tabindex="-1"></a>        )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="validador-de-schema" class="level3">
+<h3 class="anchored" data-anchor-id="validador-de-schema">2. Validador de schema</h3>
+<div id="lst-schema-validator" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-schema-validator-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Validador de schema: compara DataFrame contra el contrato
+</figcaption>
+<div aria-describedby="lst-schema-validator-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-schema-validator"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-schema-validator-1"><a href="#lst-schema-validator-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> DataFrame</span>
+<span id="lst-schema-validator-2"><a href="#lst-schema-validator-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql.types <span class="im">import</span> <span class="op">*</span></span>
+<span id="lst-schema-validator-3"><a href="#lst-schema-validator-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-schema-validator-4"><a href="#lst-schema-validator-4" aria-hidden="true" tabindex="-1"></a>TYPE_MAP <span class="op">=</span> {</span>
+<span id="lst-schema-validator-5"><a href="#lst-schema-validator-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"BIGINT"</span>: LongType(),</span>
+<span id="lst-schema-validator-6"><a href="#lst-schema-validator-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"STRING"</span>: StringType(),</span>
+<span id="lst-schema-validator-7"><a href="#lst-schema-validator-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"DATE"</span>: DateType(),</span>
+<span id="lst-schema-validator-8"><a href="#lst-schema-validator-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"DECIMAL(18,2)"</span>: DecimalType(<span class="dv">18</span>, <span class="dv">2</span>),</span>
+<span id="lst-schema-validator-9"><a href="#lst-schema-validator-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">"BOOLEAN"</span>: BooleanType(),</span>
+<span id="lst-schema-validator-10"><a href="#lst-schema-validator-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"TIMESTAMP"</span>: TimestampType(),</span>
+<span id="lst-schema-validator-11"><a href="#lst-schema-validator-11" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="lst-schema-validator-12"><a href="#lst-schema-validator-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-schema-validator-13"><a href="#lst-schema-validator-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> validate_schema(df: DataFrame, contract: DataContract) <span class="op">-&gt;</span> List[<span class="bu">str</span>]:</span>
+<span id="lst-schema-validator-14"><a href="#lst-schema-validator-14" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Valida que el DataFrame cumpla el schema del contrato."""</span></span>
+<span id="lst-schema-validator-15"><a href="#lst-schema-validator-15" aria-hidden="true" tabindex="-1"></a>    errors <span class="op">=</span> []</span>
+<span id="lst-schema-validator-16"><a href="#lst-schema-validator-16" aria-hidden="true" tabindex="-1"></a>    df_fields <span class="op">=</span> {f.name: f <span class="cf">for</span> f <span class="kw">in</span> df.schema.fields}</span>
+<span id="lst-schema-validator-17"><a href="#lst-schema-validator-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-schema-validator-18"><a href="#lst-schema-validator-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> col <span class="kw">in</span> contract.columns:</span>
+<span id="lst-schema-validator-19"><a href="#lst-schema-validator-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> col.name <span class="kw">not</span> <span class="kw">in</span> df_fields:</span>
+<span id="lst-schema-validator-20"><a href="#lst-schema-validator-20" aria-hidden="true" tabindex="-1"></a>            errors.append(<span class="ss">f"Columna faltante: </span><span class="sc">{</span>col<span class="sc">.</span>name<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="lst-schema-validator-21"><a href="#lst-schema-validator-21" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="lst-schema-validator-22"><a href="#lst-schema-validator-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-schema-validator-23"><a href="#lst-schema-validator-23" aria-hidden="true" tabindex="-1"></a>        field <span class="op">=</span> df_fields[col.name]</span>
+<span id="lst-schema-validator-24"><a href="#lst-schema-validator-24" aria-hidden="true" tabindex="-1"></a>        expected_type <span class="op">=</span> TYPE_MAP.get(col.<span class="bu">type</span>)</span>
+<span id="lst-schema-validator-25"><a href="#lst-schema-validator-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-schema-validator-26"><a href="#lst-schema-validator-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> expected_type <span class="kw">and</span> field.dataType <span class="op">!=</span> expected_type:</span>
+<span id="lst-schema-validator-27"><a href="#lst-schema-validator-27" aria-hidden="true" tabindex="-1"></a>            errors.append(</span>
+<span id="lst-schema-validator-28"><a href="#lst-schema-validator-28" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"Tipo incorrecto en </span><span class="sc">{</span>col<span class="sc">.</span>name<span class="sc">}</span><span class="ss">: "</span></span>
+<span id="lst-schema-validator-29"><a href="#lst-schema-validator-29" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"esperado </span><span class="sc">{</span>col<span class="sc">.</span><span class="bu">type</span><span class="sc">}</span><span class="ss">, encontrado </span><span class="sc">{</span>field<span class="sc">.</span>dataType<span class="sc">}</span><span class="ss">"</span></span>
+<span id="lst-schema-validator-30"><a href="#lst-schema-validator-30" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="lst-schema-validator-31"><a href="#lst-schema-validator-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-schema-validator-32"><a href="#lst-schema-validator-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> col.nullable <span class="kw">and</span> field.nullable:</span>
+<span id="lst-schema-validator-33"><a href="#lst-schema-validator-33" aria-hidden="true" tabindex="-1"></a>            errors.append(</span>
+<span id="lst-schema-validator-34"><a href="#lst-schema-validator-34" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"</span><span class="sc">{</span>col<span class="sc">.</span>name<span class="sc">}</span><span class="ss"> debería ser NOT NULL"</span></span>
+<span id="lst-schema-validator-35"><a href="#lst-schema-validator-35" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="lst-schema-validator-36"><a href="#lst-schema-validator-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-schema-validator-37"><a href="#lst-schema-validator-37" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Columnas extra (warning, no error)</span></span>
+<span id="lst-schema-validator-38"><a href="#lst-schema-validator-38" aria-hidden="true" tabindex="-1"></a>    contract_cols <span class="op">=</span> {c.name <span class="cf">for</span> c <span class="kw">in</span> contract.columns}</span>
+<span id="lst-schema-validator-39"><a href="#lst-schema-validator-39" aria-hidden="true" tabindex="-1"></a>    extra <span class="op">=</span> <span class="bu">set</span>(df_fields.keys()) <span class="op">-</span> contract_cols</span>
+<span id="lst-schema-validator-40"><a href="#lst-schema-validator-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> extra:</span>
+<span id="lst-schema-validator-41"><a href="#lst-schema-validator-41" aria-hidden="true" tabindex="-1"></a>        errors.append(<span class="ss">f"Columnas no esperadas: </span><span class="sc">{</span>extra<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="lst-schema-validator-42"><a href="#lst-schema-validator-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-schema-validator-43"><a href="#lst-schema-validator-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> errors</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="validador-de-calidad" class="level3">
+<h3 class="anchored" data-anchor-id="validador-de-calidad">3. Validador de calidad</h3>
+<div id="lst-quality-validator" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-quality-validator-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Validador de calidad: ejecuta reglas SQL y reporta violaciones
+</figcaption>
+<div aria-describedby="lst-quality-validator-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-quality-validator"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-quality-validator-1"><a href="#lst-quality-validator-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> validate_quality(</span>
+<span id="lst-quality-validator-2"><a href="#lst-quality-validator-2" aria-hidden="true" tabindex="-1"></a>    spark,</span>
+<span id="lst-quality-validator-3"><a href="#lst-quality-validator-3" aria-hidden="true" tabindex="-1"></a>    table_name: <span class="bu">str</span>,</span>
+<span id="lst-quality-validator-4"><a href="#lst-quality-validator-4" aria-hidden="true" tabindex="-1"></a>    contract: DataContract</span>
+<span id="lst-quality-validator-5"><a href="#lst-quality-validator-5" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> List[<span class="bu">dict</span>]:</span>
+<span id="lst-quality-validator-6"><a href="#lst-quality-validator-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Ejecuta las reglas de calidad y reporta violaciones."""</span></span>
+<span id="lst-quality-validator-7"><a href="#lst-quality-validator-7" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> []</span>
+<span id="lst-quality-validator-8"><a href="#lst-quality-validator-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-quality-validator-9"><a href="#lst-quality-validator-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> rule <span class="kw">in</span> contract.quality_rules:</span>
+<span id="lst-quality-validator-10"><a href="#lst-quality-validator-10" aria-hidden="true" tabindex="-1"></a>        query <span class="op">=</span> rule.sql.<span class="bu">format</span>(table<span class="op">=</span>table_name)</span>
+<span id="lst-quality-validator-11"><a href="#lst-quality-validator-11" aria-hidden="true" tabindex="-1"></a>        value <span class="op">=</span> spark.sql(query).collect()[<span class="dv">0</span>][<span class="dv">0</span>]</span>
+<span id="lst-quality-validator-12"><a href="#lst-quality-validator-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-quality-validator-13"><a href="#lst-quality-validator-13" aria-hidden="true" tabindex="-1"></a>        passed <span class="op">=</span> value <span class="op">&lt;=</span> rule.threshold</span>
+<span id="lst-quality-validator-14"><a href="#lst-quality-validator-14" aria-hidden="true" tabindex="-1"></a>        results.append({</span>
+<span id="lst-quality-validator-15"><a href="#lst-quality-validator-15" aria-hidden="true" tabindex="-1"></a>            <span class="st">"rule"</span>: rule.name,</span>
+<span id="lst-quality-validator-16"><a href="#lst-quality-validator-16" aria-hidden="true" tabindex="-1"></a>            <span class="st">"value"</span>: value,</span>
+<span id="lst-quality-validator-17"><a href="#lst-quality-validator-17" aria-hidden="true" tabindex="-1"></a>            <span class="st">"threshold"</span>: rule.threshold,</span>
+<span id="lst-quality-validator-18"><a href="#lst-quality-validator-18" aria-hidden="true" tabindex="-1"></a>            <span class="st">"passed"</span>: passed</span>
+<span id="lst-quality-validator-19"><a href="#lst-quality-validator-19" aria-hidden="true" tabindex="-1"></a>        })</span>
+<span id="lst-quality-validator-20"><a href="#lst-quality-validator-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-quality-validator-21"><a href="#lst-quality-validator-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> passed:</span>
+<span id="lst-quality-validator-22"><a href="#lst-quality-validator-22" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"FAIL: </span><span class="sc">{</span>rule<span class="sc">.</span>name<span class="sc">}</span><span class="ss"> = </span><span class="sc">{</span>value<span class="sc">}</span><span class="ss"> "</span></span>
+<span id="lst-quality-validator-23"><a href="#lst-quality-validator-23" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"(threshold: </span><span class="sc">{</span>rule<span class="sc">.</span>threshold<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="lst-quality-validator-24"><a href="#lst-quality-validator-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-quality-validator-25"><a href="#lst-quality-validator-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="integración-en-el-pipeline" class="level3">
+<h3 class="anchored" data-anchor-id="integración-en-el-pipeline">4. Integración en el pipeline</h3>
+<div id="lst-ingest-pipeline" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ingest-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: Pipeline de ingesta con validación de contrato integrada
+</figcaption>
+<div aria-describedby="lst-ingest-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-ingest-pipeline"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-ingest-pipeline-1"><a href="#lst-ingest-pipeline-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ContractViolation(<span class="pp">Exception</span>):</span>
+<span id="lst-ingest-pipeline-2"><a href="#lst-ingest-pipeline-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Excepción para violaciones de Data Contracts."""</span></span>
+<span id="lst-ingest-pipeline-3"><a href="#lst-ingest-pipeline-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">pass</span></span>
+<span id="lst-ingest-pipeline-4"><a href="#lst-ingest-pipeline-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-ingest-pipeline-5"><a href="#lst-ingest-pipeline-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> alert_team(owner: <span class="bu">str</span>, failures: <span class="bu">list</span>):</span>
+<span id="lst-ingest-pipeline-6"><a href="#lst-ingest-pipeline-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Notifica al equipo dueño del contrato sobre las fallas de calidad."""</span></span>
+<span id="lst-ingest-pipeline-7"><a href="#lst-ingest-pipeline-7" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Implementar según tu stack: Slack webhook, email, PagerDuty, etc.</span></span>
+<span id="lst-ingest-pipeline-8"><a href="#lst-ingest-pipeline-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> f <span class="kw">in</span> failures:</span>
+<span id="lst-ingest-pipeline-9"><a href="#lst-ingest-pipeline-9" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"[ALERT → </span><span class="sc">{</span>owner<span class="sc">}</span><span class="ss">] </span><span class="sc">{</span>f[<span class="st">'rule'</span>]<span class="sc">}</span><span class="ss">: valor=</span><span class="sc">{</span>f[<span class="st">'value'</span>]<span class="sc">}</span><span class="ss">, "</span></span>
+<span id="lst-ingest-pipeline-10"><a href="#lst-ingest-pipeline-10" aria-hidden="true" tabindex="-1"></a>              <span class="ss">f"threshold=</span><span class="sc">{</span>f[<span class="st">'threshold'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="lst-ingest-pipeline-11"><a href="#lst-ingest-pipeline-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-ingest-pipeline-12"><a href="#lst-ingest-pipeline-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ingest_with_contract(</span>
+<span id="lst-ingest-pipeline-13"><a href="#lst-ingest-pipeline-13" aria-hidden="true" tabindex="-1"></a>    spark,</span>
+<span id="lst-ingest-pipeline-14"><a href="#lst-ingest-pipeline-14" aria-hidden="true" tabindex="-1"></a>    source_df: DataFrame,</span>
+<span id="lst-ingest-pipeline-15"><a href="#lst-ingest-pipeline-15" aria-hidden="true" tabindex="-1"></a>    contract_path: <span class="bu">str</span>,</span>
+<span id="lst-ingest-pipeline-16"><a href="#lst-ingest-pipeline-16" aria-hidden="true" tabindex="-1"></a>    target_table: <span class="bu">str</span></span>
+<span id="lst-ingest-pipeline-17"><a href="#lst-ingest-pipeline-17" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="lst-ingest-pipeline-18"><a href="#lst-ingest-pipeline-18" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Pipeline de ingesta con validación de contrato."""</span></span>
+<span id="lst-ingest-pipeline-19"><a href="#lst-ingest-pipeline-19" aria-hidden="true" tabindex="-1"></a>    contract <span class="op">=</span> DataContract.from_yaml(contract_path)</span>
+<span id="lst-ingest-pipeline-20"><a href="#lst-ingest-pipeline-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-ingest-pipeline-21"><a href="#lst-ingest-pipeline-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1. Validar schema</span></span>
+<span id="lst-ingest-pipeline-22"><a href="#lst-ingest-pipeline-22" aria-hidden="true" tabindex="-1"></a>    schema_errors <span class="op">=</span> validate_schema(source_df, contract)</span>
+<span id="lst-ingest-pipeline-23"><a href="#lst-ingest-pipeline-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> schema_errors:</span>
+<span id="lst-ingest-pipeline-24"><a href="#lst-ingest-pipeline-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">raise</span> ContractViolation(</span>
+<span id="lst-ingest-pipeline-25"><a href="#lst-ingest-pipeline-25" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"Schema violation en </span><span class="sc">{</span>contract<span class="sc">.</span>name<span class="sc">}</span><span class="ss">: "</span></span>
+<span id="lst-ingest-pipeline-26"><a href="#lst-ingest-pipeline-26" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"</span><span class="sc">{</span>schema_errors<span class="sc">}</span><span class="ss">"</span></span>
+<span id="lst-ingest-pipeline-27"><a href="#lst-ingest-pipeline-27" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="lst-ingest-pipeline-28"><a href="#lst-ingest-pipeline-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-ingest-pipeline-29"><a href="#lst-ingest-pipeline-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2. Escribir a tabla</span></span>
+<span id="lst-ingest-pipeline-30"><a href="#lst-ingest-pipeline-30" aria-hidden="true" tabindex="-1"></a>    source_df.write.mode(<span class="st">"append"</span>).saveAsTable(target_table)</span>
+<span id="lst-ingest-pipeline-31"><a href="#lst-ingest-pipeline-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-ingest-pipeline-32"><a href="#lst-ingest-pipeline-32" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3. Validar calidad post-write</span></span>
+<span id="lst-ingest-pipeline-33"><a href="#lst-ingest-pipeline-33" aria-hidden="true" tabindex="-1"></a>    quality <span class="op">=</span> validate_quality(spark, target_table, contract)</span>
+<span id="lst-ingest-pipeline-34"><a href="#lst-ingest-pipeline-34" aria-hidden="true" tabindex="-1"></a>    failures <span class="op">=</span> [r <span class="cf">for</span> r <span class="kw">in</span> quality <span class="cf">if</span> <span class="kw">not</span> r[<span class="st">"passed"</span>]]</span>
+<span id="lst-ingest-pipeline-35"><a href="#lst-ingest-pipeline-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-ingest-pipeline-36"><a href="#lst-ingest-pipeline-36" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> failures:</span>
+<span id="lst-ingest-pipeline-37"><a href="#lst-ingest-pipeline-37" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Alertar pero no fallar (soft contract)</span></span>
+<span id="lst-ingest-pipeline-38"><a href="#lst-ingest-pipeline-38" aria-hidden="true" tabindex="-1"></a>        alert_team(contract.owner, failures)</span>
+<span id="lst-ingest-pipeline-39"><a href="#lst-ingest-pipeline-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-ingest-pipeline-40"><a href="#lst-ingest-pipeline-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> quality</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+</section>
+<section id="hard-contracts-vs-soft-contracts" class="level2">
+<h2 class="anchored" data-anchor-id="hard-contracts-vs-soft-contracts">Hard Contracts vs Soft Contracts</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tipo</th>
+<th>Qué pasa si falla</th>
+<th>Cuándo usarlo</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Hard</strong></td>
+<td>Pipeline se detiene, dato no entra</td>
+<td>Fuentes críticas (core bancario, pagos)</td>
+</tr>
+<tr class="even">
+<td><strong>Soft</strong></td>
+<td>Se loguea warning, dato entra igual</td>
+<td>Fuentes externas, datos no críticos</td>
+</tr>
+</tbody>
+</table>
+<div id="lst-hard-vs-soft" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-hard-vs-soft-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: Hard contract vs Soft contract: fallar o enviar a cuarentena
+</figcaption>
+<div aria-describedby="lst-hard-vs-soft-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-hard-vs-soft"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-hard-vs-soft-1"><a href="#lst-hard-vs-soft-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Hard contract: falla y para</span></span>
+<span id="lst-hard-vs-soft-2"><a href="#lst-hard-vs-soft-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> schema_errors:</span>
+<span id="lst-hard-vs-soft-3"><a href="#lst-hard-vs-soft-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> ContractViolation(...)</span>
+<span id="lst-hard-vs-soft-4"><a href="#lst-hard-vs-soft-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-hard-vs-soft-5"><a href="#lst-hard-vs-soft-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Soft contract: loguea y sigue</span></span>
+<span id="lst-hard-vs-soft-6"><a href="#lst-hard-vs-soft-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> schema_errors:</span>
+<span id="lst-hard-vs-soft-7"><a href="#lst-hard-vs-soft-7" aria-hidden="true" tabindex="-1"></a>    log_violation(contract, schema_errors)</span>
+<span id="lst-hard-vs-soft-8"><a href="#lst-hard-vs-soft-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># dato entra igual a una tabla de quarantine</span></span>
+<span id="lst-hard-vs-soft-9"><a href="#lst-hard-vs-soft-9" aria-hidden="true" tabindex="-1"></a>    source_df.write.saveAsTable(<span class="ss">f"</span><span class="sc">{</span>target_table<span class="sc">}</span><span class="ss">_quarantine"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="con-databricks-expectations-dlt" class="level2">
+<h2 class="anchored" data-anchor-id="con-databricks-expectations-dlt">Con Databricks Expectations (DLT)</h2>
+<p>Si usás DLT / Lakeflow Declarative Pipelines, podés expresar los contracts como expectations:</p>
+<div id="lst-dlt-expectations" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dlt-expectations-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;7: Data Contracts como DLT Expectations en Databricks
+</figcaption>
+<div aria-describedby="lst-dlt-expectations-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-dlt-expectations"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-dlt-expectations-1"><a href="#lst-dlt-expectations-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> dlt</span>
+<span id="lst-dlt-expectations-2"><a href="#lst-dlt-expectations-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-dlt-expectations-3"><a href="#lst-dlt-expectations-3" aria-hidden="true" tabindex="-1"></a><span class="at">@dlt.table</span>(name<span class="op">=</span><span class="st">"silver_transactions"</span>)</span>
+<span id="lst-dlt-expectations-4"><a href="#lst-dlt-expectations-4" aria-hidden="true" tabindex="-1"></a><span class="at">@dlt.expect_all_or_drop</span>({</span>
+<span id="lst-dlt-expectations-5"><a href="#lst-dlt-expectations-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"valid_amount"</span>: <span class="st">"amount &gt; 0 AND amount &lt; 1000000"</span>,</span>
+<span id="lst-dlt-expectations-6"><a href="#lst-dlt-expectations-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"valid_status"</span>: <span class="st">"status IN ('completed','pending','failed','reversed')"</span>,</span>
+<span id="lst-dlt-expectations-7"><a href="#lst-dlt-expectations-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"not_null_id"</span>: <span class="st">"transaction_id IS NOT NULL"</span>,</span>
+<span id="lst-dlt-expectations-8"><a href="#lst-dlt-expectations-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"valid_date"</span>: <span class="st">"transaction_date &gt;= '2020-01-01'"</span></span>
+<span id="lst-dlt-expectations-9"><a href="#lst-dlt-expectations-9" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="lst-dlt-expectations-10"><a href="#lst-dlt-expectations-10" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> clean_transactions():</span>
+<span id="lst-dlt-expectations-11"><a href="#lst-dlt-expectations-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> dlt.read(<span class="st">"bronze_transactions"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><code>expect_all_or_drop</code> es un hard contract: las filas que no cumplen se descartan. <code>expect_all_or_fail</code> para el pipeline entero. <code>expect_all</code> solo loguea.</p>
+</section>
+<section id="links" class="level2">
+<h2 class="anchored" data-anchor-id="links">Links</h2>
+<ul>
+<li><p><a href="https://datacontract.com/">Data Contracts (Andrew Jones)</a> — referencia de la comunidad</p></li>
+<li><h2 id="dlt-expectations-databricks-documentación-oficial" class="anchored"><a href="https://docs.databricks.com/en/delta-live-tables/expectations.html">DLT Expectations (Databricks)</a> — documentación oficial</h2></li>
+</ul>
+<p><em>Próxima semana: Data Mesh en la práctica — lo que funciona y lo que no.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

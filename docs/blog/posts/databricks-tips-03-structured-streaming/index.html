@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-03-17">
+<meta name="description" content="Trigger modes, watermarks, foreachBatch, Auto Loader y las trampas que te hacen perder datos o plata.">
+
+<title>Databricks Tips #4: Structured Streaming — watermarks, triggers y las trampas del micro-batch – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Databricks Tips #4: Structured Streaming — watermarks, triggers y las trampas del micro-batch – Mauro Loprete">
+<meta property="og:description" content="Trigger modes, watermarks, foreachBatch, Auto Loader y las trampas que te hacen perder datos o plata.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-03-structured-streaming/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #4: Structured Streaming — watermarks, triggers y las trampas del micro-batch – Mauro Loprete">
+<meta name="twitter:description" content="Trigger modes, watermarks, foreachBatch, Auto Loader y las trampas que te hacen perder datos o plata.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-03-structured-streaming/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#trigger-modes-la-decisión-más-importante" id="toc-trigger-modes-la-decisión-más-importante" class="nav-link active" data-scroll-target="#trigger-modes-la-decisión-más-importante">Trigger modes: la decisión más importante</a></li>
+  <li><a href="#watermarks-cómo-no-perder-datos-tardíos" id="toc-watermarks-cómo-no-perder-datos-tardíos" class="nav-link" data-scroll-target="#watermarks-cómo-no-perder-datos-tardíos">Watermarks: cómo no perder datos tardíos</a></li>
+  <li><a href="#auto-loader-la-forma-correcta-de-ingestar-archivos" id="toc-auto-loader-la-forma-correcta-de-ingestar-archivos" class="nav-link" data-scroll-target="#auto-loader-la-forma-correcta-de-ingestar-archivos">Auto Loader: la forma correcta de ingestar archivos</a></li>
+  <li><a href="#foreachbatch-el-escape-hatch" id="toc-foreachbatch-el-escape-hatch" class="nav-link" data-scroll-target="#foreachbatch-el-escape-hatch">foreachBatch: el escape hatch</a></li>
+  <li><a href="#monitoreo-qué-mirar-en-producción" id="toc-monitoreo-qué-mirar-en-producción" class="nav-link" data-scroll-target="#monitoreo-qué-mirar-en-producción">Monitoreo: qué mirar en producción</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #4: Structured Streaming — watermarks, triggers y las trampas del micro-batch</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Streaming</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Trigger modes, watermarks, foreachBatch, Auto Loader y las trampas que te hacen perder datos o plata.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 17, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Cuarta entrega de <strong>Databricks Tips</strong>. Structured Streaming en Databricks parece simple hasta que perdés datos en producción o te llega una factura de compute que no esperabas.</p>
+<section id="trigger-modes-la-decisión-más-importante" class="level2">
+<h2 class="anchored" data-anchor-id="trigger-modes-la-decisión-más-importante">Trigger modes: la decisión más importante</h2>
+<p>El trigger define <strong>cuándo</strong> se ejecuta cada micro-batch. Elegir mal sale caro:</p>
+<div id="lst-trigger-modes" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-trigger-modes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Trigger modes: processingTime vs availableNow según latencia
+</figcaption>
+<div aria-describedby="lst-trigger-modes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-trigger-modes"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-trigger-modes-1"><a href="#lst-trigger-modes-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MALO en producción: procesa continuamente, consume cluster 24/7</span></span>
+<span id="lst-trigger-modes-2"><a href="#lst-trigger-modes-2" aria-hidden="true" tabindex="-1"></a>df.writeStream <span class="op">\</span></span>
+<span id="lst-trigger-modes-3"><a href="#lst-trigger-modes-3" aria-hidden="true" tabindex="-1"></a>  .trigger(processingTime<span class="op">=</span><span class="st">"0 seconds"</span>) <span class="op">\</span></span>
+<span id="lst-trigger-modes-4"><a href="#lst-trigger-modes-4" aria-hidden="true" tabindex="-1"></a>  .start()</span>
+<span id="lst-trigger-modes-5"><a href="#lst-trigger-modes-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-trigger-modes-6"><a href="#lst-trigger-modes-6" aria-hidden="true" tabindex="-1"></a><span class="co"># MEJOR para la mayoría: cada 5 minutos</span></span>
+<span id="lst-trigger-modes-7"><a href="#lst-trigger-modes-7" aria-hidden="true" tabindex="-1"></a>df.writeStream <span class="op">\</span></span>
+<span id="lst-trigger-modes-8"><a href="#lst-trigger-modes-8" aria-hidden="true" tabindex="-1"></a>  .trigger(processingTime<span class="op">=</span><span class="st">"5 minutes"</span>) <span class="op">\</span></span>
+<span id="lst-trigger-modes-9"><a href="#lst-trigger-modes-9" aria-hidden="true" tabindex="-1"></a>  .start()</span>
+<span id="lst-trigger-modes-10"><a href="#lst-trigger-modes-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-trigger-modes-11"><a href="#lst-trigger-modes-11" aria-hidden="true" tabindex="-1"></a><span class="co"># IDEAL para pipelines que no necesitan baja latencia:</span></span>
+<span id="lst-trigger-modes-12"><a href="#lst-trigger-modes-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Procesa todo lo pendiente y para</span></span>
+<span id="lst-trigger-modes-13"><a href="#lst-trigger-modes-13" aria-hidden="true" tabindex="-1"></a>df.writeStream <span class="op">\</span></span>
+<span id="lst-trigger-modes-14"><a href="#lst-trigger-modes-14" aria-hidden="true" tabindex="-1"></a>  .trigger(availableNow<span class="op">=</span><span class="va">True</span>) <span class="op">\</span></span>
+<span id="lst-trigger-modes-15"><a href="#lst-trigger-modes-15" aria-hidden="true" tabindex="-1"></a>  .start()</span>
+<span id="lst-trigger-modes-16"><a href="#lst-trigger-modes-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-trigger-modes-17"><a href="#lst-trigger-modes-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Para pipelines event-driven (ej: cada vez que llega un archivo)</span></span>
+<span id="lst-trigger-modes-18"><a href="#lst-trigger-modes-18" aria-hidden="true" tabindex="-1"></a>df.writeStream <span class="op">\</span></span>
+<span id="lst-trigger-modes-19"><a href="#lst-trigger-modes-19" aria-hidden="true" tabindex="-1"></a>  .trigger(availableNow<span class="op">=</span><span class="va">True</span>) <span class="op">\</span></span>
+<span id="lst-trigger-modes-20"><a href="#lst-trigger-modes-20" aria-hidden="true" tabindex="-1"></a>  .start()</span>
+<span id="lst-trigger-modes-21"><a href="#lst-trigger-modes-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Combinado con un job que se triggerea por file arrival</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>La trampa</strong>: <code>processingTime="0 seconds"</code> es el default y mucha gente ni lo toca. Un cluster corriendo 24/7 procesando cero datos la mayor parte del tiempo.</p>
+<p><strong>Regla práctica</strong>:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Latencia requerida</th>
+<th>Trigger</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>&lt; 1 minuto</td>
+<td><code>processingTime="10 seconds"</code></td>
+</tr>
+<tr class="even">
+<td>1-15 minutos</td>
+<td><code>processingTime="5 minutes"</code></td>
+</tr>
+<tr class="odd">
+<td>&gt; 15 minutos</td>
+<td><code>availableNow=True</code> + job schedule</td>
+</tr>
+<tr class="even">
+<td>Batch diario</td>
+<td><code>availableNow=True</code> + cron diario</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="watermarks-cómo-no-perder-datos-tardíos" class="level2">
+<h2 class="anchored" data-anchor-id="watermarks-cómo-no-perder-datos-tardíos">Watermarks: cómo no perder datos tardíos</h2>
+<p>Sin watermark, Spark mantiene <strong>todo</strong> el estado en memoria para joins y aggregations. Con tablas grandes, esto explota:</p>
+<div id="lst-watermark" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-watermark-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Watermark: limitar el estado en memoria para aggregations
+</figcaption>
+<div aria-describedby="lst-watermark-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-watermark"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-watermark-1"><a href="#lst-watermark-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql.functions <span class="im">import</span> window, col</span>
+<span id="lst-watermark-2"><a href="#lst-watermark-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-watermark-3"><a href="#lst-watermark-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Sin watermark: el estado crece infinitamente</span></span>
+<span id="lst-watermark-4"><a href="#lst-watermark-4" aria-hidden="true" tabindex="-1"></a>events <span class="op">\</span></span>
+<span id="lst-watermark-5"><a href="#lst-watermark-5" aria-hidden="true" tabindex="-1"></a>  .groupBy(window(<span class="st">"event_time"</span>, <span class="st">"1 hour"</span>)) <span class="op">\</span></span>
+<span id="lst-watermark-6"><a href="#lst-watermark-6" aria-hidden="true" tabindex="-1"></a>  .count()</span>
+<span id="lst-watermark-7"><a href="#lst-watermark-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-watermark-8"><a href="#lst-watermark-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Con watermark: Spark descarta estado de más de 2 horas</span></span>
+<span id="lst-watermark-9"><a href="#lst-watermark-9" aria-hidden="true" tabindex="-1"></a>events <span class="op">\</span></span>
+<span id="lst-watermark-10"><a href="#lst-watermark-10" aria-hidden="true" tabindex="-1"></a>  .withWatermark(<span class="st">"event_time"</span>, <span class="st">"2 hours"</span>) <span class="op">\</span></span>
+<span id="lst-watermark-11"><a href="#lst-watermark-11" aria-hidden="true" tabindex="-1"></a>  .groupBy(window(<span class="st">"event_time"</span>, <span class="st">"1 hour"</span>)) <span class="op">\</span></span>
+<span id="lst-watermark-12"><a href="#lst-watermark-12" aria-hidden="true" tabindex="-1"></a>  .count()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>¿Qué pasa con datos que llegan después del watermark?</strong> Se descartan silenciosamente. No hay error, no hay log. Solo desaparecen.</p>
+<p><strong>Cómo elegir el watermark</strong>:</p>
+<ol type="1">
+<li>Medí el delay máximo real de tus datos (percentil 99)</li>
+<li>Agregale un margen de seguridad (2x)</li>
+<li>Monitorealo: si ves datos faltantes, aumentá el watermark</li>
+</ol>
+</section>
+<section id="auto-loader-la-forma-correcta-de-ingestar-archivos" class="level2">
+<h2 class="anchored" data-anchor-id="auto-loader-la-forma-correcta-de-ingestar-archivos">Auto Loader: la forma correcta de ingestar archivos</h2>
+<p><code>spark.readStream.format("cloudFiles")</code> es el Auto Loader. Es superior a <code>spark.readStream.format("parquet")</code> por varias razones:</p>
+<div id="lst-auto-loader" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-auto-loader-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Auto Loader vs file source: schema evolution y exactly-once
+</figcaption>
+<div aria-describedby="lst-auto-loader-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-auto-loader"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-auto-loader-1"><a href="#lst-auto-loader-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MALO: file source básico</span></span>
+<span id="lst-auto-loader-2"><a href="#lst-auto-loader-2" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> (spark.readStream</span>
+<span id="lst-auto-loader-3"><a href="#lst-auto-loader-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">format</span>(<span class="st">"parquet"</span>)</span>
+<span id="lst-auto-loader-4"><a href="#lst-auto-loader-4" aria-hidden="true" tabindex="-1"></a>  .schema(my_schema)</span>
+<span id="lst-auto-loader-5"><a href="#lst-auto-loader-5" aria-hidden="true" tabindex="-1"></a>  .load(<span class="st">"s3://bucket/landing/"</span>))</span>
+<span id="lst-auto-loader-6"><a href="#lst-auto-loader-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-auto-loader-7"><a href="#lst-auto-loader-7" aria-hidden="true" tabindex="-1"></a><span class="co"># BIEN: Auto Loader</span></span>
+<span id="lst-auto-loader-8"><a href="#lst-auto-loader-8" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> (spark.readStream</span>
+<span id="lst-auto-loader-9"><a href="#lst-auto-loader-9" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">format</span>(<span class="st">"cloudFiles"</span>)</span>
+<span id="lst-auto-loader-10"><a href="#lst-auto-loader-10" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"cloudFiles.format"</span>, <span class="st">"parquet"</span>)</span>
+<span id="lst-auto-loader-11"><a href="#lst-auto-loader-11" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"cloudFiles.schemaLocation"</span>, <span class="st">"/checkpoints/schema/"</span>)</span>
+<span id="lst-auto-loader-12"><a href="#lst-auto-loader-12" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"cloudFiles.inferColumnTypes"</span>, <span class="st">"true"</span>)</span>
+<span id="lst-auto-loader-13"><a href="#lst-auto-loader-13" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"cloudFiles.schemaEvolutionMode"</span>, <span class="st">"addNewColumns"</span>)</span>
+<span id="lst-auto-loader-14"><a href="#lst-auto-loader-14" aria-hidden="true" tabindex="-1"></a>  .load(<span class="st">"s3://bucket/landing/"</span>))</span>
+<span id="lst-auto-loader-15"><a href="#lst-auto-loader-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-auto-loader-16"><a href="#lst-auto-loader-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Escribir con merge schema</span></span>
+<span id="lst-auto-loader-17"><a href="#lst-auto-loader-17" aria-hidden="true" tabindex="-1"></a>df.writeStream <span class="op">\</span></span>
+<span id="lst-auto-loader-18"><a href="#lst-auto-loader-18" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">format</span>(<span class="st">"delta"</span>) <span class="op">\</span></span>
+<span id="lst-auto-loader-19"><a href="#lst-auto-loader-19" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"checkpointLocation"</span>, <span class="st">"/checkpoints/events/"</span>) <span class="op">\</span></span>
+<span id="lst-auto-loader-20"><a href="#lst-auto-loader-20" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"mergeSchema"</span>, <span class="st">"true"</span>) <span class="op">\</span></span>
+<span id="lst-auto-loader-21"><a href="#lst-auto-loader-21" aria-hidden="true" tabindex="-1"></a>  .trigger(availableNow<span class="op">=</span><span class="va">True</span>) <span class="op">\</span></span>
+<span id="lst-auto-loader-22"><a href="#lst-auto-loader-22" aria-hidden="true" tabindex="-1"></a>  .toTable(<span class="st">"catalog.bronze.events"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Ventajas del Auto Loader</strong>:</p>
+<ul>
+<li><strong>Notificación vs listing</strong>: usa SNS/SQS (AWS) o Event Grid (Azure) para detectar archivos nuevos. En directorios con millones de archivos, listing tarda minutos; notificación es instantáneo.</li>
+<li><strong>Schema evolution</strong>: detecta columnas nuevas automáticamente.</li>
+<li><strong>Rescue column</strong>: columnas que no matchean el schema van a <code>_rescued_data</code> en vez de fallar.</li>
+<li><strong>Exactly-once</strong>: el checkpoint garantiza que nunca procesás un archivo dos veces.</li>
+</ul>
+<div id="lst-rescue-column" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-rescue-column-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Rescue column: capturar datos que no matchean el schema
+</figcaption>
+<div aria-describedby="lst-rescue-column-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-rescue-column"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-rescue-column-1"><a href="#lst-rescue-column-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Habilitar rescue column para datos sucios</span></span>
+<span id="lst-rescue-column-2"><a href="#lst-rescue-column-2" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> (spark.readStream</span>
+<span id="lst-rescue-column-3"><a href="#lst-rescue-column-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">format</span>(<span class="st">"cloudFiles"</span>)</span>
+<span id="lst-rescue-column-4"><a href="#lst-rescue-column-4" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"cloudFiles.format"</span>, <span class="st">"json"</span>)</span>
+<span id="lst-rescue-column-5"><a href="#lst-rescue-column-5" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"cloudFiles.schemaLocation"</span>, <span class="st">"/checkpoints/schema/"</span>)</span>
+<span id="lst-rescue-column-6"><a href="#lst-rescue-column-6" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"rescuedDataColumn"</span>, <span class="st">"_rescued_data"</span>)</span>
+<span id="lst-rescue-column-7"><a href="#lst-rescue-column-7" aria-hidden="true" tabindex="-1"></a>  .load(<span class="st">"s3://bucket/raw/"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="foreachbatch-el-escape-hatch" class="level2">
+<h2 class="anchored" data-anchor-id="foreachbatch-el-escape-hatch">foreachBatch: el escape hatch</h2>
+<p>Cuando necesitás lógica que no se puede expresar en streaming puro (upserts, llamadas a APIs, multi-table writes):</p>
+<div id="lst-foreach-batch" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-foreach-batch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: foreachBatch con MERGE: upsert idempotente en streaming
+</figcaption>
+<div aria-describedby="lst-foreach-batch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-foreach-batch"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-foreach-batch-1"><a href="#lst-foreach-batch-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> upsert_to_delta(batch_df, batch_id):</span>
+<span id="lst-foreach-batch-2"><a href="#lst-foreach-batch-2" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> delta.tables <span class="im">import</span> DeltaTable</span>
+<span id="lst-foreach-batch-3"><a href="#lst-foreach-batch-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-foreach-batch-4"><a href="#lst-foreach-batch-4" aria-hidden="true" tabindex="-1"></a>    target <span class="op">=</span> DeltaTable.forName(spark, <span class="st">"catalog.silver.customers"</span>)</span>
+<span id="lst-foreach-batch-5"><a href="#lst-foreach-batch-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-foreach-batch-6"><a href="#lst-foreach-batch-6" aria-hidden="true" tabindex="-1"></a>    (target.alias(<span class="st">"t"</span>)</span>
+<span id="lst-foreach-batch-7"><a href="#lst-foreach-batch-7" aria-hidden="true" tabindex="-1"></a>     .merge(batch_df.alias(<span class="st">"s"</span>), <span class="st">"t.customer_id = s.customer_id"</span>)</span>
+<span id="lst-foreach-batch-8"><a href="#lst-foreach-batch-8" aria-hidden="true" tabindex="-1"></a>     .whenMatchedUpdateAll()</span>
+<span id="lst-foreach-batch-9"><a href="#lst-foreach-batch-9" aria-hidden="true" tabindex="-1"></a>     .whenNotMatchedInsertAll()</span>
+<span id="lst-foreach-batch-10"><a href="#lst-foreach-batch-10" aria-hidden="true" tabindex="-1"></a>     .execute())</span>
+<span id="lst-foreach-batch-11"><a href="#lst-foreach-batch-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-foreach-batch-12"><a href="#lst-foreach-batch-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Stream con upsert</span></span>
+<span id="lst-foreach-batch-13"><a href="#lst-foreach-batch-13" aria-hidden="true" tabindex="-1"></a>(spark.readStream</span>
+<span id="lst-foreach-batch-14"><a href="#lst-foreach-batch-14" aria-hidden="true" tabindex="-1"></a>  .table(<span class="st">"catalog.bronze.customers"</span>)</span>
+<span id="lst-foreach-batch-15"><a href="#lst-foreach-batch-15" aria-hidden="true" tabindex="-1"></a>  .writeStream</span>
+<span id="lst-foreach-batch-16"><a href="#lst-foreach-batch-16" aria-hidden="true" tabindex="-1"></a>  .foreachBatch(upsert_to_delta)</span>
+<span id="lst-foreach-batch-17"><a href="#lst-foreach-batch-17" aria-hidden="true" tabindex="-1"></a>  .option(<span class="st">"checkpointLocation"</span>, <span class="st">"/checkpoints/customers_upsert/"</span>)</span>
+<span id="lst-foreach-batch-18"><a href="#lst-foreach-batch-18" aria-hidden="true" tabindex="-1"></a>  .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
+<span id="lst-foreach-batch-19"><a href="#lst-foreach-batch-19" aria-hidden="true" tabindex="-1"></a>  .start())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Ojo con foreachBatch</strong>: si tu función falla a mitad de camino, el batch se reintenta completo. Asegurate de que la operación sea <strong>idempotente</strong> (MERGE lo es, INSERT no).</p>
+</section>
+<section id="monitoreo-qué-mirar-en-producción" class="level2">
+<h2 class="anchored" data-anchor-id="monitoreo-qué-mirar-en-producción">Monitoreo: qué mirar en producción</h2>
+<div id="lst-stream-monitor" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-stream-monitor-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: StreamingQueryListener: monitorear batches y detectar lag
+</figcaption>
+<div aria-describedby="lst-stream-monitor-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-stream-monitor"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-stream-monitor-1"><a href="#lst-stream-monitor-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Query listener para métricas</span></span>
+<span id="lst-stream-monitor-2"><a href="#lst-stream-monitor-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql.streaming <span class="im">import</span> StreamingQueryListener</span>
+<span id="lst-stream-monitor-3"><a href="#lst-stream-monitor-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-stream-monitor-4"><a href="#lst-stream-monitor-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> StreamMonitor(StreamingQueryListener):</span>
+<span id="lst-stream-monitor-5"><a href="#lst-stream-monitor-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> onQueryProgress(<span class="va">self</span>, event):</span>
+<span id="lst-stream-monitor-6"><a href="#lst-stream-monitor-6" aria-hidden="true" tabindex="-1"></a>        progress <span class="op">=</span> event.progress</span>
+<span id="lst-stream-monitor-7"><a href="#lst-stream-monitor-7" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"""</span></span>
+<span id="lst-stream-monitor-8"><a href="#lst-stream-monitor-8" aria-hidden="true" tabindex="-1"></a><span class="ss">        Batch: </span><span class="sc">{</span>progress<span class="sc">.</span>batchId<span class="sc">}</span></span>
+<span id="lst-stream-monitor-9"><a href="#lst-stream-monitor-9" aria-hidden="true" tabindex="-1"></a><span class="ss">        Input rows: </span><span class="sc">{</span>progress<span class="sc">.</span>numInputRows<span class="sc">}</span></span>
+<span id="lst-stream-monitor-10"><a href="#lst-stream-monitor-10" aria-hidden="true" tabindex="-1"></a><span class="ss">        Processing time: </span><span class="sc">{</span>progress<span class="sc">.</span>batchDuration<span class="sc">}</span><span class="ss">ms</span></span>
+<span id="lst-stream-monitor-11"><a href="#lst-stream-monitor-11" aria-hidden="true" tabindex="-1"></a><span class="ss">        Watermark: </span><span class="sc">{</span>progress<span class="sc">.</span>eventTime<span class="sc">.</span>get(<span class="st">'watermark'</span>, <span class="st">'N/A'</span>)<span class="sc">}</span></span>
+<span id="lst-stream-monitor-12"><a href="#lst-stream-monitor-12" aria-hidden="true" tabindex="-1"></a><span class="ss">        """</span>)</span>
+<span id="lst-stream-monitor-13"><a href="#lst-stream-monitor-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-stream-monitor-14"><a href="#lst-stream-monitor-14" aria-hidden="true" tabindex="-1"></a>spark.streams.addListener(StreamMonitor())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Métricas clave</strong>:</p>
+<ul>
+<li><code>numInputRows = 0</code> por mucho tiempo → el trigger está corriendo sin datos (plata tirada)</li>
+<li><code>batchDuration</code> crece batch a batch → el estado está creciendo, necesitás watermark</li>
+<li><code>inputRowsPerSecond</code> vs <code>processedRowsPerSecond</code> → si input &gt; processed, estás acumulando lag</li>
+</ul>
+<hr>
+<p><em>Próxima semana: MLflow en Unity Catalog — registro de modelos, linaje de experimentos y serving.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

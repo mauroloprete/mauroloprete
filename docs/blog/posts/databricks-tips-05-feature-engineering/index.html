@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-03-31">
+<meta name="description" content="Feature Store, point-in-time lookups, online features, feature freshness y los errores clásicos de data leakage.">
+
+<title>Databricks Tips #6: Feature Engineering — diseñar features que sobrevivan a producción – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Databricks Tips #6: Feature Engineering — diseñar features que sobrevivan a producción – Mauro Loprete">
+<meta property="og:description" content="Feature Store, point-in-time lookups, online features, feature freshness y los errores clásicos de data leakage.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-05-feature-engineering/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #6: Feature Engineering — diseñar features que sobrevivan a producción – Mauro Loprete">
+<meta name="twitter:description" content="Feature Store, point-in-time lookups, online features, feature freshness y los errores clásicos de data leakage.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-05-feature-engineering/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#el-problema-training-serving-skew" id="toc-el-problema-training-serving-skew" class="nav-link active" data-scroll-target="#el-problema-training-serving-skew">El problema: training-serving skew</a></li>
+  <li><a href="#feature-store-la-fuente-de-verdad" id="toc-feature-store-la-fuente-de-verdad" class="nav-link" data-scroll-target="#feature-store-la-fuente-de-verdad">Feature Store: la fuente de verdad</a></li>
+  <li><a href="#point-in-time-lookups-evitar-data-leakage" id="toc-point-in-time-lookups-evitar-data-leakage" class="nav-link" data-scroll-target="#point-in-time-lookups-evitar-data-leakage">Point-in-time lookups: evitar data leakage</a></li>
+  <li><a href="#pipeline-de-features-batch-streaming" id="toc-pipeline-de-features-batch-streaming" class="nav-link" data-scroll-target="#pipeline-de-features-batch-streaming">Pipeline de features: batch + streaming</a></li>
+  <li><a href="#online-feature-store-serving-en-milisegundos" id="toc-online-feature-store-serving-en-milisegundos" class="nav-link" data-scroll-target="#online-feature-store-serving-en-milisegundos">Online Feature Store: serving en milisegundos</a></li>
+  <li><a href="#feature-freshness-monitoreo" id="toc-feature-freshness-monitoreo" class="nav-link" data-scroll-target="#feature-freshness-monitoreo">Feature freshness: monitoreo</a></li>
+  <li><a href="#checklist-de-feature-engineering" id="toc-checklist-de-feature-engineering" class="nav-link" data-scroll-target="#checklist-de-feature-engineering">Checklist de Feature Engineering</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #6: Feature Engineering — diseñar features que sobrevivan a producción</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Machine Learning</div>
+    <div class="quarto-category">Feature Engineering</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Feature Store, point-in-time lookups, online features, feature freshness y los errores clásicos de data leakage.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 31, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Sexta entrega de <strong>Databricks Tips</strong>. Feature Engineering es donde la mayoría de los proyectos de ML fallan silenciosamente: el modelo funciona en el notebook pero no en producción. Casi siempre el problema está en los features.</p>
+<section id="el-problema-training-serving-skew" class="level2">
+<h2 class="anchored" data-anchor-id="el-problema-training-serving-skew">El problema: training-serving skew</h2>
+<p>El error más común en ML no es elegir el modelo equivocado. Es que los features en producción se calculan diferente a como se calcularon en entrenamiento:</p>
+<div id="lst-training-skew" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-training-skew-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Training-serving skew: data leakage por ventana temporal
+</figcaption>
+<div aria-describedby="lst-training-skew-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-training-skew"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-training-skew-1"><a href="#lst-training-skew-1" aria-hidden="true" tabindex="-1"></a><span class="co"># En el notebook (entrenamiento):</span></span>
+<span id="lst-training-skew-2"><a href="#lst-training-skew-2" aria-hidden="true" tabindex="-1"></a>df[<span class="st">"avg_purchases_30d"</span>] <span class="op">=</span> df.groupby(<span class="st">"customer_id"</span>)[<span class="st">"amount"</span>] <span class="op">\</span></span>
+<span id="lst-training-skew-3"><a href="#lst-training-skew-3" aria-hidden="true" tabindex="-1"></a>    .transform(<span class="kw">lambda</span> x: x.rolling(<span class="dv">30</span>).mean())</span>
+<span id="lst-training-skew-4"><a href="#lst-training-skew-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Esto usa datos FUTUROS (data leakage)</span></span>
+<span id="lst-training-skew-5"><a href="#lst-training-skew-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-training-skew-6"><a href="#lst-training-skew-6" aria-hidden="true" tabindex="-1"></a><span class="co"># En producción (serving):</span></span>
+<span id="lst-training-skew-7"><a href="#lst-training-skew-7" aria-hidden="true" tabindex="-1"></a><span class="co"># No tenés acceso a los últimos 30 días de datos</span></span>
+<span id="lst-training-skew-8"><a href="#lst-training-skew-8" aria-hidden="true" tabindex="-1"></a><span class="co"># El feature se calcula con otra ventana</span></span>
+<span id="lst-training-skew-9"><a href="#lst-training-skew-9" aria-hidden="true" tabindex="-1"></a><span class="co"># El modelo predice basura</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p>La solución: <strong>Feature Store con point-in-time correctness</strong>.</p>
+</section>
+<section id="feature-store-la-fuente-de-verdad" class="level2">
+<h2 class="anchored" data-anchor-id="feature-store-la-fuente-de-verdad">Feature Store: la fuente de verdad</h2>
+<div id="lst-feature-table" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-feature-table-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Crear Feature Table con timestamp key para point-in-time
+</figcaption>
+<div aria-describedby="lst-feature-table-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-feature-table"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-feature-table-1"><a href="#lst-feature-table-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.feature_engineering <span class="im">import</span> FeatureEngineeringClient</span>
+<span id="lst-feature-table-2"><a href="#lst-feature-table-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-feature-table-3"><a href="#lst-feature-table-3" aria-hidden="true" tabindex="-1"></a>fe <span class="op">=</span> FeatureEngineeringClient()</span>
+<span id="lst-feature-table-4"><a href="#lst-feature-table-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-feature-table-5"><a href="#lst-feature-table-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Feature table con timestamp key (crítico para PIT)</span></span>
+<span id="lst-feature-table-6"><a href="#lst-feature-table-6" aria-hidden="true" tabindex="-1"></a>fe.create_table(</span>
+<span id="lst-feature-table-7"><a href="#lst-feature-table-7" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"catalog.ml.customer_features"</span>,</span>
+<span id="lst-feature-table-8"><a href="#lst-feature-table-8" aria-hidden="true" tabindex="-1"></a>    primary_keys<span class="op">=</span>[<span class="st">"customer_id"</span>],</span>
+<span id="lst-feature-table-9"><a href="#lst-feature-table-9" aria-hidden="true" tabindex="-1"></a>    timestamp_keys<span class="op">=</span>[<span class="st">"feature_date"</span>],</span>
+<span id="lst-feature-table-10"><a href="#lst-feature-table-10" aria-hidden="true" tabindex="-1"></a>    df<span class="op">=</span>features_df,</span>
+<span id="lst-feature-table-11"><a href="#lst-feature-table-11" aria-hidden="true" tabindex="-1"></a>    description<span class="op">=</span><span class="st">"Features diarios de comportamiento de clientes"</span></span>
+<span id="lst-feature-table-12"><a href="#lst-feature-table-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Las tres reglas del Feature Store</strong>:</p>
+<ol type="1">
+<li><strong>Primary key</strong>: identifica la entidad (customer_id, product_id)</li>
+<li><strong>Timestamp key</strong>: cuándo se calculó el feature (para point-in-time)</li>
+<li><strong>Feature columns</strong>: los valores calculados</li>
+</ol>
+</section>
+<section id="point-in-time-lookups-evitar-data-leakage" class="level2">
+<h2 class="anchored" data-anchor-id="point-in-time-lookups-evitar-data-leakage">Point-in-time lookups: evitar data leakage</h2>
+<p>Acá es donde la mayoría la embarran. Si entrenás con features calculados al momento de correr el notebook, estás usando información del futuro:</p>
+<div id="lst-pit-lookup" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pit-lookup-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Point-in-time lookup: evitar data leakage en training set
+</figcaption>
+<div aria-describedby="lst-pit-lookup-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-pit-lookup"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-pit-lookup-1"><a href="#lst-pit-lookup-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.feature_engineering <span class="im">import</span> FeatureLookup</span>
+<span id="lst-pit-lookup-2"><a href="#lst-pit-lookup-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-pit-lookup-3"><a href="#lst-pit-lookup-3" aria-hidden="true" tabindex="-1"></a><span class="co"># CORRECTO: point-in-time lookup</span></span>
+<span id="lst-pit-lookup-4"><a href="#lst-pit-lookup-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Para cada fila de labels, busca los features</span></span>
+<span id="lst-pit-lookup-5"><a href="#lst-pit-lookup-5" aria-hidden="true" tabindex="-1"></a><span class="co"># que existían ANTES del evento (no después)</span></span>
+<span id="lst-pit-lookup-6"><a href="#lst-pit-lookup-6" aria-hidden="true" tabindex="-1"></a>training_set <span class="op">=</span> fe.create_training_set(</span>
+<span id="lst-pit-lookup-7"><a href="#lst-pit-lookup-7" aria-hidden="true" tabindex="-1"></a>    df<span class="op">=</span>labels_df,  <span class="co"># customer_id, event_date, churned</span></span>
+<span id="lst-pit-lookup-8"><a href="#lst-pit-lookup-8" aria-hidden="true" tabindex="-1"></a>    feature_lookups<span class="op">=</span>[</span>
+<span id="lst-pit-lookup-9"><a href="#lst-pit-lookup-9" aria-hidden="true" tabindex="-1"></a>        FeatureLookup(</span>
+<span id="lst-pit-lookup-10"><a href="#lst-pit-lookup-10" aria-hidden="true" tabindex="-1"></a>            table_name<span class="op">=</span><span class="st">"catalog.ml.customer_features"</span>,</span>
+<span id="lst-pit-lookup-11"><a href="#lst-pit-lookup-11" aria-hidden="true" tabindex="-1"></a>            feature_names<span class="op">=</span>[</span>
+<span id="lst-pit-lookup-12"><a href="#lst-pit-lookup-12" aria-hidden="true" tabindex="-1"></a>                <span class="st">"avg_purchases_30d"</span>,</span>
+<span id="lst-pit-lookup-13"><a href="#lst-pit-lookup-13" aria-hidden="true" tabindex="-1"></a>                <span class="st">"days_since_last_purchase"</span>,</span>
+<span id="lst-pit-lookup-14"><a href="#lst-pit-lookup-14" aria-hidden="true" tabindex="-1"></a>                <span class="st">"support_tickets_count"</span></span>
+<span id="lst-pit-lookup-15"><a href="#lst-pit-lookup-15" aria-hidden="true" tabindex="-1"></a>            ],</span>
+<span id="lst-pit-lookup-16"><a href="#lst-pit-lookup-16" aria-hidden="true" tabindex="-1"></a>            lookup_key<span class="op">=</span><span class="st">"customer_id"</span>,</span>
+<span id="lst-pit-lookup-17"><a href="#lst-pit-lookup-17" aria-hidden="true" tabindex="-1"></a>            timestamp_lookup_key<span class="op">=</span><span class="st">"event_date"</span></span>
+<span id="lst-pit-lookup-18"><a href="#lst-pit-lookup-18" aria-hidden="true" tabindex="-1"></a>            <span class="co"># ^ busca features con feature_date &lt;= event_date</span></span>
+<span id="lst-pit-lookup-19"><a href="#lst-pit-lookup-19" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="lst-pit-lookup-20"><a href="#lst-pit-lookup-20" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="lst-pit-lookup-21"><a href="#lst-pit-lookup-21" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">"churned"</span></span>
+<span id="lst-pit-lookup-22"><a href="#lst-pit-lookup-22" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-pit-lookup-23"><a href="#lst-pit-lookup-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-pit-lookup-24"><a href="#lst-pit-lookup-24" aria-hidden="true" tabindex="-1"></a>training_df <span class="op">=</span> training_set.load_df()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p>El <code>timestamp_lookup_key</code> garantiza que para un evento del 15 de marzo, solo usa features calculados hasta el 14 de marzo. Sin esto, tenés data leakage y métricas infladas.</p>
+</section>
+<section id="pipeline-de-features-batch-streaming" class="level2">
+<h2 class="anchored" data-anchor-id="pipeline-de-features-batch-streaming">Pipeline de features: batch + streaming</h2>
+<p>Un patrón que funciona bien en producción:</p>
+<div id="lst-pipeline-features" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pipeline-features-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Pipeline de features: batch diario + streaming en DLT
+</figcaption>
+<div aria-describedby="lst-pipeline-features-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-pipeline-features"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-pipeline-features-1"><a href="#lst-pipeline-features-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Features batch (se calculan diariamente)</span></span>
+<span id="lst-pipeline-features-2"><a href="#lst-pipeline-features-2" aria-hidden="true" tabindex="-1"></a><span class="at">@dlt.table</span>(</span>
+<span id="lst-pipeline-features-3"><a href="#lst-pipeline-features-3" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"customer_features_daily"</span>,</span>
+<span id="lst-pipeline-features-4"><a href="#lst-pipeline-features-4" aria-hidden="true" tabindex="-1"></a>    comment<span class="op">=</span><span class="st">"Features diarios calculados en batch"</span></span>
+<span id="lst-pipeline-features-5"><a href="#lst-pipeline-features-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-pipeline-features-6"><a href="#lst-pipeline-features-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_daily_features():</span>
+<span id="lst-pipeline-features-7"><a href="#lst-pipeline-features-7" aria-hidden="true" tabindex="-1"></a>    orders <span class="op">=</span> dlt.read(<span class="st">"silver_orders"</span>)</span>
+<span id="lst-pipeline-features-8"><a href="#lst-pipeline-features-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (orders</span>
+<span id="lst-pipeline-features-9"><a href="#lst-pipeline-features-9" aria-hidden="true" tabindex="-1"></a>        .groupBy(<span class="st">"customer_id"</span>, <span class="st">"feature_date"</span>)</span>
+<span id="lst-pipeline-features-10"><a href="#lst-pipeline-features-10" aria-hidden="true" tabindex="-1"></a>        .agg(</span>
+<span id="lst-pipeline-features-11"><a href="#lst-pipeline-features-11" aria-hidden="true" tabindex="-1"></a>            F.avg(<span class="st">"amount"</span>).alias(<span class="st">"avg_order_amount"</span>),</span>
+<span id="lst-pipeline-features-12"><a href="#lst-pipeline-features-12" aria-hidden="true" tabindex="-1"></a>            F.count(<span class="st">"*"</span>).alias(<span class="st">"order_count"</span>),</span>
+<span id="lst-pipeline-features-13"><a href="#lst-pipeline-features-13" aria-hidden="true" tabindex="-1"></a>            F.<span class="bu">sum</span>(<span class="st">"amount"</span>).alias(<span class="st">"total_spent"</span>)</span>
+<span id="lst-pipeline-features-14"><a href="#lst-pipeline-features-14" aria-hidden="true" tabindex="-1"></a>        ))</span>
+<span id="lst-pipeline-features-15"><a href="#lst-pipeline-features-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-pipeline-features-16"><a href="#lst-pipeline-features-16" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Features streaming (near real-time)</span></span>
+<span id="lst-pipeline-features-17"><a href="#lst-pipeline-features-17" aria-hidden="true" tabindex="-1"></a><span class="at">@dlt.table</span>(</span>
+<span id="lst-pipeline-features-18"><a href="#lst-pipeline-features-18" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"customer_features_rt"</span>,</span>
+<span id="lst-pipeline-features-19"><a href="#lst-pipeline-features-19" aria-hidden="true" tabindex="-1"></a>    comment<span class="op">=</span><span class="st">"Features en tiempo real"</span></span>
+<span id="lst-pipeline-features-20"><a href="#lst-pipeline-features-20" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-pipeline-features-21"><a href="#lst-pipeline-features-21" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_rt_features():</span>
+<span id="lst-pipeline-features-22"><a href="#lst-pipeline-features-22" aria-hidden="true" tabindex="-1"></a>    events <span class="op">=</span> dlt.read_stream(<span class="st">"bronze_events"</span>)</span>
+<span id="lst-pipeline-features-23"><a href="#lst-pipeline-features-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (events</span>
+<span id="lst-pipeline-features-24"><a href="#lst-pipeline-features-24" aria-hidden="true" tabindex="-1"></a>        .withWatermark(<span class="st">"event_time"</span>, <span class="st">"1 hour"</span>)</span>
+<span id="lst-pipeline-features-25"><a href="#lst-pipeline-features-25" aria-hidden="true" tabindex="-1"></a>        .groupBy(</span>
+<span id="lst-pipeline-features-26"><a href="#lst-pipeline-features-26" aria-hidden="true" tabindex="-1"></a>            <span class="st">"customer_id"</span>,</span>
+<span id="lst-pipeline-features-27"><a href="#lst-pipeline-features-27" aria-hidden="true" tabindex="-1"></a>            F.window(<span class="st">"event_time"</span>, <span class="st">"1 hour"</span>)</span>
+<span id="lst-pipeline-features-28"><a href="#lst-pipeline-features-28" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="lst-pipeline-features-29"><a href="#lst-pipeline-features-29" aria-hidden="true" tabindex="-1"></a>        .agg(</span>
+<span id="lst-pipeline-features-30"><a href="#lst-pipeline-features-30" aria-hidden="true" tabindex="-1"></a>            F.count(<span class="st">"*"</span>).alias(<span class="st">"events_last_hour"</span>),</span>
+<span id="lst-pipeline-features-31"><a href="#lst-pipeline-features-31" aria-hidden="true" tabindex="-1"></a>            F.countDistinct(<span class="st">"page"</span>).alias(<span class="st">"pages_visited"</span>)</span>
+<span id="lst-pipeline-features-32"><a href="#lst-pipeline-features-32" aria-hidden="true" tabindex="-1"></a>        ))</span>
+<span id="lst-pipeline-features-33"><a href="#lst-pipeline-features-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-pipeline-features-34"><a href="#lst-pipeline-features-34" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Publicar al Feature Store</span></span>
+<span id="lst-pipeline-features-35"><a href="#lst-pipeline-features-35" aria-hidden="true" tabindex="-1"></a>fe.write_table(</span>
+<span id="lst-pipeline-features-36"><a href="#lst-pipeline-features-36" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"catalog.ml.customer_features"</span>,</span>
+<span id="lst-pipeline-features-37"><a href="#lst-pipeline-features-37" aria-hidden="true" tabindex="-1"></a>    df<span class="op">=</span>daily_features,</span>
+<span id="lst-pipeline-features-38"><a href="#lst-pipeline-features-38" aria-hidden="true" tabindex="-1"></a>    mode<span class="op">=</span><span class="st">"merge"</span></span>
+<span id="lst-pipeline-features-39"><a href="#lst-pipeline-features-39" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="online-feature-store-serving-en-milisegundos" class="level2">
+<h2 class="anchored" data-anchor-id="online-feature-store-serving-en-milisegundos">Online Feature Store: serving en milisegundos</h2>
+<p>Para modelos que sirven predicciones en tiempo real, leer features de Delta (segundos) es muy lento. Necesitás un online store:</p>
+<div id="lst-online-store" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-online-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: Publicar features a Online Store para serving en milisegundos
+</figcaption>
+<div aria-describedby="lst-online-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-online-store"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-online-store-1"><a href="#lst-online-store-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.feature_engineering <span class="im">import</span> FeatureEngineeringClient</span>
+<span id="lst-online-store-2"><a href="#lst-online-store-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-online-store-3"><a href="#lst-online-store-3" aria-hidden="true" tabindex="-1"></a>fe <span class="op">=</span> FeatureEngineeringClient()</span>
+<span id="lst-online-store-4"><a href="#lst-online-store-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-online-store-5"><a href="#lst-online-store-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Publicar features a online store</span></span>
+<span id="lst-online-store-6"><a href="#lst-online-store-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Esto sincroniza Delta → Cosmos DB / DynamoDB</span></span>
+<span id="lst-online-store-7"><a href="#lst-online-store-7" aria-hidden="true" tabindex="-1"></a>spec <span class="op">=</span> fe.publish_table(</span>
+<span id="lst-online-store-8"><a href="#lst-online-store-8" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"catalog.ml.customer_features"</span>,</span>
+<span id="lst-online-store-9"><a href="#lst-online-store-9" aria-hidden="true" tabindex="-1"></a>    online_store<span class="op">=</span>OnlineStoreSpec(</span>
+<span id="lst-online-store-10"><a href="#lst-online-store-10" aria-hidden="true" tabindex="-1"></a>        cloud<span class="op">=</span><span class="st">"azure"</span>,</span>
+<span id="lst-online-store-11"><a href="#lst-online-store-11" aria-hidden="true" tabindex="-1"></a>        write_secret_prefix<span class="op">=</span><span class="st">"online-store"</span></span>
+<span id="lst-online-store-12"><a href="#lst-online-store-12" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="lst-online-store-13"><a href="#lst-online-store-13" aria-hidden="true" tabindex="-1"></a>    features<span class="op">=</span>[<span class="st">"avg_purchases_30d"</span>, <span class="st">"days_since_last_purchase"</span>]</span>
+<span id="lst-online-store-14"><a href="#lst-online-store-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-online-store-15"><a href="#lst-online-store-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-online-store-16"><a href="#lst-online-store-16" aria-hidden="true" tabindex="-1"></a><span class="co"># En serving, el modelo busca features online automáticamente</span></span>
+<span id="lst-online-store-17"><a href="#lst-online-store-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Latencia: ~10ms vs ~2s de Delta</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="feature-freshness-monitoreo" class="level2">
+<h2 class="anchored" data-anchor-id="feature-freshness-monitoreo">Feature freshness: monitoreo</h2>
+<p>Los features se vuelven stale. Un pipeline que falla silenciosamente produce features viejos y predicciones malas:</p>
+<div id="lst-freshness-check" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-freshness-check-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: Monitoreo de freshness: alertar si los features son stale
+</figcaption>
+<div aria-describedby="lst-freshness-check-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-freshness-check"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-freshness-check-1"><a href="#lst-freshness-check-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Chequear freshness antes de servir</span></span>
+<span id="lst-freshness-check-2"><a href="#lst-freshness-check-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datetime <span class="im">import</span> datetime, timedelta</span>
+<span id="lst-freshness-check-3"><a href="#lst-freshness-check-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-freshness-check-4"><a href="#lst-freshness-check-4" aria-hidden="true" tabindex="-1"></a>latest_feature <span class="op">=</span> spark.sql(<span class="st">"""</span></span>
+<span id="lst-freshness-check-5"><a href="#lst-freshness-check-5" aria-hidden="true" tabindex="-1"></a><span class="st">    SELECT MAX(feature_date) as latest</span></span>
+<span id="lst-freshness-check-6"><a href="#lst-freshness-check-6" aria-hidden="true" tabindex="-1"></a><span class="st">    FROM catalog.ml.customer_features</span></span>
+<span id="lst-freshness-check-7"><a href="#lst-freshness-check-7" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span>).collect()[<span class="dv">0</span>][<span class="st">"latest"</span>]</span>
+<span id="lst-freshness-check-8"><a href="#lst-freshness-check-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-freshness-check-9"><a href="#lst-freshness-check-9" aria-hidden="true" tabindex="-1"></a>staleness <span class="op">=</span> datetime.now() <span class="op">-</span> latest_feature</span>
+<span id="lst-freshness-check-10"><a href="#lst-freshness-check-10" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> staleness <span class="op">&gt;</span> timedelta(hours<span class="op">=</span><span class="dv">26</span>):  <span class="co"># batch diario + margen</span></span>
+<span id="lst-freshness-check-11"><a href="#lst-freshness-check-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> Alert(<span class="ss">f"Features stale by </span><span class="sc">{</span>staleness<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Tip</strong>: configurá un <code>quality_monitor</code> de Unity Catalog sobre tu feature table para alertas automáticas de drift y freshness.</p>
+</section>
+<section id="checklist-de-feature-engineering" class="level2">
+<h2 class="anchored" data-anchor-id="checklist-de-feature-engineering">Checklist de Feature Engineering</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Paso</th>
+<th>Pregunta</th>
+<th>Si no lo hacés…</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Point-in-time</td>
+<td>¿Tus features respetan el orden temporal?</td>
+<td>Data leakage, métricas falsas</td>
+</tr>
+<tr class="even">
+<td>Feature Store</td>
+<td>¿Los features se comparten entre modelos?</td>
+<td>Duplicación, inconsistencia</td>
+</tr>
+<tr class="odd">
+<td>Online Store</td>
+<td>¿El serving necesita baja latencia?</td>
+<td>Timeouts en producción</td>
+</tr>
+<tr class="even">
+<td>Freshness</td>
+<td>¿Monitoreás la antigüedad de los features?</td>
+<td>Predicciones con datos viejos</td>
+</tr>
+<tr class="odd">
+<td>Lineage</td>
+<td>¿Sabés qué tablas alimentan cada feature?</td>
+<td>No podés debuggear</td>
+</tr>
+<tr class="even">
+<td>Idempotencia</td>
+<td>¿Si recalculás features, el resultado es igual?</td>
+<td>Drift silencioso</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><em>Próxima semana: Lakeflow Declarative Pipelines (ex-DLT) — expectations, materialized views y serverless compute.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

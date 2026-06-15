@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2025-09-01">
+<meta name="description" content="Qué es DataOps de verdad, en qué se diferencia de DevOps, los tres pilares (automatización, observabilidad, colaboración) y errores comunes en producción.">
+
+<title>DataOps: cómo llevar tus pipelines al siguiente nivel – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/all.min.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="DataOps: cómo llevar tus pipelines al siguiente nivel – Mauro Loprete">
+<meta property="og:description" content="Qué es DataOps de verdad, en qué se diferencia de DevOps, los tres pilares (automatización, observabilidad, colaboración) y errores comunes en producción.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/dataops-pipelines/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="DataOps: cómo llevar tus pipelines al siguiente nivel – Mauro Loprete">
+<meta name="twitter:description" content="Qué es DataOps de verdad, en qué se diferencia de DevOps, los tres pilares (automatización, observabilidad, colaboración) y errores comunes en producción.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/dataops-pipelines/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#que-es-dataops-de-verdad" id="toc-que-es-dataops-de-verdad" class="nav-link active" data-scroll-target="#que-es-dataops-de-verdad">Que es DataOps (de verdad)</a></li>
+  <li><a href="#dataops-vs-devops-primos-no-gemelos" id="toc-dataops-vs-devops-primos-no-gemelos" class="nav-link" data-scroll-target="#dataops-vs-devops-primos-no-gemelos">DataOps vs DevOps: primos, no gemelos</a></li>
+  <li><a href="#los-tres-pilares-de-dataops" id="toc-los-tres-pilares-de-dataops" class="nav-link" data-scroll-target="#los-tres-pilares-de-dataops">Los tres pilares de DataOps</a>
+  <ul class="collapse">
+  <li><a href="#automatizacion" id="toc-automatizacion" class="nav-link" data-scroll-target="#automatizacion">1. Automatizacion</a></li>
+  <li><a href="#monitoreo-y-observabilidad" id="toc-monitoreo-y-observabilidad" class="nav-link" data-scroll-target="#monitoreo-y-observabilidad">2. Monitoreo y observabilidad</a></li>
+  <li><a href="#colaboracion" id="toc-colaboracion" class="nav-link" data-scroll-target="#colaboracion">3. Colaboracion</a></li>
+  </ul></li>
+  <li><a href="#niveles-de-madurez-en-dataops" id="toc-niveles-de-madurez-en-dataops" class="nav-link" data-scroll-target="#niveles-de-madurez-en-dataops">Niveles de madurez en DataOps</a></li>
+  <li><a href="#errores-comunes" id="toc-errores-comunes" class="nav-link" data-scroll-target="#errores-comunes">Errores comunes</a></li>
+  <li><a href="#links" id="toc-links" class="nav-link" data-scroll-target="#links">Links</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">DataOps: cómo llevar tus pipelines al siguiente nivel</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Podcast</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">DataOps</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Qué es DataOps de verdad, en qué se diferencia de DevOps, los tres pilares (automatización, observabilidad, colaboración) y errores comunes en producción.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">September 1, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>En este episodio del podcast hablo sobre DataOps: que es, por que no es simplemente “DevOps para datos”, y como puede transformar la forma en que construimos y mantenemos pipelines. Aca va una version expandida con ejemplos concretos y opiniones basadas en lo que vi funcionando (y fallando) en produccion.</p>
+<p><i class="fa-solid fa-podcast" aria-label="podcast"></i> <a href="https://open.spotify.com/episode/7wyLHHZroEG7JZ8YH2K9h0">Escuchar el episodio en Spotify</a></p>
+<section id="que-es-dataops-de-verdad" class="level2">
+<h2 class="anchored" data-anchor-id="que-es-dataops-de-verdad">Que es DataOps (de verdad)</h2>
+<p>DataOps es la aplicacion de principios de ingenieria de software — automatizacion, testing, CI/CD, monitoreo — al ciclo de vida de los datos. Pero ojo: no es comprar una herramienta ni instalar Airflow y declarar victoria.</p>
+<p>Una definicion practica: <strong>DataOps es un conjunto de practicas que buscan reducir el tiempo entre que un cambio en un pipeline se escribe y llega a produccion de forma confiable, testeada y observable.</strong></p>
+<p>Si tu proceso para deployar un pipeline es “abrir un notebook en produccion y correrlo a mano”, no estas haciendo DataOps. Si tu unica forma de saber que un pipeline fallo es que alguien te avisa por Slack, tampoco.</p>
+</section>
+<section id="dataops-vs-devops-primos-no-gemelos" class="level2">
+<h2 class="anchored" data-anchor-id="dataops-vs-devops-primos-no-gemelos">DataOps vs DevOps: primos, no gemelos</h2>
+<p>DevOps y DataOps comparten principios (automatizacion, feedback rapido, colaboracion entre equipos). Pero los datos tienen problemas que el software tradicional no tiene:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dimension</th>
+<th>DevOps</th>
+<th>DataOps</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Que se versiona</td>
+<td>Codigo fuente</td>
+<td>Codigo + datos + schemas + configs</td>
+</tr>
+<tr class="even">
+<td>Estado</td>
+<td>Stateless (idealmente)</td>
+<td>Stateful siempre — los datos persisten</td>
+</tr>
+<tr class="odd">
+<td>Testing</td>
+<td>Unit tests, integration tests</td>
+<td>Todo lo anterior + calidad de datos, freshness, volumen</td>
+</tr>
+<tr class="even">
+<td>Falla tipica</td>
+<td>“No compila”</td>
+<td>“Compila perfecto, pero los datos estan mal”</td>
+</tr>
+<tr class="odd">
+<td>Schema</td>
+<td>API contracts fijos</td>
+<td>Schema drift constante — las fuentes cambian sin avisar</td>
+</tr>
+<tr class="even">
+<td>Dependencias</td>
+<td>Entre servicios</td>
+<td>Entre datasets, con temporalidad y orden de ejecucion</td>
+</tr>
+</tbody>
+</table>
+<p>La diferencia clave: <strong>en software, si el test pasa, el codigo funciona. En datos, el test puede pasar y los datos pueden seguir estando mal.</strong> Un pipeline de ingesta puede correr sin errores y traer filas duplicadas, campos vacios, o datos de hace tres dias porque la fuente se colgo.</p>
+</section>
+<section id="los-tres-pilares-de-dataops" class="level2">
+<h2 class="anchored" data-anchor-id="los-tres-pilares-de-dataops">Los tres pilares de DataOps</h2>
+<section id="automatizacion" class="level3">
+<h3 class="anchored" data-anchor-id="automatizacion">1. Automatizacion</h3>
+<p>Si haces algo mas de dos veces a mano, automatizalo. Esto incluye:</p>
+<p><strong>CI/CD para pipelines.</strong> Cada cambio en un pipeline deberia pasar por un proceso automatizado antes de llegar a produccion. Ejemplo con GitHub Actions y Databricks Asset Bundles:</p>
+<div id="lst-cicd-gha" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cicd-gha-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: CI/CD para pipelines con GitHub Actions y Databricks Asset Bundles
+</figcaption>
+<div aria-describedby="lst-cicd-gha-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-cicd-gha"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-cicd-gha-1"><a href="#lst-cicd-gha-1" aria-hidden="true" tabindex="-1"></a><span class="co"># .github/workflows/deploy-pipeline.yml</span></span>
+<span id="lst-cicd-gha-2"><a href="#lst-cicd-gha-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> Deploy Pipeline</span></span>
+<span id="lst-cicd-gha-3"><a href="#lst-cicd-gha-3" aria-hidden="true" tabindex="-1"></a><span class="fu">on</span><span class="kw">:</span></span>
+<span id="lst-cicd-gha-4"><a href="#lst-cicd-gha-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">push</span><span class="kw">:</span></span>
+<span id="lst-cicd-gha-5"><a href="#lst-cicd-gha-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">branches</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">main</span><span class="kw">]</span></span>
+<span id="lst-cicd-gha-6"><a href="#lst-cicd-gha-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">paths</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">'pipelines/**'</span><span class="kw">]</span></span>
+<span id="lst-cicd-gha-7"><a href="#lst-cicd-gha-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-cicd-gha-8"><a href="#lst-cicd-gha-8" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="lst-cicd-gha-9"><a href="#lst-cicd-gha-9" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">validate-and-deploy</span><span class="kw">:</span></span>
+<span id="lst-cicd-gha-10"><a href="#lst-cicd-gha-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">runs-on</span><span class="kw">:</span><span class="at"> ubuntu-latest</span></span>
+<span id="lst-cicd-gha-11"><a href="#lst-cicd-gha-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
+<span id="lst-cicd-gha-12"><a href="#lst-cicd-gha-12" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
+<span id="lst-cicd-gha-13"><a href="#lst-cicd-gha-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-cicd-gha-14"><a href="#lst-cicd-gha-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Setup Databricks CLI</span></span>
+<span id="lst-cicd-gha-15"><a href="#lst-cicd-gha-15" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> databricks/setup-cli@main</span></span>
+<span id="lst-cicd-gha-16"><a href="#lst-cicd-gha-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-cicd-gha-17"><a href="#lst-cicd-gha-17" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Validate bundle</span></span>
+<span id="lst-cicd-gha-18"><a href="#lst-cicd-gha-18" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">run</span><span class="kw">:</span><span class="at"> databricks bundle validate</span></span>
+<span id="lst-cicd-gha-19"><a href="#lst-cicd-gha-19" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">env</span><span class="kw">:</span></span>
+<span id="lst-cicd-gha-20"><a href="#lst-cicd-gha-20" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_HOST</span><span class="kw">:</span><span class="at"> ${{ secrets.DBX_HOST }}</span></span>
+<span id="lst-cicd-gha-21"><a href="#lst-cicd-gha-21" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_TOKEN</span><span class="kw">:</span><span class="at"> ${{ secrets.DBX_TOKEN }}</span></span>
+<span id="lst-cicd-gha-22"><a href="#lst-cicd-gha-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-cicd-gha-23"><a href="#lst-cicd-gha-23" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Run tests</span></span>
+<span id="lst-cicd-gha-24"><a href="#lst-cicd-gha-24" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">run</span><span class="kw">:</span><span class="at"> databricks bundle run test_pipeline --no-wait</span></span>
+<span id="lst-cicd-gha-25"><a href="#lst-cicd-gha-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-cicd-gha-26"><a href="#lst-cicd-gha-26" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Deploy to production</span></span>
+<span id="lst-cicd-gha-27"><a href="#lst-cicd-gha-27" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">if</span><span class="kw">:</span><span class="at"> success()</span></span>
+<span id="lst-cicd-gha-28"><a href="#lst-cicd-gha-28" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">run</span><span class="kw">:</span><span class="at"> databricks bundle deploy --target prod</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Tests automatizados de calidad de datos.</strong> No alcanza con testear que el pipeline no tire excepcion. Hay que testear los datos. Ejemplo con un test en PySpark:</p>
+<div id="lst-tests-quality" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-tests-quality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Tests automatizados de duplicados y freshness en PySpark
+</figcaption>
+<div aria-describedby="lst-tests-quality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-tests-quality"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-tests-quality-1"><a href="#lst-tests-quality-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
+<span id="lst-tests-quality-2"><a href="#lst-tests-quality-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-tests-quality-3"><a href="#lst-tests-quality-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_no_duplicates(df, key_columns):</span>
+<span id="lst-tests-quality-4"><a href="#lst-tests-quality-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Valida que no haya duplicados por clave primaria."""</span></span>
+<span id="lst-tests-quality-5"><a href="#lst-tests-quality-5" aria-hidden="true" tabindex="-1"></a>    total <span class="op">=</span> df.count()</span>
+<span id="lst-tests-quality-6"><a href="#lst-tests-quality-6" aria-hidden="true" tabindex="-1"></a>    distinct <span class="op">=</span> df.select(key_columns).distinct().count()</span>
+<span id="lst-tests-quality-7"><a href="#lst-tests-quality-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> total <span class="op">==</span> distinct, (</span>
+<span id="lst-tests-quality-8"><a href="#lst-tests-quality-8" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"Duplicados detectados: </span><span class="sc">{</span>total<span class="sc">}</span><span class="ss"> filas, "</span></span>
+<span id="lst-tests-quality-9"><a href="#lst-tests-quality-9" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"</span><span class="sc">{</span>distinct<span class="sc">}</span><span class="ss"> distintas por </span><span class="sc">{</span>key_columns<span class="sc">}</span><span class="ss">"</span></span>
+<span id="lst-tests-quality-10"><a href="#lst-tests-quality-10" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="lst-tests-quality-11"><a href="#lst-tests-quality-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-tests-quality-12"><a href="#lst-tests-quality-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_freshness(df, date_col, max_hours<span class="op">=</span><span class="dv">24</span>):</span>
+<span id="lst-tests-quality-13"><a href="#lst-tests-quality-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Valida que los datos no tengan mas de N horas de atraso."""</span></span>
+<span id="lst-tests-quality-14"><a href="#lst-tests-quality-14" aria-hidden="true" tabindex="-1"></a>    latest <span class="op">=</span> df.agg(F.<span class="bu">max</span>(date_col)).collect()[<span class="dv">0</span>][<span class="dv">0</span>]</span>
+<span id="lst-tests-quality-15"><a href="#lst-tests-quality-15" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> datetime <span class="im">import</span> datetime, timedelta</span>
+<span id="lst-tests-quality-16"><a href="#lst-tests-quality-16" aria-hidden="true" tabindex="-1"></a>    threshold <span class="op">=</span> datetime.now() <span class="op">-</span> timedelta(hours<span class="op">=</span>max_hours)</span>
+<span id="lst-tests-quality-17"><a href="#lst-tests-quality-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> latest <span class="op">&gt;=</span> threshold, (</span>
+<span id="lst-tests-quality-18"><a href="#lst-tests-quality-18" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"Datos desactualizados: ultimo registro </span><span class="sc">{</span>latest<span class="sc">}</span><span class="ss">, "</span></span>
+<span id="lst-tests-quality-19"><a href="#lst-tests-quality-19" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"threshold </span><span class="sc">{</span>threshold<span class="sc">}</span><span class="ss">"</span></span>
+<span id="lst-tests-quality-20"><a href="#lst-tests-quality-20" aria-hidden="true" tabindex="-1"></a>    )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Validacion de schema.</strong> Si usas dbt, esto es nativo:</p>
+<div id="lst-dbt-tests" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dbt-tests-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Validación de schema y calidad con tests de dbt
+</figcaption>
+<div aria-describedby="lst-dbt-tests-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-dbt-tests"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-dbt-tests-1"><a href="#lst-dbt-tests-1" aria-hidden="true" tabindex="-1"></a><span class="co"># models/staging/stg_transactions.yml</span></span>
+<span id="lst-dbt-tests-2"><a href="#lst-dbt-tests-2" aria-hidden="true" tabindex="-1"></a><span class="fu">models</span><span class="kw">:</span></span>
+<span id="lst-dbt-tests-3"><a href="#lst-dbt-tests-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> stg_transactions</span></span>
+<span id="lst-dbt-tests-4"><a href="#lst-dbt-tests-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">columns</span><span class="kw">:</span></span>
+<span id="lst-dbt-tests-5"><a href="#lst-dbt-tests-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> transaction_id</span></span>
+<span id="lst-dbt-tests-6"><a href="#lst-dbt-tests-6" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">tests</span><span class="kw">:</span></span>
+<span id="lst-dbt-tests-7"><a href="#lst-dbt-tests-7" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> not_null</span></span>
+<span id="lst-dbt-tests-8"><a href="#lst-dbt-tests-8" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> unique</span></span>
+<span id="lst-dbt-tests-9"><a href="#lst-dbt-tests-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> amount</span></span>
+<span id="lst-dbt-tests-10"><a href="#lst-dbt-tests-10" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">tests</span><span class="kw">:</span></span>
+<span id="lst-dbt-tests-11"><a href="#lst-dbt-tests-11" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> not_null</span></span>
+<span id="lst-dbt-tests-12"><a href="#lst-dbt-tests-12" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> </span><span class="fu">dbt_utils.accepted_range</span><span class="kw">:</span></span>
+<span id="lst-dbt-tests-13"><a href="#lst-dbt-tests-13" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">min_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
+<span id="lst-dbt-tests-14"><a href="#lst-dbt-tests-14" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">max_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000000</span></span>
+<span id="lst-dbt-tests-15"><a href="#lst-dbt-tests-15" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> status</span></span>
+<span id="lst-dbt-tests-16"><a href="#lst-dbt-tests-16" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">tests</span><span class="kw">:</span></span>
+<span id="lst-dbt-tests-17"><a href="#lst-dbt-tests-17" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> </span><span class="fu">accepted_values</span><span class="kw">:</span></span>
+<span id="lst-dbt-tests-18"><a href="#lst-dbt-tests-18" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">'completed'</span><span class="kw">,</span><span class="at"> </span><span class="st">'pending'</span><span class="kw">,</span><span class="at"> </span><span class="st">'failed'</span><span class="kw">]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="monitoreo-y-observabilidad" class="level3">
+<h3 class="anchored" data-anchor-id="monitoreo-y-observabilidad">2. Monitoreo y observabilidad</h3>
+<p>Automatizar sin monitorear es como manejar con los ojos cerrados. Los cuatro tipos de monitoreo que necesitas:</p>
+<ul>
+<li><strong>Calidad de datos</strong>: nulos inesperados, duplicados, valores fuera de rango, schema drift</li>
+<li><strong>Freshness / SLAs</strong>: los datos llegan a tiempo? la tabla Silver se actualizo antes de las 8 AM?</li>
+<li><strong>Performance</strong>: latencia del pipeline, tiempo de ejecucion, volumen procesado por batch</li>
+<li><strong>Costo</strong>: cuantos DBUs consumiste, cuanto compute estas quemando en OPTIMIZE innecesarios</li>
+</ul>
+<p>No necesitas una herramienta cara para arrancar. Un check basico en tu pipeline ya es monitoreo:</p>
+<div id="lst-monitoring" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-monitoring-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Monitoreo básico post-ejecución: volumen y nulidad por columna
+</figcaption>
+<div aria-describedby="lst-monitoring-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-monitoring"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-monitoring-1"><a href="#lst-monitoring-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> logging</span>
+<span id="lst-monitoring-2"><a href="#lst-monitoring-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-monitoring-3"><a href="#lst-monitoring-3" aria-hidden="true" tabindex="-1"></a>logger <span class="op">=</span> logging.getLogger(<span class="st">"pipeline_monitor"</span>)</span>
+<span id="lst-monitoring-4"><a href="#lst-monitoring-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-monitoring-5"><a href="#lst-monitoring-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> monitor_pipeline_run(df, table_name, expected_min_rows<span class="op">=</span><span class="dv">1000</span>):</span>
+<span id="lst-monitoring-6"><a href="#lst-monitoring-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Monitoreo basico post-ejecucion."""</span></span>
+<span id="lst-monitoring-7"><a href="#lst-monitoring-7" aria-hidden="true" tabindex="-1"></a>    row_count <span class="op">=</span> df.count()</span>
+<span id="lst-monitoring-8"><a href="#lst-monitoring-8" aria-hidden="true" tabindex="-1"></a>    null_pct <span class="op">=</span> (</span>
+<span id="lst-monitoring-9"><a href="#lst-monitoring-9" aria-hidden="true" tabindex="-1"></a>        df.select(</span>
+<span id="lst-monitoring-10"><a href="#lst-monitoring-10" aria-hidden="true" tabindex="-1"></a>            [F.<span class="bu">sum</span>(F.col(c).isNull().cast(<span class="st">"int"</span>)).alias(c)</span>
+<span id="lst-monitoring-11"><a href="#lst-monitoring-11" aria-hidden="true" tabindex="-1"></a>             <span class="cf">for</span> c <span class="kw">in</span> df.columns]</span>
+<span id="lst-monitoring-12"><a href="#lst-monitoring-12" aria-hidden="true" tabindex="-1"></a>        ).collect()[<span class="dv">0</span>]</span>
+<span id="lst-monitoring-13"><a href="#lst-monitoring-13" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="lst-monitoring-14"><a href="#lst-monitoring-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-monitoring-15"><a href="#lst-monitoring-15" aria-hidden="true" tabindex="-1"></a>    logger.info(<span class="ss">f"[</span><span class="sc">{</span>table_name<span class="sc">}</span><span class="ss">] Filas procesadas: </span><span class="sc">{</span>row_count<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="lst-monitoring-16"><a href="#lst-monitoring-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-monitoring-17"><a href="#lst-monitoring-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> row_count <span class="op">&lt;</span> expected_min_rows:</span>
+<span id="lst-monitoring-18"><a href="#lst-monitoring-18" aria-hidden="true" tabindex="-1"></a>        logger.warning(</span>
+<span id="lst-monitoring-19"><a href="#lst-monitoring-19" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"[</span><span class="sc">{</span>table_name<span class="sc">}</span><span class="ss">] Volumen bajo: </span><span class="sc">{</span>row_count<span class="sc">}</span><span class="ss"> filas "</span></span>
+<span id="lst-monitoring-20"><a href="#lst-monitoring-20" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"(esperado &gt;= </span><span class="sc">{</span>expected_min_rows<span class="sc">}</span><span class="ss">)"</span></span>
+<span id="lst-monitoring-21"><a href="#lst-monitoring-21" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="lst-monitoring-22"><a href="#lst-monitoring-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-monitoring-23"><a href="#lst-monitoring-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> col_name, null_count <span class="kw">in</span> <span class="bu">zip</span>(df.columns, null_pct):</span>
+<span id="lst-monitoring-24"><a href="#lst-monitoring-24" aria-hidden="true" tabindex="-1"></a>        pct <span class="op">=</span> (null_count <span class="op">/</span> row_count <span class="op">*</span> <span class="dv">100</span>) <span class="cf">if</span> row_count <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> <span class="dv">0</span></span>
+<span id="lst-monitoring-25"><a href="#lst-monitoring-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> pct <span class="op">&gt;</span> <span class="dv">10</span>:</span>
+<span id="lst-monitoring-26"><a href="#lst-monitoring-26" aria-hidden="true" tabindex="-1"></a>            logger.warning(</span>
+<span id="lst-monitoring-27"><a href="#lst-monitoring-27" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"[</span><span class="sc">{</span>table_name<span class="sc">}</span><span class="ss">] Alta nulidad en </span><span class="sc">{</span>col_name<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>pct<span class="sc">:.1f}</span><span class="ss">%"</span></span>
+<span id="lst-monitoring-28"><a href="#lst-monitoring-28" aria-hidden="true" tabindex="-1"></a>            )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="colaboracion" class="level3">
+<h3 class="anchored" data-anchor-id="colaboracion">3. Colaboracion</h3>
+<p>Este es el pilar que mas se ignora. DataOps no es solo tooling — es como los equipos trabajan juntos.</p>
+<p><strong>Data Contracts entre equipos.</strong> El equipo de backend no puede cambiar el tipo de una columna sin avisarte. Necesitas un contrato formal. Escribi un post entero sobre esto (ver links abajo).</p>
+<p><strong>Documentacion como codigo.</strong> Si la documentacion esta en un Confluence que nadie actualiza, no sirve. La documentacion deberia vivir junto al codigo (como los <code>.yml</code> de dbt o los comentarios en los modelos).</p>
+<p><strong>Linaje compartido.</strong> Todos los equipos deberian poder ver de donde vienen los datos, por donde pasan, y quien los consume. Unity Catalog en Databricks te da esto gratis si lo configuras bien.</p>
+</section>
+</section>
+<section id="niveles-de-madurez-en-dataops" class="level2">
+<h2 class="anchored" data-anchor-id="niveles-de-madurez-en-dataops">Niveles de madurez en DataOps</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Nivel</th>
+<th>Nombre</th>
+<th>Caracteristicas</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0</td>
+<td>Manual</td>
+<td>Pipelines se corren a mano, no hay tests, no hay CI/CD. “Funciona en mi notebook.”</td>
+</tr>
+<tr class="even">
+<td>1</td>
+<td>CI basico</td>
+<td>El codigo esta en Git, hay algun proceso de deploy, pero los tests son manuales o no existen.</td>
+</tr>
+<tr class="odd">
+<td>2</td>
+<td>Testing automatizado</td>
+<td>Tests de calidad de datos en el pipeline, validacion de schema, CI/CD completo. Los errores se detectan antes de produccion.</td>
+</tr>
+<tr class="even">
+<td>3</td>
+<td>Observabilidad completa</td>
+<td>Monitoreo de freshness, SLAs, costos, data contracts entre equipos, alertas automaticas, linaje end-to-end.</td>
+</tr>
+</tbody>
+</table>
+<p>La mayoria de los equipos que conozco estan entre el nivel 0 y el 1. Llegar al nivel 2 ya es un salto enorme. El nivel 3 es donde queres estar, pero requiere no solo herramientas sino un cambio cultural.</p>
+</section>
+<section id="errores-comunes" class="level2">
+<h2 class="anchored" data-anchor-id="errores-comunes">Errores comunes</h2>
+<p><strong>“Hacemos DataOps porque usamos Airflow.”</strong> No.&nbsp;Airflow es un orquestador, no una practica. Podes tener Airflow y seguir deployando a mano, sin tests, sin monitoreo. La herramienta no es la practica.</p>
+<p><strong>Confundir CI/CD con DataOps.</strong> CI/CD es una parte de DataOps (automatizacion), pero si no tenes monitoreo ni colaboracion, tenes un tercio del puzzle.</p>
+<p><strong>Automatizar sin testear.</strong> El peor escenario: un pipeline que se deployea automaticamente a produccion, sin tests de calidad, y rompe datos en silencio. Automatizaste el desastre.</p>
+<p><strong>Ignorar el costo.</strong> DataOps tambien es eficiencia. Si tu pipeline corre un <code>OPTIMIZE</code> completo en una tabla de 10 TB todos los dias sin predicado, estas quemando plata. El monitoreo de costos es parte de la observabilidad.</p>
+</section>
+<section id="links" class="level2">
+<h2 class="anchored" data-anchor-id="links">Links</h2>
+<ul>
+<li><i class="fa-solid fa-podcast" aria-label="podcast"></i> <a href="https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w">Episodio en Spotify</a></li>
+<li><i class="fa-solid fa-book" aria-label="book"></i> <a href="https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/">Fundamentals of Data Engineering (Reis &amp; Housley)</a> — cubre DataOps como disciplina</li>
+<li><i class="fa-solid fa-book" aria-label="book"></i> <a href="https://www.oreilly.com/library/view/data-pipelines-pocket/9781492087823/">Data Pipelines Pocket Reference (Densmore)</a> — patrones practicos de CI/CD para datos</li>
+<li><i class="fa-solid fa-link" aria-label="link"></i> <a href="https://dataopsmanifesto.org/">DataOps Manifesto</a> — los 18 principios originales</li>
+<li><i class="fa-solid fa-code-branch" aria-label="code-branch"></i> <a href="https://docs.databricks.com/en/dev-tools/bundles/index.html">Databricks Asset Bundles docs</a> — CI/CD nativo para Databricks</li>
+</ul>
+<hr>
+<p><em>Proximo episodio: Data Contracts — como disenar un framework desde cero.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

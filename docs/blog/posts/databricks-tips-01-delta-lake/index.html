@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-03-03">
+<meta name="description" content="Liquid clustering, OPTIMIZE, Z-ORDER, vacuum, time travel y trucos que cambian cómo trabajás con Delta.">
+
+<title>Databricks Tips #2: 7 cosas de Delta Lake que ojalá me hubieran dicho antes – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Databricks Tips #2: 7 cosas de Delta Lake que ojalá me hubieran dicho antes – Mauro Loprete">
+<meta property="og:description" content="Liquid clustering, OPTIMIZE, Z-ORDER, vacuum, time travel y trucos que cambian cómo trabajás con Delta.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-01-delta-lake/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #2: 7 cosas de Delta Lake que ojalá me hubieran dicho antes – Mauro Loprete">
+<meta name="twitter:description" content="Liquid clustering, OPTIMIZE, Z-ORDER, vacuum, time travel y trucos que cambian cómo trabajás con Delta.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-01-delta-lake/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#liquid-clustering-reemplaza-a-z-order" id="toc-liquid-clustering-reemplaza-a-z-order" class="nav-link active" data-scroll-target="#liquid-clustering-reemplaza-a-z-order">1. Liquid Clustering reemplaza a Z-ORDER</a></li>
+  <li><a href="#optimize-no-es-lo-que-pensás" id="toc-optimize-no-es-lo-que-pensás" class="nav-link" data-scroll-target="#optimize-no-es-lo-que-pensás">2. OPTIMIZE no es lo que pensás</a></li>
+  <li><a href="#vacuum-el-detalle-que-nadie-te-cuenta" id="toc-vacuum-el-detalle-que-nadie-te-cuenta" class="nav-link" data-scroll-target="#vacuum-el-detalle-que-nadie-te-cuenta">3. VACUUM: el detalle que nadie te cuenta</a></li>
+  <li><a href="#time-travel-más-allá-del-select-as-of" id="toc-time-travel-más-allá-del-select-as-of" class="nav-link" data-scroll-target="#time-travel-más-allá-del-select-as-of">4. Time Travel: más allá del SELECT AS OF</a></li>
+  <li><a href="#delta-lake-change-data-feed-cdf" id="toc-delta-lake-change-data-feed-cdf" class="nav-link" data-scroll-target="#delta-lake-change-data-feed-cdf">5. Delta Lake Change Data Feed (CDF)</a></li>
+  <li><a href="#deletion-vectors-borrar-sin-reescribir" id="toc-deletion-vectors-borrar-sin-reescribir" class="nav-link" data-scroll-target="#deletion-vectors-borrar-sin-reescribir">6. Deletion Vectors: borrar sin reescribir</a></li>
+  <li><a href="#tabla-cuándo-usar-cada-feature" id="toc-tabla-cuándo-usar-cada-feature" class="nav-link" data-scroll-target="#tabla-cuándo-usar-cada-feature">7. Tabla: cuándo usar cada feature</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #2: 7 cosas de Delta Lake que ojalá me hubieran dicho antes</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Delta Lake</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Liquid clustering, OPTIMIZE, Z-ORDER, vacuum, time travel y trucos que cambian cómo trabajás con Delta.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 3, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Segunda entrega de la serie <strong>Databricks Tips</strong>, donde cada semana comparto algo avanzado que descubrí en producción. Esta vez: Delta Lake.</p>
+<section id="liquid-clustering-reemplaza-a-z-order" class="level2">
+<h2 class="anchored" data-anchor-id="liquid-clustering-reemplaza-a-z-order">1. Liquid Clustering reemplaza a Z-ORDER</h2>
+<p>Si todavía estás usando <code>OPTIMIZE table ZORDER BY (col)</code> a mano, pará. Desde DBR 13.3+, <strong>Liquid Clustering</strong> hace esto automático y adaptativo:</p>
+<div id="lst-liquid-clustering" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-liquid-clustering-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Liquid Clustering: crear tabla, alterar existente y optimizar
+</figcaption>
+<div aria-describedby="lst-liquid-clustering-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-liquid-clustering"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-liquid-clustering-1"><a href="#lst-liquid-clustering-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Crear tabla con liquid clustering</span></span>
+<span id="lst-liquid-clustering-2"><a href="#lst-liquid-clustering-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span> (</span>
+<span id="lst-liquid-clustering-3"><a href="#lst-liquid-clustering-3" aria-hidden="true" tabindex="-1"></a>  event_date <span class="dt">DATE</span>,</span>
+<span id="lst-liquid-clustering-4"><a href="#lst-liquid-clustering-4" aria-hidden="true" tabindex="-1"></a>  user_id BIGINT,</span>
+<span id="lst-liquid-clustering-5"><a href="#lst-liquid-clustering-5" aria-hidden="true" tabindex="-1"></a>  event_type STRING,</span>
+<span id="lst-liquid-clustering-6"><a href="#lst-liquid-clustering-6" aria-hidden="true" tabindex="-1"></a>  payload STRING</span>
+<span id="lst-liquid-clustering-7"><a href="#lst-liquid-clustering-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-liquid-clustering-8"><a href="#lst-liquid-clustering-8" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA</span>
+<span id="lst-liquid-clustering-9"><a href="#lst-liquid-clustering-9" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (event_date, user_id);</span>
+<span id="lst-liquid-clustering-10"><a href="#lst-liquid-clustering-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-liquid-clustering-11"><a href="#lst-liquid-clustering-11" aria-hidden="true" tabindex="-1"></a><span class="co">-- Aplicar a tabla existente</span></span>
+<span id="lst-liquid-clustering-12"><a href="#lst-liquid-clustering-12" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span></span>
+<span id="lst-liquid-clustering-13"><a href="#lst-liquid-clustering-13" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (event_date, user_id);</span>
+<span id="lst-liquid-clustering-14"><a href="#lst-liquid-clustering-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-liquid-clustering-15"><a href="#lst-liquid-clustering-15" aria-hidden="true" tabindex="-1"></a><span class="co">-- Trigger manual (normalmente no necesario)</span></span>
+<span id="lst-liquid-clustering-16"><a href="#lst-liquid-clustering-16" aria-hidden="true" tabindex="-1"></a>OPTIMIZE catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p>La diferencia clave: Z-ORDER es estático (siempre ordena por las mismas columnas), Liquid Clustering se adapta a los patrones de consulta reales. Además podés cambiar las columnas de clustering sin reescribir la tabla.</p>
+<p><strong>Cuándo seguir con Z-ORDER</strong>: tablas donde necesitás control exacto del orden físico y tenés un patrón de consulta que nunca cambia.</p>
+</section>
+<section id="optimize-no-es-lo-que-pensás" class="level2">
+<h2 class="anchored" data-anchor-id="optimize-no-es-lo-que-pensás">2. OPTIMIZE no es lo que pensás</h2>
+<p>Mucha gente corre <code>OPTIMIZE</code> como cron job diario en todas las tablas. Mal:</p>
+<ul>
+<li><strong>Sin predicado</strong>: reescribe <em>toda</em> la tabla. En tablas de TB, esto son horas de compute.</li>
+<li><strong>Con predicado</strong>: solo reescribe las particiones que matchean.</li>
+</ul>
+<div id="lst-optimize-predicate" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-optimize-predicate-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: OPTIMIZE con y sin predicado: impacto en reescritura de datos
+</figcaption>
+<div aria-describedby="lst-optimize-predicate-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-optimize-predicate"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-optimize-predicate-1"><a href="#lst-optimize-predicate-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Malo: reescribe todo</span></span>
+<span id="lst-optimize-predicate-2"><a href="#lst-optimize-predicate-2" aria-hidden="true" tabindex="-1"></a>OPTIMIZE catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span>
+<span id="lst-optimize-predicate-3"><a href="#lst-optimize-predicate-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-optimize-predicate-4"><a href="#lst-optimize-predicate-4" aria-hidden="true" tabindex="-1"></a><span class="co">-- Mejor: solo la partición de ayer</span></span>
+<span id="lst-optimize-predicate-5"><a href="#lst-optimize-predicate-5" aria-hidden="true" tabindex="-1"></a>OPTIMIZE catalog.<span class="kw">schema</span>.<span class="kw">events</span></span>
+<span id="lst-optimize-predicate-6"><a href="#lst-optimize-predicate-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> event_date <span class="op">=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">1</span> <span class="dt">DAY</span>;</span>
+<span id="lst-optimize-predicate-7"><a href="#lst-optimize-predicate-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-optimize-predicate-8"><a href="#lst-optimize-predicate-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- Aún mejor con liquid clustering: no necesitás OPTIMIZE manual</span></span>
+<span id="lst-optimize-predicate-9"><a href="#lst-optimize-predicate-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- El motor lo hace incrementalmente en escritura</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Tip</strong>: si usás Liquid Clustering, <code>OPTIMIZE</code> corre incremental (solo archivos no clusterizados). Es seguro correrlo seguido porque no reescribe lo que ya está bien.</p>
+</section>
+<section id="vacuum-el-detalle-que-nadie-te-cuenta" class="level2">
+<h2 class="anchored" data-anchor-id="vacuum-el-detalle-que-nadie-te-cuenta">3. VACUUM: el detalle que nadie te cuenta</h2>
+<p><code>VACUUM</code> borra archivos viejos que ya no son parte de la tabla. El default es 7 días de retención. Pero:</p>
+<div id="lst-vacuum-retention" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-vacuum-retention-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: VACUUM: retención peligrosa vs.&nbsp;retención segura de 7 dias
+</figcaption>
+<div aria-describedby="lst-vacuum-retention-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-vacuum-retention"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-vacuum-retention-1"><a href="#lst-vacuum-retention-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Esto puede romper queries activas</span></span>
+<span id="lst-vacuum-retention-2"><a href="#lst-vacuum-retention-2" aria-hidden="true" tabindex="-1"></a>VACUUM catalog.<span class="kw">schema</span>.<span class="kw">events</span> RETAIN <span class="dv">0</span> HOURS;</span>
+<span id="lst-vacuum-retention-3"><a href="#lst-vacuum-retention-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-vacuum-retention-4"><a href="#lst-vacuum-retention-4" aria-hidden="true" tabindex="-1"></a><span class="co">-- Seguro: respetar la retención</span></span>
+<span id="lst-vacuum-retention-5"><a href="#lst-vacuum-retention-5" aria-hidden="true" tabindex="-1"></a>VACUUM catalog.<span class="kw">schema</span>.<span class="kw">events</span> RETAIN <span class="dv">168</span> HOURS; <span class="co">-- 7 días</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p>Lo que nadie te dice: <strong>VACUUM no borra los archivos de log</strong> (delta log). Si necesitás limpiar el log, usá:</p>
+<div id="lst-delta-log" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-delta-log-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Gestionar el delta log: checkpoint, compactacion y retención
+</figcaption>
+<div aria-describedby="lst-delta-log-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-delta-log"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-delta-log-1"><a href="#lst-delta-log-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ver cuánto ocupa el log</span></span>
+<span id="lst-delta-log-2"><a href="#lst-delta-log-2" aria-hidden="true" tabindex="-1"></a>DESCRIBE DETAIL catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span>
+<span id="lst-delta-log-3"><a href="#lst-delta-log-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-delta-log-4"><a href="#lst-delta-log-4" aria-hidden="true" tabindex="-1"></a><span class="co">-- Forzar checkpoint (compacta el JSON log en Parquet)</span></span>
+<span id="lst-delta-log-5"><a href="#lst-delta-log-5" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ocurre automáticamente cada 10 commits, pero podés forzarlo:</span></span>
+<span id="lst-delta-log-6"><a href="#lst-delta-log-6" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> spark.databricks.delta.<span class="kw">checkpoint</span>.partSize <span class="op">=</span> <span class="dv">1</span>;</span>
+<span id="lst-delta-log-7"><a href="#lst-delta-log-7" aria-hidden="true" tabindex="-1"></a>OPTIMIZE catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span>
+<span id="lst-delta-log-8"><a href="#lst-delta-log-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-delta-log-9"><a href="#lst-delta-log-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- Configurar retención del log (default 30 días)</span></span>
+<span id="lst-delta-log-10"><a href="#lst-delta-log-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span></span>
+<span id="lst-delta-log-11"><a href="#lst-delta-log-11" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> TBLPROPERTIES (delta.logRetentionDuration <span class="op">=</span> <span class="st">'interval 30 days'</span>);</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>En producción</strong>: automatizá VACUUM con un job semanal, nunca con retención menor a la ventana de time travel que necesites.</p>
+</section>
+<section id="time-travel-más-allá-del-select-as-of" class="level2">
+<h2 class="anchored" data-anchor-id="time-travel-más-allá-del-select-as-of">4. Time Travel: más allá del SELECT AS OF</h2>
+<p>Todos conocen <code>SELECT * FROM table VERSION AS OF 5</code>. Pero time travel tiene más usos:</p>
+<div id="lst-time-travel" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-time-travel-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: Time Travel: restore, comparar versiones, clone y historial
+</figcaption>
+<div aria-describedby="lst-time-travel-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-time-travel"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-time-travel-1"><a href="#lst-time-travel-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Restaurar una tabla a una versión anterior (rollback)</span></span>
+<span id="lst-time-travel-2"><a href="#lst-time-travel-2" aria-hidden="true" tabindex="-1"></a>RESTORE <span class="kw">TABLE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span> <span class="kw">TO</span> VERSION <span class="kw">AS</span> <span class="kw">OF</span> <span class="dv">42</span>;</span>
+<span id="lst-time-travel-3"><a href="#lst-time-travel-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-time-travel-4"><a href="#lst-time-travel-4" aria-hidden="true" tabindex="-1"></a><span class="co">-- Comparar dos versiones (ideal para validar pipelines)</span></span>
+<span id="lst-time-travel-5"><a href="#lst-time-travel-5" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span> VERSION <span class="kw">AS</span> <span class="kw">OF</span> <span class="dv">10</span></span>
+<span id="lst-time-travel-6"><a href="#lst-time-travel-6" aria-hidden="true" tabindex="-1"></a><span class="kw">EXCEPT</span></span>
+<span id="lst-time-travel-7"><a href="#lst-time-travel-7" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span> VERSION <span class="kw">AS</span> <span class="kw">OF</span> <span class="dv">11</span>;</span>
+<span id="lst-time-travel-8"><a href="#lst-time-travel-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-time-travel-9"><a href="#lst-time-travel-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- Clone una versión específica para debugging</span></span>
+<span id="lst-time-travel-10"><a href="#lst-time-travel-10" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> catalog.<span class="kw">schema</span>.events_debug</span>
+<span id="lst-time-travel-11"><a href="#lst-time-travel-11" aria-hidden="true" tabindex="-1"></a>SHALLOW <span class="kw">CLONE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span> VERSION <span class="kw">AS</span> <span class="kw">OF</span> <span class="dv">42</span>;</span>
+<span id="lst-time-travel-12"><a href="#lst-time-travel-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-time-travel-13"><a href="#lst-time-travel-13" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ver el historial completo de operaciones</span></span>
+<span id="lst-time-travel-14"><a href="#lst-time-travel-14" aria-hidden="true" tabindex="-1"></a>DESCRIBE HISTORY catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p>El <code>SHALLOW CLONE</code> es muy útil: crea una referencia a los datos sin copiarlos. Podés hacer queries de investigación sobre una versión sin tocar la tabla original.</p>
+</section>
+<section id="delta-lake-change-data-feed-cdf" class="level2">
+<h2 class="anchored" data-anchor-id="delta-lake-change-data-feed-cdf">5. Delta Lake Change Data Feed (CDF)</h2>
+<p>Si tenés pipelines downstream que necesitan saber <em>qué cambió</em> en una tabla, no necesitás comparar snapshots. Activá CDF:</p>
+<div id="lst-cdf" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cdf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: Change Data Feed: activar CDF y leer cambios entre versiones
+</figcaption>
+<div aria-describedby="lst-cdf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-cdf"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-cdf-1"><a href="#lst-cdf-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Activar CDF</span></span>
+<span id="lst-cdf-2"><a href="#lst-cdf-2" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span></span>
+<span id="lst-cdf-3"><a href="#lst-cdf-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> TBLPROPERTIES (delta.enableChangeDataFeed <span class="op">=</span> <span class="kw">true</span>);</span>
+<span id="lst-cdf-4"><a href="#lst-cdf-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-cdf-5"><a href="#lst-cdf-5" aria-hidden="true" tabindex="-1"></a><span class="co">-- Leer los cambios entre versiones</span></span>
+<span id="lst-cdf-6"><a href="#lst-cdf-6" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> table_changes(<span class="st">'catalog.schema.events'</span>, <span class="dv">5</span>, <span class="dv">10</span>);</span>
+<span id="lst-cdf-7"><a href="#lst-cdf-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-cdf-8"><a href="#lst-cdf-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- En PySpark</span></span>
+<span id="lst-cdf-9"><a href="#lst-cdf-9" aria-hidden="true" tabindex="-1"></a>df_changes <span class="op">=</span> (spark.<span class="kw">read</span>.format(<span class="ot">"delta"</span>)</span>
+<span id="lst-cdf-10"><a href="#lst-cdf-10" aria-hidden="true" tabindex="-1"></a>    .<span class="kw">option</span>(<span class="ot">"readChangeFeed"</span>, <span class="ot">"true"</span>)</span>
+<span id="lst-cdf-11"><a href="#lst-cdf-11" aria-hidden="true" tabindex="-1"></a>    .<span class="kw">option</span>(<span class="ot">"startingVersion"</span>, <span class="dv">5</span>)</span>
+<span id="lst-cdf-12"><a href="#lst-cdf-12" aria-hidden="true" tabindex="-1"></a>    .<span class="kw">option</span>(<span class="ot">"endingVersion"</span>, <span class="dv">10</span>)</span>
+<span id="lst-cdf-13"><a href="#lst-cdf-13" aria-hidden="true" tabindex="-1"></a>    .<span class="kw">table</span>(<span class="ot">"catalog.schema.events"</span>))</span>
+<span id="lst-cdf-14"><a href="#lst-cdf-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-cdf-15"><a href="#lst-cdf-15" aria-hidden="true" tabindex="-1"></a># Columnas extra: _change_type, _commit_version, _commit_timestamp</span>
+<span id="lst-cdf-16"><a href="#lst-cdf-16" aria-hidden="true" tabindex="-1"></a>df_changes.<span class="kw">filter</span>(<span class="ot">"_change_type = 'update_postimage'"</span>).show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><code>_change_type</code> puede ser: <code>insert</code>, <code>update_preimage</code>, <code>update_postimage</code>, <code>delete</code>. Esto es la base para hacer CDC eficiente sin herramientas externas.</p>
+</section>
+<section id="deletion-vectors-borrar-sin-reescribir" class="level2">
+<h2 class="anchored" data-anchor-id="deletion-vectors-borrar-sin-reescribir">6. Deletion Vectors: borrar sin reescribir</h2>
+<p>Desde DBR 14.1, Delta Lake soporta <strong>Deletion Vectors</strong> (DVs). En vez de reescribir archivos Parquet para borrar filas, se escribe un archivo liviano que marca qué filas están borradas:</p>
+<div id="lst-deletion-vectors" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-deletion-vectors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;7: Deletion Vectors: activar DVs para borrados rapidos sin reescribir
+</figcaption>
+<div aria-describedby="lst-deletion-vectors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-deletion-vectors"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-deletion-vectors-1"><a href="#lst-deletion-vectors-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Activar DVs</span></span>
+<span id="lst-deletion-vectors-2"><a href="#lst-deletion-vectors-2" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span></span>
+<span id="lst-deletion-vectors-3"><a href="#lst-deletion-vectors-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> TBLPROPERTIES (</span>
+<span id="lst-deletion-vectors-4"><a href="#lst-deletion-vectors-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">'delta.enableDeletionVectors'</span> <span class="op">=</span> <span class="kw">true</span></span>
+<span id="lst-deletion-vectors-5"><a href="#lst-deletion-vectors-5" aria-hidden="true" tabindex="-1"></a>);</span>
+<span id="lst-deletion-vectors-6"><a href="#lst-deletion-vectors-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-deletion-vectors-7"><a href="#lst-deletion-vectors-7" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ahora DELETE y UPDATE son mucho más rápidos</span></span>
+<span id="lst-deletion-vectors-8"><a href="#lst-deletion-vectors-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- porque no reescriben archivos completos</span></span>
+<span id="lst-deletion-vectors-9"><a href="#lst-deletion-vectors-9" aria-hidden="true" tabindex="-1"></a><span class="kw">DELETE</span> <span class="kw">FROM</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span></span>
+<span id="lst-deletion-vectors-10"><a href="#lst-deletion-vectors-10" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> user_id <span class="op">=</span> <span class="dv">12345</span>;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>Impacto real</strong>: en tablas grandes, un <code>DELETE</code> que antes tardaba 30 minutos (reescribir archivos de GB) ahora tarda segundos. Los archivos se limpian eventualmente con <code>OPTIMIZE</code> o <code>VACUUM</code>.</p>
+</section>
+<section id="tabla-cuándo-usar-cada-feature" class="level2">
+<h2 class="anchored" data-anchor-id="tabla-cuándo-usar-cada-feature">7. Tabla: cuándo usar cada feature</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Necesidad</th>
+<th>Feature</th>
+<th>Desde DBR</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Ordenar datos para queries rápidas</td>
+<td>Liquid Clustering</td>
+<td>13.3</td>
+</tr>
+<tr class="even">
+<td>Compactar archivos chicos</td>
+<td>OPTIMIZE</td>
+<td>7.0</td>
+</tr>
+<tr class="odd">
+<td>Limpiar archivos viejos</td>
+<td>VACUUM</td>
+<td>7.0</td>
+</tr>
+<tr class="even">
+<td>Rollback de datos</td>
+<td>Time Travel + RESTORE</td>
+<td>7.0</td>
+</tr>
+<tr class="odd">
+<td>Propagar cambios downstream</td>
+<td>Change Data Feed</td>
+<td>10.4</td>
+</tr>
+<tr class="even">
+<td>Borrados/updates rápidos</td>
+<td>Deletion Vectors</td>
+<td>14.1</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><em>Próxima semana: Unity Catalog — permisos, linaje y patrones de gobernanza que nadie implementa bien.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

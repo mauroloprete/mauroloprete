@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-04-07">
+<meta name="description" content="Comparativa práctica de los tres modelos de datos más usados en la industria. Con ejemplos reales, trade-offs y una guía para elegir.">
+
+<title>Medallion vs Data Vault vs Kimball: cuándo usar cada uno y por qué importa – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Medallion vs Data Vault vs Kimball: cuándo usar cada uno y por qué importa – Mauro Loprete">
+<meta property="og:description" content="Comparativa práctica de los tres modelos de datos más usados en la industria. Con ejemplos reales, trade-offs y una guía para elegir.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/data-modeling-medallion-vault-kimball/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Medallion vs Data Vault vs Kimball: cuándo usar cada uno y por qué importa – Mauro Loprete">
+<meta name="twitter:description" content="Comparativa práctica de los tres modelos de datos más usados en la industria. Con ejemplos reales, trade-offs y una guía para elegir.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/data-modeling-medallion-vault-kimball/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#el-problema" id="toc-el-problema" class="nav-link active" data-scroll-target="#el-problema">El problema</a></li>
+  <li><a href="#kimball-dimensional-modeling" id="toc-kimball-dimensional-modeling" class="nav-link" data-scroll-target="#kimball-dimensional-modeling">Kimball (Dimensional Modeling)</a>
+  <ul class="collapse">
+  <li><a href="#la-idea" id="toc-la-idea" class="nav-link" data-scroll-target="#la-idea">La idea</a></li>
+  <li><a href="#cuándo-usarlo" id="toc-cuándo-usarlo" class="nav-link" data-scroll-target="#cuándo-usarlo">Cuándo usarlo</a></li>
+  <li><a href="#cuándo-no-usarlo" id="toc-cuándo-no-usarlo" class="nav-link" data-scroll-target="#cuándo-no-usarlo">Cuándo NO usarlo</a></li>
+  <li><a href="#en-databricks" id="toc-en-databricks" class="nav-link" data-scroll-target="#en-databricks">En Databricks</a></li>
+  </ul></li>
+  <li><a href="#data-vault-2.0" id="toc-data-vault-2.0" class="nav-link" data-scroll-target="#data-vault-2.0">Data Vault 2.0</a>
+  <ul class="collapse">
+  <li><a href="#la-idea-1" id="toc-la-idea-1" class="nav-link" data-scroll-target="#la-idea-1">La idea</a></li>
+  <li><a href="#cuándo-usarlo-1" id="toc-cuándo-usarlo-1" class="nav-link" data-scroll-target="#cuándo-usarlo-1">Cuándo usarlo</a></li>
+  <li><a href="#cuándo-no-usarlo-1" id="toc-cuándo-no-usarlo-1" class="nav-link" data-scroll-target="#cuándo-no-usarlo-1">Cuándo NO usarlo</a></li>
+  <li><a href="#en-databricks-1" id="toc-en-databricks-1" class="nav-link" data-scroll-target="#en-databricks-1">En Databricks</a></li>
+  </ul></li>
+  <li><a href="#medallion-bronze-silver-gold" id="toc-medallion-bronze-silver-gold" class="nav-link" data-scroll-target="#medallion-bronze-silver-gold">Medallion (Bronze / Silver / Gold)</a>
+  <ul class="collapse">
+  <li><a href="#la-idea-2" id="toc-la-idea-2" class="nav-link" data-scroll-target="#la-idea-2">La idea</a></li>
+  <li><a href="#el-punto-clave-que-muchos-no-ven" id="toc-el-punto-clave-que-muchos-no-ven" class="nav-link" data-scroll-target="#el-punto-clave-que-muchos-no-ven">El punto clave que muchos no ven</a></li>
+  <li><a href="#cuándo-usarlo-2" id="toc-cuándo-usarlo-2" class="nav-link" data-scroll-target="#cuándo-usarlo-2">Cuándo usarlo</a></li>
+  <li><a href="#cuándo-no-usarlo-solo" id="toc-cuándo-no-usarlo-solo" class="nav-link" data-scroll-target="#cuándo-no-usarlo-solo">Cuándo NO usarlo (solo)</a></li>
+  <li><a href="#en-databricks-2" id="toc-en-databricks-2" class="nav-link" data-scroll-target="#en-databricks-2">En Databricks</a></li>
+  </ul></li>
+  <li><a href="#la-comparativa" id="toc-la-comparativa" class="nav-link" data-scroll-target="#la-comparativa">La comparativa</a></li>
+  <li><a href="#mi-recomendación" id="toc-mi-recomendación" class="nav-link" data-scroll-target="#mi-recomendación">Mi recomendación</a></li>
+  <li><a href="#links" id="toc-links" class="nav-link" data-scroll-target="#links">Links</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Medallion vs Data Vault vs Kimball: cuándo usar cada uno y por qué importa</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Data Architecture</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Podcast</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Comparativa práctica de los tres modelos de datos más usados en la industria. Con ejemplos reales, trade-offs y una guía para elegir.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">April 7, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Cada vez que arrancás un proyecto de datos, la primera pregunta arquitectónica es: ¿cómo modelo los datos? Y la respuesta que más escucho es “Medallion, obvio”. Pero no siempre es la mejor opción.</p>
+<p>En este post comparo los tres enfoques más usados en la industria, con trade-offs reales y sin vender humo.</p>
+<section id="el-problema" class="level2">
+<h2 class="anchored" data-anchor-id="el-problema">El problema</h2>
+<p>Tenés datos crudos de múltiples fuentes y necesitás llevarlos a un estado consumible por analistas, científicos de datos y dashboards. ¿Cómo organizás las capas intermedias?</p>
+</section>
+<section id="kimball-dimensional-modeling" class="level2">
+<h2 class="anchored" data-anchor-id="kimball-dimensional-modeling">Kimball (Dimensional Modeling)</h2>
+<p>El abuelo del modelado de datos. Ralph Kimball lo publicó en los 90 y sigue vigente.</p>
+<section id="la-idea" class="level3">
+<h3 class="anchored" data-anchor-id="la-idea">La idea</h3>
+<p>Organizás los datos en <strong>tablas de hechos</strong> (fact tables) y <strong>tablas de dimensiones</strong> (dimension tables). Los hechos son las métricas (ventas, clicks, transacciones), las dimensiones son el contexto (quién, cuándo, dónde, qué).</p>
+<div class="cell" data-fig-width="8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">erDiagram
+    dim_customer {
+        bigint customer_id PK
+        string name
+        string segment
+        string country
+    }
+    dim_product {
+        bigint product_id PK
+        string name
+        string category
+        string brand
+    }
+    dim_date {
+        int date_id PK
+        date full_date
+        int month
+        int year
+    }
+    fact_sales {
+        bigint sale_id PK
+        bigint customer_id FK
+        bigint product_id FK
+        int date_id FK
+        decimal amount
+        int quantity
+    }
+
+    dim_customer ||--o{ fact_sales : ""
+    dim_product  ||--o{ fact_sales : ""
+    dim_date     ||--o{ fact_sales : ""
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="cuándo-usarlo" class="level3">
+<h3 class="anchored" data-anchor-id="cuándo-usarlo">Cuándo usarlo</h3>
+<ul>
+<li><strong>Reportería clásica</strong>: dashboards de BI, KPIs, análisis dimensional</li>
+<li><strong>Equipos de analistas que usan SQL</strong>: el modelo estrella es intuitivo, los JOINs son simples</li>
+<li><strong>Requerimientos estables</strong>: sabés qué preguntas te van a hacer</li>
+</ul>
+</section>
+<section id="cuándo-no-usarlo" class="level3">
+<h3 class="anchored" data-anchor-id="cuándo-no-usarlo">Cuándo NO usarlo</h3>
+<ul>
+<li>Cuando las fuentes cambian seguido (Kimball asume esquemas estables)</li>
+<li>Cuando necesitás auditoría completa del historial de cambios</li>
+<li>Cuando tenés 50+ fuentes con relaciones complejas</li>
+</ul>
+</section>
+<section id="en-databricks" class="level3">
+<h3 class="anchored" data-anchor-id="en-databricks">En Databricks</h3>
+<div id="lst-kimball-ddl" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-kimball-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Kimball en Databricks: fact table y dimensión con SCD Type 2
+</figcaption>
+<div aria-describedby="lst-kimball-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-kimball-ddl"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-kimball-ddl-1"><a href="#lst-kimball-ddl-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Fact table</span></span>
+<span id="lst-kimball-ddl-2"><a href="#lst-kimball-ddl-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> gold.fact_sales (</span>
+<span id="lst-kimball-ddl-3"><a href="#lst-kimball-ddl-3" aria-hidden="true" tabindex="-1"></a>  sale_id BIGINT,</span>
+<span id="lst-kimball-ddl-4"><a href="#lst-kimball-ddl-4" aria-hidden="true" tabindex="-1"></a>  customer_id BIGINT,</span>
+<span id="lst-kimball-ddl-5"><a href="#lst-kimball-ddl-5" aria-hidden="true" tabindex="-1"></a>  product_id BIGINT,</span>
+<span id="lst-kimball-ddl-6"><a href="#lst-kimball-ddl-6" aria-hidden="true" tabindex="-1"></a>  date_id <span class="dt">INT</span>,</span>
+<span id="lst-kimball-ddl-7"><a href="#lst-kimball-ddl-7" aria-hidden="true" tabindex="-1"></a>  amount <span class="dt">DECIMAL</span>(<span class="dv">18</span>,<span class="dv">2</span>),</span>
+<span id="lst-kimball-ddl-8"><a href="#lst-kimball-ddl-8" aria-hidden="true" tabindex="-1"></a>  quantity <span class="dt">INT</span></span>
+<span id="lst-kimball-ddl-9"><a href="#lst-kimball-ddl-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-kimball-ddl-10"><a href="#lst-kimball-ddl-10" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA</span>
+<span id="lst-kimball-ddl-11"><a href="#lst-kimball-ddl-11" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (date_id, customer_id);</span>
+<span id="lst-kimball-ddl-12"><a href="#lst-kimball-ddl-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-kimball-ddl-13"><a href="#lst-kimball-ddl-13" aria-hidden="true" tabindex="-1"></a><span class="co">-- Dimension table con SCD Type 2</span></span>
+<span id="lst-kimball-ddl-14"><a href="#lst-kimball-ddl-14" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> gold.dim_customer (</span>
+<span id="lst-kimball-ddl-15"><a href="#lst-kimball-ddl-15" aria-hidden="true" tabindex="-1"></a>  customer_sk BIGINT <span class="kw">GENERATED</span> ALWAYS <span class="kw">AS</span> IDENTITY,</span>
+<span id="lst-kimball-ddl-16"><a href="#lst-kimball-ddl-16" aria-hidden="true" tabindex="-1"></a>  customer_id BIGINT,</span>
+<span id="lst-kimball-ddl-17"><a href="#lst-kimball-ddl-17" aria-hidden="true" tabindex="-1"></a>  name STRING,</span>
+<span id="lst-kimball-ddl-18"><a href="#lst-kimball-ddl-18" aria-hidden="true" tabindex="-1"></a>  <span class="kw">segment</span> STRING,</span>
+<span id="lst-kimball-ddl-19"><a href="#lst-kimball-ddl-19" aria-hidden="true" tabindex="-1"></a>  country STRING,</span>
+<span id="lst-kimball-ddl-20"><a href="#lst-kimball-ddl-20" aria-hidden="true" tabindex="-1"></a>  valid_from <span class="dt">DATE</span>,</span>
+<span id="lst-kimball-ddl-21"><a href="#lst-kimball-ddl-21" aria-hidden="true" tabindex="-1"></a>  valid_to <span class="dt">DATE</span>,</span>
+<span id="lst-kimball-ddl-22"><a href="#lst-kimball-ddl-22" aria-hidden="true" tabindex="-1"></a>  is_current <span class="dt">BOOLEAN</span></span>
+<span id="lst-kimball-ddl-23"><a href="#lst-kimball-ddl-23" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-kimball-ddl-24"><a href="#lst-kimball-ddl-24" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+</section>
+<section id="data-vault-2.0" class="level2">
+<h2 class="anchored" data-anchor-id="data-vault-2.0">Data Vault 2.0</h2>
+<p>Inventado por Dan Linstedt. Es el enfoque más robusto para empresas con muchas fuentes y requerimientos de auditoría.</p>
+<section id="la-idea-1" class="level3">
+<h3 class="anchored" data-anchor-id="la-idea-1">La idea</h3>
+<p>Tres tipos de tablas: <strong>Hubs</strong> (entidades de negocio), <strong>Links</strong> (relaciones entre hubs) y <strong>Satellites</strong> (atributos descriptivos con historial).</p>
+<div class="cell" data-fig-width="8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">erDiagram
+    hub_customer {
+        string hash_key PK
+        bigint customer_id
+        timestamp load_date
+        string record_source
+    }
+    hub_product {
+        string hash_key PK
+        bigint product_id
+        timestamp load_date
+        string record_source
+    }
+    link_sale {
+        string hash_key PK
+        string customer_hk FK
+        string product_hk FK
+        timestamp load_date
+        string record_source
+    }
+    sat_customer {
+        string hash_key FK
+        string name
+        string segment
+        string hash_diff
+        timestamp load_date
+    }
+    sat_product {
+        string hash_key FK
+        string name
+        string category
+        string hash_diff
+        timestamp load_date
+    }
+
+    hub_customer ||--o{ link_sale : ""
+    hub_product  ||--o{ link_sale : ""
+    hub_customer ||--o{ sat_customer : ""
+    hub_product  ||--o{ sat_product : ""
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="cuándo-usarlo-1" class="level3">
+<h3 class="anchored" data-anchor-id="cuándo-usarlo-1">Cuándo usarlo</h3>
+<ul>
+<li><strong>Muchas fuentes heterogéneas</strong> (50+): Data Vault no se rompe cuando agregás una fuente nueva</li>
+<li><strong>Auditoría y compliance</strong>: cada registro tiene <code>load_date</code> y <code>record_source</code>, sabés exactamente de dónde vino cada dato</li>
+<li><strong>Equipo grande</strong>: se paraleliza bien, cada desarrollador puede trabajar en un Hub/Link sin pisar al otro</li>
+<li><strong>Esquemas que cambian seguido</strong>: agregar un atributo es crear un Satellite nuevo, no alterar tablas existentes</li>
+</ul>
+</section>
+<section id="cuándo-no-usarlo-1" class="level3">
+<h3 class="anchored" data-anchor-id="cuándo-no-usarlo-1">Cuándo NO usarlo</h3>
+<ul>
+<li>Equipos chicos (&lt; 5 personas): el overhead de mantener Hubs/Links/Satellites no se justifica</li>
+<li>Proyectos rápidos o POCs: demasiada ceremonia</li>
+<li>Si tus analistas van a hacer SQL directamente sobre el vault (es feo de consumir sin una capa de presentación)</li>
+</ul>
+</section>
+<section id="en-databricks-1" class="level3">
+<h3 class="anchored" data-anchor-id="en-databricks-1">En Databricks</h3>
+<div id="lst-vault-ddl" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-vault-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Data Vault en Databricks: Hub, Satellite y Link en Delta
+</figcaption>
+<div aria-describedby="lst-vault-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-vault-ddl"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-vault-ddl-1"><a href="#lst-vault-ddl-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Hub</span></span>
+<span id="lst-vault-ddl-2"><a href="#lst-vault-ddl-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> vault.hub_customer (</span>
+<span id="lst-vault-ddl-3"><a href="#lst-vault-ddl-3" aria-hidden="true" tabindex="-1"></a>  customer_hk STRING,  <span class="co">-- hash de business key</span></span>
+<span id="lst-vault-ddl-4"><a href="#lst-vault-ddl-4" aria-hidden="true" tabindex="-1"></a>  customer_id BIGINT,</span>
+<span id="lst-vault-ddl-5"><a href="#lst-vault-ddl-5" aria-hidden="true" tabindex="-1"></a>  load_date <span class="dt">TIMESTAMP</span>,</span>
+<span id="lst-vault-ddl-6"><a href="#lst-vault-ddl-6" aria-hidden="true" tabindex="-1"></a>  record_source STRING</span>
+<span id="lst-vault-ddl-7"><a href="#lst-vault-ddl-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-vault-ddl-8"><a href="#lst-vault-ddl-8" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA;</span>
+<span id="lst-vault-ddl-9"><a href="#lst-vault-ddl-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-vault-ddl-10"><a href="#lst-vault-ddl-10" aria-hidden="true" tabindex="-1"></a><span class="co">-- Satellite</span></span>
+<span id="lst-vault-ddl-11"><a href="#lst-vault-ddl-11" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> vault.sat_customer (</span>
+<span id="lst-vault-ddl-12"><a href="#lst-vault-ddl-12" aria-hidden="true" tabindex="-1"></a>  customer_hk STRING,</span>
+<span id="lst-vault-ddl-13"><a href="#lst-vault-ddl-13" aria-hidden="true" tabindex="-1"></a>  name STRING,</span>
+<span id="lst-vault-ddl-14"><a href="#lst-vault-ddl-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">segment</span> STRING,</span>
+<span id="lst-vault-ddl-15"><a href="#lst-vault-ddl-15" aria-hidden="true" tabindex="-1"></a>  country STRING,</span>
+<span id="lst-vault-ddl-16"><a href="#lst-vault-ddl-16" aria-hidden="true" tabindex="-1"></a>  hash_diff STRING,  <span class="co">-- hash de los atributos para detectar cambios</span></span>
+<span id="lst-vault-ddl-17"><a href="#lst-vault-ddl-17" aria-hidden="true" tabindex="-1"></a>  load_date <span class="dt">TIMESTAMP</span>,</span>
+<span id="lst-vault-ddl-18"><a href="#lst-vault-ddl-18" aria-hidden="true" tabindex="-1"></a>  record_source STRING</span>
+<span id="lst-vault-ddl-19"><a href="#lst-vault-ddl-19" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-vault-ddl-20"><a href="#lst-vault-ddl-20" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA;</span>
+<span id="lst-vault-ddl-21"><a href="#lst-vault-ddl-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-vault-ddl-22"><a href="#lst-vault-ddl-22" aria-hidden="true" tabindex="-1"></a><span class="co">-- Link</span></span>
+<span id="lst-vault-ddl-23"><a href="#lst-vault-ddl-23" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> vault.link_sale (</span>
+<span id="lst-vault-ddl-24"><a href="#lst-vault-ddl-24" aria-hidden="true" tabindex="-1"></a>  sale_hk STRING,</span>
+<span id="lst-vault-ddl-25"><a href="#lst-vault-ddl-25" aria-hidden="true" tabindex="-1"></a>  customer_hk STRING,</span>
+<span id="lst-vault-ddl-26"><a href="#lst-vault-ddl-26" aria-hidden="true" tabindex="-1"></a>  product_hk STRING,</span>
+<span id="lst-vault-ddl-27"><a href="#lst-vault-ddl-27" aria-hidden="true" tabindex="-1"></a>  load_date <span class="dt">TIMESTAMP</span>,</span>
+<span id="lst-vault-ddl-28"><a href="#lst-vault-ddl-28" aria-hidden="true" tabindex="-1"></a>  record_source STRING</span>
+<span id="lst-vault-ddl-29"><a href="#lst-vault-ddl-29" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-vault-ddl-30"><a href="#lst-vault-ddl-30" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+</section>
+<section id="medallion-bronze-silver-gold" class="level2">
+<h2 class="anchored" data-anchor-id="medallion-bronze-silver-gold">Medallion (Bronze / Silver / Gold)</h2>
+<p>El enfoque que popularizó Databricks. No es un modelo de datos en el sentido de Kimball o Data Vault — es una <strong>arquitectura de capas</strong>.</p>
+<section id="la-idea-2" class="level3">
+<h3 class="anchored" data-anchor-id="la-idea-2">La idea</h3>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-3-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Arquitectura Medallion: Bronze (datos raw), Silver (limpieza y validación), Gold (modelos de negocio)."><img src="index_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="672" alt="Arquitectura Medallion: Bronze (datos raw), Silver (limpieza y validación), Gold (modelos de negocio)."></a></p>
+</figure>
+</div>
+<figcaption>Arquitectura Medallion: Bronze (datos raw), Silver (limpieza y validación), Gold (modelos de negocio).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="el-punto-clave-que-muchos-no-ven" class="level3">
+<h3 class="anchored" data-anchor-id="el-punto-clave-que-muchos-no-ven">El punto clave que muchos no ven</h3>
+<p><strong>Medallion no te dice cómo modelar Gold.</strong> Solo te dice que hay capas. En Gold podés usar Kimball, Data Vault, o tablas planas. La decisión de modelado sigue siendo tuya.</p>
+</section>
+<section id="cuándo-usarlo-2" class="level3">
+<h3 class="anchored" data-anchor-id="cuándo-usarlo-2">Cuándo usarlo</h3>
+<ul>
+<li><strong>Siempre como arquitectura de capas</strong>: es un patrón de organización, no compite con Kimball ni Data Vault</li>
+<li><strong>Equipos que recién arrancan</strong>: es simple de entender y de implementar</li>
+<li><strong>Proyectos con Databricks/Delta Lake</strong>: está optimizado para el ecosistema</li>
+</ul>
+</section>
+<section id="cuándo-no-usarlo-solo" class="level3">
+<h3 class="anchored" data-anchor-id="cuándo-no-usarlo-solo">Cuándo NO usarlo (solo)</h3>
+<ul>
+<li>Cuando necesitás auditoría formal (Medallion no tiene <code>record_source</code> nativo)</li>
+<li>Cuando Gold necesita modelado dimensional serio (ahí combinás con Kimball)</li>
+</ul>
+</section>
+<section id="en-databricks-2" class="level3">
+<h3 class="anchored" data-anchor-id="en-databricks-2">En Databricks</h3>
+<div id="lst-medallion-ddl" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-medallion-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Medallion en Databricks: tablas Bronze, Silver y Gold en Delta
+</figcaption>
+<div aria-describedby="lst-medallion-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-medallion-ddl"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-medallion-ddl-1"><a href="#lst-medallion-ddl-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Bronze: dato crudo</span></span>
+<span id="lst-medallion-ddl-2"><a href="#lst-medallion-ddl-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> bronze.raw_transactions (</span>
+<span id="lst-medallion-ddl-3"><a href="#lst-medallion-ddl-3" aria-hidden="true" tabindex="-1"></a>  _ingest_timestamp <span class="dt">TIMESTAMP</span> <span class="kw">DEFAULT</span> <span class="fu">current_timestamp</span>(),</span>
+<span id="lst-medallion-ddl-4"><a href="#lst-medallion-ddl-4" aria-hidden="true" tabindex="-1"></a>  _source_file STRING,</span>
+<span id="lst-medallion-ddl-5"><a href="#lst-medallion-ddl-5" aria-hidden="true" tabindex="-1"></a>  payload STRING  <span class="co">-- JSON crudo</span></span>
+<span id="lst-medallion-ddl-6"><a href="#lst-medallion-ddl-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-medallion-ddl-7"><a href="#lst-medallion-ddl-7" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA;</span>
+<span id="lst-medallion-ddl-8"><a href="#lst-medallion-ddl-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-medallion-ddl-9"><a href="#lst-medallion-ddl-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- Silver: limpio y tipado</span></span>
+<span id="lst-medallion-ddl-10"><a href="#lst-medallion-ddl-10" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> silver.transactions (</span>
+<span id="lst-medallion-ddl-11"><a href="#lst-medallion-ddl-11" aria-hidden="true" tabindex="-1"></a>  transaction_id BIGINT,</span>
+<span id="lst-medallion-ddl-12"><a href="#lst-medallion-ddl-12" aria-hidden="true" tabindex="-1"></a>  customer_id BIGINT,</span>
+<span id="lst-medallion-ddl-13"><a href="#lst-medallion-ddl-13" aria-hidden="true" tabindex="-1"></a>  amount <span class="dt">DECIMAL</span>(<span class="dv">18</span>,<span class="dv">2</span>),</span>
+<span id="lst-medallion-ddl-14"><a href="#lst-medallion-ddl-14" aria-hidden="true" tabindex="-1"></a>  transaction_date <span class="dt">DATE</span>,</span>
+<span id="lst-medallion-ddl-15"><a href="#lst-medallion-ddl-15" aria-hidden="true" tabindex="-1"></a>  status STRING,</span>
+<span id="lst-medallion-ddl-16"><a href="#lst-medallion-ddl-16" aria-hidden="true" tabindex="-1"></a>  _silver_timestamp <span class="dt">TIMESTAMP</span> <span class="kw">DEFAULT</span> <span class="fu">current_timestamp</span>()</span>
+<span id="lst-medallion-ddl-17"><a href="#lst-medallion-ddl-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-medallion-ddl-18"><a href="#lst-medallion-ddl-18" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA</span>
+<span id="lst-medallion-ddl-19"><a href="#lst-medallion-ddl-19" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (transaction_date);</span>
+<span id="lst-medallion-ddl-20"><a href="#lst-medallion-ddl-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-medallion-ddl-21"><a href="#lst-medallion-ddl-21" aria-hidden="true" tabindex="-1"></a><span class="co">-- Gold: modelo de negocio (acá elegís Kimball, plano, etc.)</span></span>
+<span id="lst-medallion-ddl-22"><a href="#lst-medallion-ddl-22" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> gold.daily_revenue (</span>
+<span id="lst-medallion-ddl-23"><a href="#lst-medallion-ddl-23" aria-hidden="true" tabindex="-1"></a>  <span class="dt">date</span> <span class="dt">DATE</span>,</span>
+<span id="lst-medallion-ddl-24"><a href="#lst-medallion-ddl-24" aria-hidden="true" tabindex="-1"></a>  <span class="kw">segment</span> STRING,</span>
+<span id="lst-medallion-ddl-25"><a href="#lst-medallion-ddl-25" aria-hidden="true" tabindex="-1"></a>  total_revenue <span class="dt">DECIMAL</span>(<span class="dv">18</span>,<span class="dv">2</span>),</span>
+<span id="lst-medallion-ddl-26"><a href="#lst-medallion-ddl-26" aria-hidden="true" tabindex="-1"></a>  transaction_count BIGINT,</span>
+<span id="lst-medallion-ddl-27"><a href="#lst-medallion-ddl-27" aria-hidden="true" tabindex="-1"></a>  avg_ticket <span class="dt">DECIMAL</span>(<span class="dv">18</span>,<span class="dv">2</span>)</span>
+<span id="lst-medallion-ddl-28"><a href="#lst-medallion-ddl-28" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-medallion-ddl-29"><a href="#lst-medallion-ddl-29" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+</section>
+<section id="la-comparativa" class="level2">
+<h2 class="anchored" data-anchor-id="la-comparativa">La comparativa</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Criterio</th>
+<th>Kimball</th>
+<th>Data Vault</th>
+<th>Medallion</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Complejidad</td>
+<td>Media</td>
+<td>Alta</td>
+<td>Baja</td>
+</tr>
+<tr class="even">
+<td>Auditoría</td>
+<td>Limitada (SCD)</td>
+<td>Completa</td>
+<td>No nativa</td>
+</tr>
+<tr class="odd">
+<td>Escalabilidad de fuentes</td>
+<td>Media</td>
+<td>Alta</td>
+<td>Alta</td>
+</tr>
+<tr class="even">
+<td>Curva de aprendizaje</td>
+<td>Media</td>
+<td>Alta</td>
+<td>Baja</td>
+</tr>
+<tr class="odd">
+<td>Consumo por analistas</td>
+<td>Excelente</td>
+<td>Malo (sin capa)</td>
+<td>Depende de Gold</td>
+</tr>
+<tr class="even">
+<td>Flexibilidad ante cambios</td>
+<td>Baja</td>
+<td>Alta</td>
+<td>Alta</td>
+</tr>
+<tr class="odd">
+<td>Ideal para</td>
+<td>BI clásico</td>
+<td>Enterprise, compliance</td>
+<td>Lakehouse, startups</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="mi-recomendación" class="level2">
+<h2 class="anchored" data-anchor-id="mi-recomendación">Mi recomendación</h2>
+<p>No son mutuamente excluyentes. El patrón que mejor funciona en la práctica:</p>
+<p><strong>Medallion como arquitectura de capas + Kimball en Gold para consumo.</strong></p>
+<div id="lst-pattern-recommended" class="listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pattern-recommended-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Patrón recomendado: Medallion + Kimball en Gold
+</figcaption>
+<div aria-describedby="lst-pattern-recommended-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<pre id="lst-pattern-recommended"><code>Fuentes → Bronze (raw) → Silver (clean) → Gold (Kimball star schema)</code></pre>
+</div>
+</figure>
+</div>
+<p>Si estás en un contexto enterprise con 50+ fuentes y requerimientos de auditoría:</p>
+<p><strong>Medallion + Data Vault en Silver + Kimball en Gold.</strong></p>
+<div id="lst-pattern-enterprise" class="listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pattern-enterprise-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: Patrón enterprise: Data Vault en Silver + Kimball en Gold
+</figcaption>
+<div aria-describedby="lst-pattern-enterprise-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<pre id="lst-pattern-enterprise"><code>Fuentes → Bronze (raw) → Silver (Data Vault) → Gold (Kimball)</code></pre>
+</div>
+</figure>
+</div>
+<p>Y si estás en un equipo chico haciendo un MVP:</p>
+<p><strong>Medallion con Gold plano. Sin ceremonias.</strong></p>
+<div id="lst-pattern-mvp" class="listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pattern-mvp-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: Patrón MVP: Medallion con Gold plano sin modelado formal
+</figcaption>
+<div aria-describedby="lst-pattern-mvp-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<pre id="lst-pattern-mvp"><code>Fuentes → Bronze → Silver → Gold (tablas agregadas simples)</code></pre>
+</div>
+</figure>
+</div>
+<p>Lo importante es entender que cada enfoque resuelve un problema distinto. No hay una respuesta universal — hay contexto.</p>
+</section>
+<section id="links" class="level2">
+<h2 class="anchored" data-anchor-id="links">Links</h2>
+<ul>
+<li><a href="https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/books/">The Data Warehouse Toolkit (Kimball)</a> — el libro fundacional</li>
+<li><a href="https://datavaultalliance.com/">Data Vault 2.0 (Dan Linstedt)</a> — la referencia oficial</li>
+<li><a href="https://docs.databricks.com/en/lakehouse/medallion.html">Medallion Architecture (Databricks)</a> — documentación oficial</li>
+</ul>
+<hr>
+<p><em>Próxima semana: Data Contracts — cómo diseñar un framework desde cero.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

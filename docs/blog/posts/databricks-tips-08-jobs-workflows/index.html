@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-06-04">
+<meta name="description" content="File arrival triggers, table update triggers, Trigger.AvailableNow, Job Clusters y las limitaciones que no están en el tutorial.">
+
+<title>Databricks Tips #8: Jobs &amp; Workflows — streaming y triggers que arrancan solos – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/all.min.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/latex-fontsize.css" rel="stylesheet">
+<script src="../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Databricks Tips #8: Jobs &amp; Workflows — streaming y triggers que arrancan solos – Mauro Loprete">
+<meta property="og:description" content="File arrival triggers, table update triggers, Trigger.AvailableNow, Job Clusters y las limitaciones que no están en el tutorial.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-08-jobs-workflows/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #8: Jobs &amp; Workflows — streaming y triggers que arrancan solos – Mauro Loprete">
+<meta name="twitter:description" content="File arrival triggers, table update triggers, Trigger.AvailableNow, Job Clusters y las limitaciones que no están en el tutorial.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-08-jobs-workflows/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#jobs-en-2-minutos" id="toc-jobs-en-2-minutos" class="nav-link active" data-scroll-target="#jobs-en-2-minutos">Jobs en 2 minutos</a></li>
+  <li><a href="#los-4-triggers" id="toc-los-4-triggers" class="nav-link" data-scroll-target="#los-4-triggers">Los 4 triggers</a></li>
+  <li><a href="#job-clusters-por-qué-siempre-en-producción" id="toc-job-clusters-por-qué-siempre-en-producción" class="nav-link" data-scroll-target="#job-clusters-por-qué-siempre-en-producción">Job Clusters: por qué siempre en producción</a></li>
+  <li><a href="#file-arrival-trigger" id="toc-file-arrival-trigger" class="nav-link" data-scroll-target="#file-arrival-trigger">File Arrival Trigger</a>
+  <ul class="collapse">
+  <li><a href="#configuración" id="toc-configuración" class="nav-link" data-scroll-target="#configuración">Configuración</a></li>
+  <li><a href="#monitoreo-recursivo" id="toc-monitoreo-recursivo" class="nav-link" data-scroll-target="#monitoreo-recursivo">Monitoreo recursivo</a></li>
+  <li><a href="#file-events" id="toc-file-events" class="nav-link" data-scroll-target="#file-events">File events</a></li>
+  </ul></li>
+  <li><a href="#limitaciones-del-file-arrival-trigger" id="toc-limitaciones-del-file-arrival-trigger" class="nav-link" data-scroll-target="#limitaciones-del-file-arrival-trigger">Limitaciones del File Arrival Trigger</a>
+  <ul class="collapse">
+  <li><a href="#las-que-duelen" id="toc-las-que-duelen" class="nav-link" data-scroll-target="#las-que-duelen">Las que duelen</a></li>
+  </ul></li>
+  <li><a href="#table-update-trigger" id="toc-table-update-trigger" class="nav-link" data-scroll-target="#table-update-trigger">Table Update Trigger</a>
+  <ul class="collapse">
+  <li><a href="#tablas-soportadas" id="toc-tablas-soportadas" class="nav-link" data-scroll-target="#tablas-soportadas">Tablas soportadas</a></li>
+  <li><a href="#configuración-1" id="toc-configuración-1" class="nav-link" data-scroll-target="#configuración-1">Configuración</a></li>
+  <li><a href="#parámetros-dinámicos" id="toc-parámetros-dinámicos" class="nav-link" data-scroll-target="#parámetros-dinámicos">Parámetros dinámicos</a></li>
+  </ul></li>
+  <li><a href="#limitaciones-del-table-update-trigger" id="toc-limitaciones-del-table-update-trigger" class="nav-link" data-scroll-target="#limitaciones-del-table-update-trigger">Limitaciones del Table Update Trigger</a>
+  <ul class="collapse">
+  <li><a href="#la-trampa-de-las-views" id="toc-la-trampa-de-las-views" class="nav-link" data-scroll-target="#la-trampa-de-las-views">La trampa de las views</a></li>
+  </ul></li>
+  <li><a href="#trigger.availablenow-el-trigger-que-te-falta" id="toc-trigger.availablenow-el-trigger-que-te-falta" class="nav-link" data-scroll-target="#trigger.availablenow-el-trigger-que-te-falta"><code>Trigger.AvailableNow</code> — el trigger que te falta</a>
+  <ul class="collapse">
+  <li><a href="#comparativa" id="toc-comparativa" class="nav-link" data-scroll-target="#comparativa">Comparativa</a></li>
+  <li><a href="#por-qué-availablenow-es-perfecto-para-jobs" id="toc-por-qué-availablenow-es-perfecto-para-jobs" class="nav-link" data-scroll-target="#por-qué-availablenow-es-perfecto-para-jobs">Por qué <code>AvailableNow</code> es perfecto para Jobs</a></li>
+  </ul></li>
+  <li><a href="#continuous-mode-streaming" id="toc-continuous-mode-streaming" class="nav-link" data-scroll-target="#continuous-mode-streaming">Continuous mode + Streaming</a>
+  <ul class="collapse">
+  <li><a href="#continuous-vs-availablenow-trigger-event-driven" id="toc-continuous-vs-availablenow-trigger-event-driven" class="nav-link" data-scroll-target="#continuous-vs-availablenow-trigger-event-driven">Continuous vs AvailableNow + Trigger event-driven</a></li>
+  </ul></li>
+  <li><a href="#ejemplo-autoloader-file-arrival-availablenow" id="toc-ejemplo-autoloader-file-arrival-availablenow" class="nav-link" data-scroll-target="#ejemplo-autoloader-file-arrival-availablenow">Ejemplo: AutoLoader + File Arrival + AvailableNow</a>
+  <ul class="collapse">
+  <li><a href="#código-del-notebook" id="toc-código-del-notebook" class="nav-link" data-scroll-target="#código-del-notebook">Código del notebook</a></li>
+  <li><a href="#variante-con-foreachbatch-lógica-custom" id="toc-variante-con-foreachbatch-lógica-custom" class="nav-link" data-scroll-target="#variante-con-foreachbatch-lógica-custom">Variante con <code>foreachBatch</code> (lógica custom)</a></li>
+  </ul></li>
+  <li><a href="#ejemplo-microbatch-con-table-update" id="toc-ejemplo-microbatch-con-table-update" class="nav-link" data-scroll-target="#ejemplo-microbatch-con-table-update">Ejemplo: Microbatch con Table Update</a>
+  <ul class="collapse">
+  <li><a href="#paso-1-habilitar-change-data-feed-en-la-tabla-bronze" id="toc-paso-1-habilitar-change-data-feed-en-la-tabla-bronze" class="nav-link" data-scroll-target="#paso-1-habilitar-change-data-feed-en-la-tabla-bronze">Paso 1: Habilitar Change Data Feed en la tabla bronze</a></li>
+  <li><a href="#paso-2-configurar-el-table-update-trigger" id="toc-paso-2-configurar-el-table-update-trigger" class="nav-link" data-scroll-target="#paso-2-configurar-el-table-update-trigger">Paso 2: Configurar el table update trigger</a></li>
+  <li><a href="#paso-3-notebook-de-transformación" id="toc-paso-3-notebook-de-transformación" class="nav-link" data-scroll-target="#paso-3-notebook-de-transformación">Paso 3: Notebook de transformación</a></li>
+  <li><a href="#usando-los-parámetros-dinámicos-del-trigger" id="toc-usando-los-parámetros-dinámicos-del-trigger" class="nav-link" data-scroll-target="#usando-los-parámetros-dinámicos-del-trigger">Usando los parámetros dinámicos del trigger</a></li>
+  </ul></li>
+  <li><a href="#gotchas" id="toc-gotchas" class="nav-link" data-scroll-target="#gotchas">Gotchas</a></li>
+  <li><a href="#cuándo-no-usar-jobs-para-streaming" id="toc-cuándo-no-usar-jobs-para-streaming" class="nav-link" data-scroll-target="#cuándo-no-usar-jobs-para-streaming">Cuándo NO usar Jobs para streaming</a></li>
+  <li><a href="#referencias" id="toc-referencias" class="nav-link" data-scroll-target="#referencias">Referencias</a></li>
+  <li><a href="#otros-posts-de-la-serie" id="toc-otros-posts-de-la-serie" class="nav-link" data-scroll-target="#otros-posts-de-la-serie">Otros posts de la serie</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #8: Jobs &amp; Workflows — streaming y triggers que arrancan solos</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Streaming</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    File arrival triggers, table update triggers, Trigger.AvailableNow, Job Clusters y las limitaciones que no están en el tutorial.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 4, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><i class="fa-solid fa-flask" aria-label="flask"></i> <strong><a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/jobs-workflows">Laboratorio práctico</a></strong> — AutoLoader + AvailableNow + microbatch bronze→silver con CDF. Ejecutable en Databricks Free Edition.</p>
+<hr>
+<p>Databricks tiene cuatro formas de disparar un Job automáticamente. Dos de ellas — <strong>file arrival</strong> y <strong>table update</strong> — son event-driven y te permiten armar pipelines de streaming sin dejar un cluster corriendo 24/7. Pero tienen limitaciones que no están en el tutorial de 5 minutos.</p>
+<p>En este post vamos a ver cómo funcionan, cuándo usarlos, y los errores que te van a hacer perder horas.</p>
+<hr>
+<section id="jobs-en-2-minutos" class="level2">
+<h2 class="anchored" data-anchor-id="jobs-en-2-minutos">Jobs en 2 minutos</h2>
+<p>Un <strong>Job</strong> en Databricks es una unidad de ejecución programada. Pensalo como un cron job con esteroides: puede tener múltiples <strong>Tasks</strong> (notebooks, scripts Python, SQL, JARs, pipelines DLT), cada una con sus dependencias, y todo orquestado como un DAG.</p>
+<p>La diferencia clave con un notebook interactivo:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Notebook interactivo</th>
+<th>Job</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Compute</strong></td>
+<td>All-Purpose Cluster (siempre prendido)</td>
+<td>Job Cluster (se prende y se apaga)</td>
+</tr>
+<tr class="even">
+<td><strong>Ejecución</strong></td>
+<td>Manual, ad-hoc</td>
+<td>Automática, programada o event-driven</td>
+</tr>
+<tr class="odd">
+<td><strong>Costo</strong></td>
+<td>Pagás mientras esté prendido</td>
+<td>Pagás solo lo que usás</td>
+</tr>
+<tr class="even">
+<td><strong>Uso</strong></td>
+<td>Exploración, desarrollo</td>
+<td>Producción</td>
+</tr>
+</tbody>
+</table>
+<p>La analogía: un notebook interactivo es como dejar la cocina prendida todo el día <em>por si querés cocinar</em>. Un Job es como prender la hornalla solo cuando tenés los ingredientes listos.</p>
+</section>
+<section id="los-4-triggers" class="level2">
+<h2 class="anchored" data-anchor-id="los-4-triggers">Los 4 triggers</h2>
+<p>Databricks ofrece cuatro tipos de trigger para disparar Jobs automáticamente:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Cuatro tipos de triggers en Databricks Jobs: Scheduled, File Arrival, Table Update y Continuous."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Cuatro tipos de triggers en Databricks Jobs: Scheduled, File Arrival, Table Update y Continuous."></a></p>
+</figure>
+</div>
+<figcaption>Cuatro tipos de triggers en Databricks Jobs: Scheduled, File Arrival, Table Update y Continuous.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Trigger</th>
+<th>Dispara cuando…</th>
+<th>Latencia típica</th>
+<th>Costo compute</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Scheduled</strong></td>
+<td>Pasa el tiempo configurado (cron)</td>
+<td>Fija (según schedule)</td>
+<td>Bajo si es esporádico</td>
+</tr>
+<tr class="even">
+<td><strong>File Arrival</strong></td>
+<td>Llegan archivos nuevos a un Volume o external location</td>
+<td>~1 min (con file events)</td>
+<td>Solo cuando hay datos</td>
+</tr>
+<tr class="odd">
+<td><strong>Table Update</strong></td>
+<td>Una tabla Delta/Iceberg se actualiza</td>
+<td>~1 min (con file events)</td>
+<td>Solo cuando hay datos</td>
+</tr>
+<tr class="even">
+<td><strong>Continuous</strong></td>
+<td>Siempre (restart automático al terminar)</td>
+<td>Sub-60 seg</td>
+<td>Alto (cluster siempre vivo)</td>
+</tr>
+</tbody>
+</table>
+<p>Los dos que nos interesan hoy son <strong>File Arrival</strong> y <strong>Table Update</strong>: event-driven, eficientes, y con trampas que no son obvias.</p>
+</section>
+<section id="job-clusters-por-qué-siempre-en-producción" class="level2">
+<h2 class="anchored" data-anchor-id="job-clusters-por-qué-siempre-en-producción">Job Clusters: por qué siempre en producción</h2>
+<p>Antes de meternos con triggers, hay que hablar de <strong>dónde corre</strong> tu Job. Porque si usás un trigger event-driven con un All-Purpose Cluster… estás tirando plata.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-2-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="All-Purpose Cluster vs Job Cluster: el primero paga tiempo idle, el segundo solo paga lo que ejecuta."><img src="index_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="All-Purpose Cluster vs Job Cluster: el primero paga tiempo idle, el segundo solo paga lo que ejecuta."></a></p>
+</figure>
+</div>
+<figcaption>All-Purpose Cluster vs Job Cluster: el primero paga tiempo idle, el segundo solo paga lo que ejecuta.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Job Cluster</strong> = se crea cuando el Job arranca, se destruye cuando termina. Pagás solo por el tiempo de ejecución.</p>
+<p><strong>All-Purpose Cluster</strong> = está siempre prendido (o con auto-termination). Pagás todo el tiempo que esté vivo, ejecutes o no.</p>
+<p>Para pipelines event-driven, la cuenta es simple:</p>
+<ul>
+<li>Si tus datos llegan cada 3 horas → el Job Cluster corre ~15 min por run → pagás ~1 hora/día</li>
+<li>Con All-Purpose → pagás 24 horas/día (o lo que dure antes del auto-terminate, y después tarda en re-encender)</li>
+</ul>
+<p><strong>Regla</strong>: en producción, siempre Job Cluster. All-Purpose es para desarrollo interactivo.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip: Instance Pools
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si el startup del Job Cluster te parece lento (~5 min), usá <a href="https://learn.microsoft.com/en-us/azure/databricks/compute/pool-index">Instance Pools</a>. Mantienen VMs pre-calentadas y reducen el startup a ~1-2 min.</p>
+</div>
+</div>
+</section>
+<section id="file-arrival-trigger" class="level2">
+<h2 class="anchored" data-anchor-id="file-arrival-trigger">File Arrival Trigger</h2>
+<p>El file arrival trigger monitorea un <strong>Volume de Unity Catalog</strong> o una <strong>external location</strong> y dispara tu Job cuando detecta archivos nuevos. Chequea cada ~1 minuto (best effort).</p>
+<section id="configuración" class="level3">
+<h3 class="anchored" data-anchor-id="configuración">Configuración</h3>
+<ol type="1">
+<li>En <strong>Jobs &amp; Pipelines</strong>, seleccioná tu Job</li>
+<li>En <strong>Schedules &amp; Triggers</strong> → <strong>Add trigger</strong> → <strong>File arrival</strong></li>
+<li>En <strong>Storage location</strong>, ingresá la ruta del Volume:</li>
+</ol>
+<div id="lst-volume-path" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-volume-path-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Ruta del Volume para configurar el file arrival trigger
+</figcaption>
+<div aria-describedby="lst-volume-path-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-volume-path"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-volume-path-1"><a href="#lst-volume-path-1" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/mi_catalogo/mi_schema/mi_volume/bronze/</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<ol start="4" type="1">
+<li>Configurá las opciones avanzadas:
+<ul>
+<li><strong>Minimum time between triggers</strong> (segundos): tiempo mínimo entre runs. Si llegan archivos durante este período, se acumulan y disparan un solo run al finalizar.</li>
+<li><strong>Wait after last change</strong> (segundos): espera X segundos después del último archivo nuevo. Si llega otro archivo, resetea el timer. Útil cuando los archivos llegan en batches.</li>
+</ul></li>
+<li>Click en <strong>Test connection</strong> para validar → <strong>Save</strong></li>
+</ol>
+</section>
+<section id="monitoreo-recursivo" class="level3">
+<h3 class="anchored" data-anchor-id="monitoreo-recursivo">Monitoreo recursivo</h3>
+<p>El trigger monitorea <strong>todos los subdirectorios</strong> de la ruta configurada. Si configurás <code>/Volumes/catalog/schema/volume/bronze/</code>, también detecta archivos en:</p>
+<div id="lst-subdirs" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-subdirs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Subdirectorios monitoreados recursivamente por el trigger
+</figcaption>
+<div aria-describedby="lst-subdirs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-subdirs"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-subdirs-1"><a href="#lst-subdirs-1" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/catalog/schema/volume/bronze/2026/06/</span></span>
+<span id="lst-subdirs-2"><a href="#lst-subdirs-2" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/catalog/schema/volume/bronze/2026/06/09/</span></span>
+<span id="lst-subdirs-3"><a href="#lst-subdirs-3" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/catalog/schema/volume/bronze/clientes/</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="file-events" class="level3">
+<h3 class="anchored" data-anchor-id="file-events">File events</h3>
+<p>Para mejor performance, habilitá <strong>file events</strong> en la external location. Sin file events, Databricks hace listing de archivos (polling). Con file events, usa notificaciones del cloud provider (Azure Event Grid, AWS S3 Events) — la detección baja de minutos a <strong>segundos</strong>.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Importante: habilitá file events
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Sin file events habilitados, tenés un límite de <strong>50 triggers por workspace</strong> y <strong>10.000 archivos</strong> por path monitoreado. Con file events, estos límites desaparecen. Habilitarlos es un one-time setup en la external location.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="limitaciones-del-file-arrival-trigger" class="level2">
+<h2 class="anchored" data-anchor-id="limitaciones-del-file-arrival-trigger">Limitaciones del File Arrival Trigger</h2>
+<p>Acá es donde la documentación se pone interesante. Estas son las trampas:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Limitación</th>
+<th>Con file events</th>
+<th>Sin file events</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Archivos por path</strong></td>
+<td>Sin límite</td>
+<td>Máx 10.000</td>
+</tr>
+<tr class="even">
+<td><strong>Triggers por workspace</strong></td>
+<td>Sin límite documentado</td>
+<td>Máx 50</td>
+</tr>
+<tr class="odd">
+<td><strong>Overwrites</strong></td>
+<td>No disparan</td>
+<td>No disparan</td>
+</tr>
+<tr class="even">
+<td><strong>Detección</strong></td>
+<td>Segundos</td>
+<td>~1 min (best effort)</td>
+</tr>
+</tbody>
+</table>
+<section id="las-que-duelen" class="level3">
+<h3 class="anchored" data-anchor-id="las-que-duelen">Las que duelen</h3>
+<p><strong>1. Overwrites no disparan runs.</strong> Si sobreescribís un archivo con el mismo nombre, el trigger no se entera. Esto es by design, no un bug. Si tu proceso upstream hace <code>PUT</code> sobre el mismo archivo, necesitás otra estrategia (nombres con timestamp, o table update trigger sobre la tabla destino).</p>
+<p><strong>2. Timeout por cambios ajenos al subpath.</strong> Con file events habilitados, si configurás el trigger en un subpath de una external location (ej: <code>/bronze/clientes/</code>), cambios en <em>otros</em> subpaths de la misma external location (ej: <code>/bronze/ventas/</code>, <code>/bronze/productos/</code>) pueden generar metadatos que el trigger necesita procesar. En entornos con muchos cambios, esto puede causar <strong>timeout y estado de error</strong>.</p>
+<p><strong>Solución</strong>: creá un Volume dedicado de Unity Catalog que apunte específicamente al directorio que querés monitorear. Así aislás el trigger del ruido.</p>
+<p><strong>3. Paths fantasma en S3/GCS.</strong> Si el directorio configurado no existe o fue borrado en S3 o GCS, el trigger <strong>sigue evaluando sin error</strong>. No falla, no te notifica — simplemente no encuentra archivos y no dispara runs. En Azure (ADLS), sí da error.</p>
+<p><strong>4. ADLS y <code>FlushWithClose</code>.</strong> En Azure, file events escucha el evento <code>FlushWithClose</code> para detectar archivos nuevos. Algunas APIs de Azure no emiten este evento, lo que puede <strong>retrasar la detección</strong>. Si tus archivos llegan por una API que no emite <code>FlushWithClose</code>, vas a tener que investigar el <a href="https://learn.microsoft.com/en-us/azure/databricks/ingestion/cloud-object-storage/auto-loader/file-notification-mode#classic-file-notifications">modo de notificación clásico</a>.</p>
+</section>
+</section>
+<section id="table-update-trigger" class="level2">
+<h2 class="anchored" data-anchor-id="table-update-trigger">Table Update Trigger</h2>
+<p>El table update trigger monitorea <strong>tablas de Unity Catalog</strong> y dispara tu Job cuando detecta cambios (inserts, updates, merges, deletes).</p>
+<section id="tablas-soportadas" class="level3">
+<h3 class="anchored" data-anchor-id="tablas-soportadas">Tablas soportadas</h3>
+<ul>
+<li>Delta managed tables (Unity Catalog)</li>
+<li>Iceberg managed tables (Unity Catalog)</li>
+<li>External tables backed by Delta Lake</li>
+<li>Materialized views</li>
+<li>Streaming tables</li>
+<li>Views y metric views de UC (con restricciones — ver limitaciones)</li>
+<li>Delta Sharing tables y system tables (Beta)</li>
+</ul>
+</section>
+<section id="configuración-1" class="level3">
+<h3 class="anchored" data-anchor-id="configuración-1">Configuración</h3>
+<ol type="1">
+<li>En <strong>Jobs &amp; Pipelines</strong>, seleccioná tu Job</li>
+<li><strong>Add trigger</strong> → <strong>Table update</strong></li>
+<li>Agregá las tablas a monitorear (hasta 10)</li>
+<li>Si seleccionás más de una, elegí el modo:
+<ul>
+<li><strong>Any table is updated</strong>: dispara cuando <em>cualquiera</em> cambia</li>
+<li><strong>All tables are updated</strong>: dispara cuando <em>todas</em> cambiaron</li>
+</ul></li>
+<li>Opciones avanzadas (mismo patrón que file arrival):
+<ul>
+<li><strong>Minimum time between triggers</strong></li>
+<li><strong>Wait after last change</strong></li>
+</ul></li>
+<li><strong>Test trigger</strong> → <strong>Save</strong></li>
+</ol>
+</section>
+<section id="parámetros-dinámicos" class="level3">
+<h3 class="anchored" data-anchor-id="parámetros-dinámicos">Parámetros dinámicos</h3>
+<p>Cuando usás table update triggers, Databricks inyecta parámetros que podés usar en tu notebook:</p>
+<div id="lst-dynamic-params" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dynamic-params-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Parámetros dinámicos inyectados por el table update trigger
+</figcaption>
+<div aria-describedby="lst-dynamic-params-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-dynamic-params"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-dynamic-params-1"><a href="#lst-dynamic-params-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Qué tablas se actualizaron (JSON list)</span></span>
+<span id="lst-dynamic-params-2"><a href="#lst-dynamic-params-2" aria-hidden="true" tabindex="-1"></a>updated <span class="op">=</span> dbutils.widgets.get(<span class="st">"job.trigger.table_update.updated_tables"</span>)</span>
+<span id="lst-dynamic-params-3"><a href="#lst-dynamic-params-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-dynamic-params-4"><a href="#lst-dynamic-params-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Timestamp del último commit que disparó el trigger</span></span>
+<span id="lst-dynamic-params-5"><a href="#lst-dynamic-params-5" aria-hidden="true" tabindex="-1"></a>ts <span class="op">=</span> dbutils.widgets.get(</span>
+<span id="lst-dynamic-params-6"><a href="#lst-dynamic-params-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"job.trigger.table_update.mi_catalogo.mi_schema.mi_tabla.commit_timestamp.iso_datetime"</span></span>
+<span id="lst-dynamic-params-7"><a href="#lst-dynamic-params-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-dynamic-params-8"><a href="#lst-dynamic-params-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-dynamic-params-9"><a href="#lst-dynamic-params-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Versión del último commit</span></span>
+<span id="lst-dynamic-params-10"><a href="#lst-dynamic-params-10" aria-hidden="true" tabindex="-1"></a>version <span class="op">=</span> dbutils.widgets.get(</span>
+<span id="lst-dynamic-params-11"><a href="#lst-dynamic-params-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"job.trigger.table_update.mi_catalogo.mi_schema.mi_tabla.version"</span></span>
+<span id="lst-dynamic-params-12"><a href="#lst-dynamic-params-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p>Estos parámetros te permiten hacer procesamiento incremental inteligente: solo procesás lo que cambió desde la última ejecución.</p>
+</section>
+</section>
+<section id="limitaciones-del-table-update-trigger" class="level2">
+<h2 class="anchored" data-anchor-id="limitaciones-del-table-update-trigger">Limitaciones del Table Update Trigger</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Limitación</th>
+<th>Detalle</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Tablas por trigger</strong></td>
+<td>Máx 10</td>
+</tr>
+<tr class="even">
+<td><strong>Views</strong></td>
+<td>Las dependencias cuentan como tablas. View con 11 tablas dependientes = no se puede usar</td>
+</tr>
+<tr class="odd">
+<td><strong>Views dependientes</strong></td>
+<td>Máx 10 views dependientes por view monitoreada</td>
+</tr>
+<tr class="even">
+<td><strong>False positives en views</strong></td>
+<td>Cambios filtrados por la view <strong>igual disparan</strong> el job</td>
+</tr>
+<tr class="odd">
+<td><strong>Sin file events</strong></td>
+<td>Máx 1.000 jobs con table update trigger por workspace</td>
+</tr>
+<tr class="even">
+<td><strong>Delta Sharing</strong></td>
+<td>Solo Databricks-to-Databricks (Beta). Open sharing no soportado</td>
+</tr>
+</tbody>
+</table>
+<section id="la-trampa-de-las-views" class="level3">
+<h3 class="anchored" data-anchor-id="la-trampa-de-las-views">La trampa de las views</h3>
+<p>Si monitoreás una <strong>view</strong> que filtra por <code>WHERE region = 'LATAM'</code>, y alguien actualiza filas con <code>region = 'EU'</code>… <strong>el trigger se dispara igual</strong>. Databricks monitorea las tablas subyacentes, no el resultado de la view. Tu Job va a correr innecesariamente.</p>
+<p>Y peor: si tu view depende de 6 tablas, y agregás otra view que depende de 5 tablas al mismo trigger, ya estás en 11 — y el trigger falla.</p>
+<p><strong>Tip</strong>: usá tablas directamente en el trigger, no views. Es más predecible.</p>
+</section>
+</section>
+<section id="trigger.availablenow-el-trigger-que-te-falta" class="level2">
+<h2 class="anchored" data-anchor-id="trigger.availablenow-el-trigger-que-te-falta"><code>Trigger.AvailableNow</code> — el trigger que te falta</h2>
+<p>Cuando combinás un trigger event-driven con un Job, necesitás que tu código de streaming <strong>procese todo lo pendiente y termine</strong>. Si usás <code>Trigger.ProcessingTime("10 seconds")</code>, tu stream queda corriendo indefinidamente y el Job nunca termina (y el Job Cluster nunca se apaga).</p>
+<p><code>Trigger.AvailableNow</code> es la solución:</p>
+<div id="lst-available-now" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-available-now-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Streaming con Trigger.AvailableNow: procesa todo y termina
+</figcaption>
+<div aria-describedby="lst-available-now-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-available-now"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-available-now-1"><a href="#lst-available-now-1" aria-hidden="true" tabindex="-1"></a>(spark.readStream</span>
+<span id="lst-available-now-2"><a href="#lst-available-now-2" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">format</span>(<span class="st">"cloudFiles"</span>)</span>
+<span id="lst-available-now-3"><a href="#lst-available-now-3" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.format"</span>, <span class="st">"json"</span>)</span>
+<span id="lst-available-now-4"><a href="#lst-available-now-4" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.schemaLocation"</span>, checkpoint_path)</span>
+<span id="lst-available-now-5"><a href="#lst-available-now-5" aria-hidden="true" tabindex="-1"></a>    .load(source_path)</span>
+<span id="lst-available-now-6"><a href="#lst-available-now-6" aria-hidden="true" tabindex="-1"></a>    .writeStream</span>
+<span id="lst-available-now-7"><a href="#lst-available-now-7" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
+<span id="lst-available-now-8"><a href="#lst-available-now-8" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)    <span class="co"># &lt;-- procesa todo y termina</span></span>
+<span id="lst-available-now-9"><a href="#lst-available-now-9" aria-hidden="true" tabindex="-1"></a>    .toTable(<span class="st">"catalog.schema.mi_tabla_bronze"</span>)</span>
+<span id="lst-available-now-10"><a href="#lst-available-now-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<section id="comparativa" class="level3">
+<h3 class="anchored" data-anchor-id="comparativa">Comparativa</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Trigger</th>
+<th>Comportamiento</th>
+<th>Job Cluster se apaga?</th>
+<th>Serverless?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>availableNow=True</code></td>
+<td>Procesa todo lo pendiente → termina</td>
+<td>Sí</td>
+<td>Sí</td>
+</tr>
+<tr class="even">
+<td><code>processingTime="10s"</code></td>
+<td>Ejecuta micro-batches cada 10s → nunca termina</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><code>once=True</code></td>
+<td>Procesa un solo micro-batch → termina</td>
+<td>Sí</td>
+<td>Sí</td>
+</tr>
+<tr class="even">
+<td><code>continuous</code></td>
+<td>Procesamiento continuo, latencia ~1ms</td>
+<td>No</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<p><code>Trigger.Once</code> está deprecado: solo procesa <strong>un micro-batch</strong>, no todo lo pendiente. Si llegaron 10.000 archivos, <code>once=True</code> procesa un batch y deja el resto para la próxima ejecución. <code>AvailableNow</code> procesa <strong>todo</strong>.</p>
+</section>
+<section id="por-qué-availablenow-es-perfecto-para-jobs" class="level3">
+<h3 class="anchored" data-anchor-id="por-qué-availablenow-es-perfecto-para-jobs">Por qué <code>AvailableNow</code> es perfecto para Jobs</h3>
+<p>El flujo es:</p>
+<ol type="1">
+<li>Llegan archivos / se actualiza tabla → trigger dispara</li>
+<li>Job Cluster se crea (~2-5 min, o ~1 min con Instance Pools)</li>
+<li>Tu notebook ejecuta el stream con <code>availableNow=True</code></li>
+<li>Procesa todo lo acumulado desde el último checkpoint</li>
+<li>Stream termina → Job Cluster se destruye → dejás de pagar</li>
+</ol>
+<p>Esto es <strong>streaming en modo batch eficiente</strong>: tenés las garantías de exactly-once de Structured Streaming (checkpoints), pero sin el costo de un cluster 24/7.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Nota: Serverless
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>En serverless compute, <strong>solo</strong> <code>Trigger.AvailableNow</code> funciona para Structured Streaming. <code>ProcessingTime</code> y <code>Trigger.Continuous</code> <strong>no están soportados</strong>. Otro motivo más para usar <code>AvailableNow</code>.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="continuous-mode-streaming" class="level2">
+<h2 class="anchored" data-anchor-id="continuous-mode-streaming">Continuous mode + Streaming</h2>
+<p>Si necesitás <strong>latencia sub-minuto</strong>, el modo continuous es otra opción. Configurás el Job como <strong>Continuous</strong> y Databricks reinicia automáticamente el run cuando termina (con un delay de &lt; 60 segundos).</p>
+<div id="lst-continuous-mode" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-continuous-mode-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: Continuous mode con AvailableNow: restart automático al terminar
+</figcaption>
+<div aria-describedby="lst-continuous-mode-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-continuous-mode"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-continuous-mode-1"><a href="#lst-continuous-mode-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Con continuous mode, usás AvailableNow</span></span>
+<span id="lst-continuous-mode-2"><a href="#lst-continuous-mode-2" aria-hidden="true" tabindex="-1"></a><span class="co"># El Job Cluster se reinicia automáticamente al terminar</span></span>
+<span id="lst-continuous-mode-3"><a href="#lst-continuous-mode-3" aria-hidden="true" tabindex="-1"></a>(spark.readStream</span>
+<span id="lst-continuous-mode-4"><a href="#lst-continuous-mode-4" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">format</span>(<span class="st">"delta"</span>)</span>
+<span id="lst-continuous-mode-5"><a href="#lst-continuous-mode-5" aria-hidden="true" tabindex="-1"></a>    .table(<span class="st">"catalog.schema.bronze"</span>)</span>
+<span id="lst-continuous-mode-6"><a href="#lst-continuous-mode-6" aria-hidden="true" tabindex="-1"></a>    .writeStream</span>
+<span id="lst-continuous-mode-7"><a href="#lst-continuous-mode-7" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
+<span id="lst-continuous-mode-8"><a href="#lst-continuous-mode-8" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
+<span id="lst-continuous-mode-9"><a href="#lst-continuous-mode-9" aria-hidden="true" tabindex="-1"></a>    .toTable(<span class="st">"catalog.schema.silver"</span>)</span>
+<span id="lst-continuous-mode-10"><a href="#lst-continuous-mode-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p>El retry usa <strong>exponential backoff</strong>: si el task falla, reintenta con delays crecientes (máximo 3 reintentos por task). Si sigue fallando, cancela el run y arranca uno nuevo.</p>
+<section id="continuous-vs-availablenow-trigger-event-driven" class="level3">
+<h3 class="anchored" data-anchor-id="continuous-vs-availablenow-trigger-event-driven">Continuous vs AvailableNow + Trigger event-driven</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Continuous + AvailableNow</th>
+<th>File Arrival/Table Update + AvailableNow</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Latencia</strong></td>
+<td>Sub-60 seg (delay entre runs)</td>
+<td>1-5 min (detección + cluster startup)</td>
+</tr>
+<tr class="even">
+<td><strong>Costo</strong></td>
+<td>Alto (cluster siempre vivo*)</td>
+<td>Bajo (cluster solo cuando hay datos)</td>
+</tr>
+<tr class="odd">
+<td><strong>Complejidad</strong></td>
+<td>Baja (no configurás trigger)</td>
+<td>Media (configurás trigger + file events)</td>
+</tr>
+<tr class="even">
+<td><strong>Ideal para</strong></td>
+<td>Streams de alta frecuencia</td>
+<td>Datos que llegan esporádicamente</td>
+</tr>
+</tbody>
+</table>
+<p><em>* En continuous mode el cluster está siempre activo porque los runs se reinician automáticamente.</em></p>
+<p><strong>Regla práctica</strong>: si tus datos llegan cada 5+ minutos, usá trigger event-driven. Si llegan constantemente (Kafka, IoT), usá continuous o directamente Lakeflow Declarative Pipelines.</p>
+</section>
+</section>
+<section id="ejemplo-autoloader-file-arrival-availablenow" class="level2">
+<h2 class="anchored" data-anchor-id="ejemplo-autoloader-file-arrival-availablenow">Ejemplo: AutoLoader + File Arrival + AvailableNow</h2>
+<p>El escenario más común: archivos JSON llegan a un Volume de Unity Catalog, querés ingestarlos en una tabla Delta.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-3-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3"><img src="index_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864"></a></p>
+</figure>
+</div>
+</div>
+</div>
+<section id="código-del-notebook" class="level3">
+<h3 class="anchored" data-anchor-id="código-del-notebook">Código del notebook</h3>
+<div id="lst-autoloader-bronze" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-autoloader-bronze-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: AutoLoader con file events y AvailableNow para ingesta bronze
+</figcaption>
+<div aria-describedby="lst-autoloader-bronze-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-autoloader-bronze"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-autoloader-bronze-1"><a href="#lst-autoloader-bronze-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Configuración</span></span>
+<span id="lst-autoloader-bronze-2"><a href="#lst-autoloader-bronze-2" aria-hidden="true" tabindex="-1"></a>volume_path <span class="op">=</span> <span class="st">"/Volumes/mi_catalogo/mi_schema/bronze/clientes/"</span></span>
+<span id="lst-autoloader-bronze-3"><a href="#lst-autoloader-bronze-3" aria-hidden="true" tabindex="-1"></a>checkpoint_path <span class="op">=</span> <span class="st">"/Volumes/mi_catalogo/mi_schema/checkpoints/clientes_bronze/"</span></span>
+<span id="lst-autoloader-bronze-4"><a href="#lst-autoloader-bronze-4" aria-hidden="true" tabindex="-1"></a>target_table <span class="op">=</span> <span class="st">"mi_catalogo.mi_schema.clientes_bronze"</span></span>
+<span id="lst-autoloader-bronze-5"><a href="#lst-autoloader-bronze-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-autoloader-bronze-6"><a href="#lst-autoloader-bronze-6" aria-hidden="true" tabindex="-1"></a><span class="co"># AutoLoader: descubre archivos nuevos incrementalmente</span></span>
+<span id="lst-autoloader-bronze-7"><a href="#lst-autoloader-bronze-7" aria-hidden="true" tabindex="-1"></a>(spark.readStream</span>
+<span id="lst-autoloader-bronze-8"><a href="#lst-autoloader-bronze-8" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">format</span>(<span class="st">"cloudFiles"</span>)</span>
+<span id="lst-autoloader-bronze-9"><a href="#lst-autoloader-bronze-9" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.format"</span>, <span class="st">"json"</span>)</span>
+<span id="lst-autoloader-bronze-10"><a href="#lst-autoloader-bronze-10" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.schemaLocation"</span>, checkpoint_path)</span>
+<span id="lst-autoloader-bronze-11"><a href="#lst-autoloader-bronze-11" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.useManagedFileEvents"</span>, <span class="st">"true"</span>)  <span class="co"># usa file events</span></span>
+<span id="lst-autoloader-bronze-12"><a href="#lst-autoloader-bronze-12" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.inferColumnTypes"</span>, <span class="st">"true"</span>)</span>
+<span id="lst-autoloader-bronze-13"><a href="#lst-autoloader-bronze-13" aria-hidden="true" tabindex="-1"></a>    .load(volume_path)</span>
+<span id="lst-autoloader-bronze-14"><a href="#lst-autoloader-bronze-14" aria-hidden="true" tabindex="-1"></a>    .writeStream</span>
+<span id="lst-autoloader-bronze-15"><a href="#lst-autoloader-bronze-15" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
+<span id="lst-autoloader-bronze-16"><a href="#lst-autoloader-bronze-16" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"mergeSchema"</span>, <span class="st">"true"</span>)   <span class="co"># maneja schema evolution</span></span>
+<span id="lst-autoloader-bronze-17"><a href="#lst-autoloader-bronze-17" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
+<span id="lst-autoloader-bronze-18"><a href="#lst-autoloader-bronze-18" aria-hidden="true" tabindex="-1"></a>    .toTable(target_table)</span>
+<span id="lst-autoloader-bronze-19"><a href="#lst-autoloader-bronze-19" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<p><strong>¿Qué pasa acá?</strong></p>
+<ol type="1">
+<li>El file arrival trigger detecta archivos nuevos en el Volume</li>
+<li>Dispara el Job → se crea un Job Cluster</li>
+<li>AutoLoader (<code>cloudFiles</code>) descubre los archivos nuevos desde el último checkpoint</li>
+<li><code>availableNow=True</code> procesa <strong>todo</strong> lo pendiente y termina</li>
+<li>El Job Cluster se destruye → dejás de pagar</li>
+</ol>
+<p>El checkpoint garantiza <strong>exactly-once</strong>: si el Job falla a mitad, al reiniciar retoma desde donde quedó.</p>
+</section>
+<section id="variante-con-foreachbatch-lógica-custom" class="level3">
+<h3 class="anchored" data-anchor-id="variante-con-foreachbatch-lógica-custom">Variante con <code>foreachBatch</code> (lógica custom)</h3>
+<p>Si necesitás hacer algo más que escribir en una tabla (ej: llamar una API, validar datos, merge):</p>
+<div id="lst-foreach-batch" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-foreach-batch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;7: foreachBatch con validación y escritura a bronze y quarantine
+</figcaption>
+<div aria-describedby="lst-foreach-batch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-foreach-batch"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-foreach-batch-1"><a href="#lst-foreach-batch-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> procesar_batch(batch_df, batch_id):</span>
+<span id="lst-foreach-batch-2"><a href="#lst-foreach-batch-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Validaciones</span></span>
+<span id="lst-foreach-batch-3"><a href="#lst-foreach-batch-3" aria-hidden="true" tabindex="-1"></a>    df_valido <span class="op">=</span> batch_df.<span class="bu">filter</span>(<span class="st">"email IS NOT NULL AND cantidad &gt; 0"</span>)</span>
+<span id="lst-foreach-batch-4"><a href="#lst-foreach-batch-4" aria-hidden="true" tabindex="-1"></a>    df_invalido <span class="op">=</span> batch_df.<span class="bu">filter</span>(<span class="st">"email IS NULL OR cantidad &lt;= 0"</span>)</span>
+<span id="lst-foreach-batch-5"><a href="#lst-foreach-batch-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-foreach-batch-6"><a href="#lst-foreach-batch-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Escribir válidos en bronze</span></span>
+<span id="lst-foreach-batch-7"><a href="#lst-foreach-batch-7" aria-hidden="true" tabindex="-1"></a>    df_valido.write.mode(<span class="st">"append"</span>).saveAsTable(<span class="st">"catalog.schema.clientes_bronze"</span>)</span>
+<span id="lst-foreach-batch-8"><a href="#lst-foreach-batch-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-foreach-batch-9"><a href="#lst-foreach-batch-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Escribir rechazados en quarantine</span></span>
+<span id="lst-foreach-batch-10"><a href="#lst-foreach-batch-10" aria-hidden="true" tabindex="-1"></a>    df_invalido.write.mode(<span class="st">"append"</span>).saveAsTable(<span class="st">"catalog.schema.clientes_quarantine"</span>)</span>
+<span id="lst-foreach-batch-11"><a href="#lst-foreach-batch-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-foreach-batch-12"><a href="#lst-foreach-batch-12" aria-hidden="true" tabindex="-1"></a>(spark.readStream</span>
+<span id="lst-foreach-batch-13"><a href="#lst-foreach-batch-13" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">format</span>(<span class="st">"cloudFiles"</span>)</span>
+<span id="lst-foreach-batch-14"><a href="#lst-foreach-batch-14" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.format"</span>, <span class="st">"json"</span>)</span>
+<span id="lst-foreach-batch-15"><a href="#lst-foreach-batch-15" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.schemaLocation"</span>, checkpoint_path)</span>
+<span id="lst-foreach-batch-16"><a href="#lst-foreach-batch-16" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"cloudFiles.useManagedFileEvents"</span>, <span class="st">"true"</span>)</span>
+<span id="lst-foreach-batch-17"><a href="#lst-foreach-batch-17" aria-hidden="true" tabindex="-1"></a>    .load(volume_path)</span>
+<span id="lst-foreach-batch-18"><a href="#lst-foreach-batch-18" aria-hidden="true" tabindex="-1"></a>    .writeStream</span>
+<span id="lst-foreach-batch-19"><a href="#lst-foreach-batch-19" aria-hidden="true" tabindex="-1"></a>    .foreachBatch(procesar_batch)</span>
+<span id="lst-foreach-batch-20"><a href="#lst-foreach-batch-20" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
+<span id="lst-foreach-batch-21"><a href="#lst-foreach-batch-21" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
+<span id="lst-foreach-batch-22"><a href="#lst-foreach-batch-22" aria-hidden="true" tabindex="-1"></a>    .start()</span>
+<span id="lst-foreach-batch-23"><a href="#lst-foreach-batch-23" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Ojo con <code>foreachBatch</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>foreachBatch</code> da <strong>at-least-once</strong> guarantees, no exactly-once. Si el Job falla y reinicia, puede reprocesar un batch. Diseñá tu lógica para ser idempotente (ej: usá <code>MERGE</code> en vez de <code>INSERT</code>).</p>
+</div>
+</div>
+</section>
+</section>
+<section id="ejemplo-microbatch-con-table-update" class="level2">
+<h2 class="anchored" data-anchor-id="ejemplo-microbatch-con-table-update">Ejemplo: Microbatch con Table Update</h2>
+<p>Escenario: la tabla <code>bronze</code> se actualiza (por el pipeline del ejemplo anterior, o por otro proceso). Querés transformar los datos nuevos y escribirlos en <code>silver</code>.</p>
+<section id="paso-1-habilitar-change-data-feed-en-la-tabla-bronze" class="level3">
+<h3 class="anchored" data-anchor-id="paso-1-habilitar-change-data-feed-en-la-tabla-bronze">Paso 1: Habilitar Change Data Feed en la tabla bronze</h3>
+<div id="lst-enable-cdf" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-enable-cdf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;8: Habilitar Change Data Feed en la tabla bronze
+</figcaption>
+<div aria-describedby="lst-enable-cdf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-enable-cdf"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-enable-cdf-1"><a href="#lst-enable-cdf-1" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> mi_catalogo.mi_schema.clientes_bronze</span>
+<span id="lst-enable-cdf-2"><a href="#lst-enable-cdf-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> TBLPROPERTIES (delta.enableChangeDataFeed <span class="op">=</span> <span class="kw">true</span>);</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="paso-2-configurar-el-table-update-trigger" class="level3">
+<h3 class="anchored" data-anchor-id="paso-2-configurar-el-table-update-trigger">Paso 2: Configurar el table update trigger</h3>
+<p>En el Job de silver, agregá un trigger <strong>Table Update</strong> que monitoree <code>mi_catalogo.mi_schema.clientes_bronze</code> con modo <strong>Any table is updated</strong>.</p>
+</section>
+<section id="paso-3-notebook-de-transformación" class="level3">
+<h3 class="anchored" data-anchor-id="paso-3-notebook-de-transformación">Paso 3: Notebook de transformación</h3>
+<div id="lst-bronze-to-silver" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-bronze-to-silver-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;9: Transformación bronze a silver con Change Data Feed (CDF)
+</figcaption>
+<div aria-describedby="lst-bronze-to-silver-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-bronze-to-silver"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-bronze-to-silver-1"><a href="#lst-bronze-to-silver-1" aria-hidden="true" tabindex="-1"></a>checkpoint_path <span class="op">=</span> <span class="st">"/Volumes/mi_catalogo/mi_schema/checkpoints/clientes_silver/"</span></span>
+<span id="lst-bronze-to-silver-2"><a href="#lst-bronze-to-silver-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-bronze-to-silver-3"><a href="#lst-bronze-to-silver-3" aria-hidden="true" tabindex="-1"></a>(spark.readStream</span>
+<span id="lst-bronze-to-silver-4"><a href="#lst-bronze-to-silver-4" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">format</span>(<span class="st">"delta"</span>)</span>
+<span id="lst-bronze-to-silver-5"><a href="#lst-bronze-to-silver-5" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"readChangeFeed"</span>, <span class="st">"true"</span>)   <span class="co"># lee solo los cambios (CDF)</span></span>
+<span id="lst-bronze-to-silver-6"><a href="#lst-bronze-to-silver-6" aria-hidden="true" tabindex="-1"></a>    .table(<span class="st">"mi_catalogo.mi_schema.clientes_bronze"</span>)</span>
+<span id="lst-bronze-to-silver-7"><a href="#lst-bronze-to-silver-7" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">filter</span>(<span class="st">"_change_type IN ('insert', 'update_postimage')"</span>)</span>
+<span id="lst-bronze-to-silver-8"><a href="#lst-bronze-to-silver-8" aria-hidden="true" tabindex="-1"></a>    .drop(<span class="st">"_change_type"</span>, <span class="st">"_commit_version"</span>, <span class="st">"_commit_timestamp"</span>)</span>
+<span id="lst-bronze-to-silver-9"><a href="#lst-bronze-to-silver-9" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"nombre_upper"</span>, F.upper(F.col(<span class="st">"nombre"</span>)))</span>
+<span id="lst-bronze-to-silver-10"><a href="#lst-bronze-to-silver-10" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"procesado_at"</span>, F.current_timestamp())</span>
+<span id="lst-bronze-to-silver-11"><a href="#lst-bronze-to-silver-11" aria-hidden="true" tabindex="-1"></a>    .writeStream</span>
+<span id="lst-bronze-to-silver-12"><a href="#lst-bronze-to-silver-12" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
+<span id="lst-bronze-to-silver-13"><a href="#lst-bronze-to-silver-13" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
+<span id="lst-bronze-to-silver-14"><a href="#lst-bronze-to-silver-14" aria-hidden="true" tabindex="-1"></a>    .toTable(<span class="st">"mi_catalogo.mi_schema.clientes_silver"</span>)</span>
+<span id="lst-bronze-to-silver-15"><a href="#lst-bronze-to-silver-15" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="usando-los-parámetros-dinámicos-del-trigger" class="level3">
+<h3 class="anchored" data-anchor-id="usando-los-parámetros-dinámicos-del-trigger">Usando los parámetros dinámicos del trigger</h3>
+<p>Opcionalmente, podés usar los parámetros que Databricks inyecta para logging o auditoría:</p>
+<div id="lst-trigger-logging" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-trigger-logging-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;10: Uso de parámetros dinámicos del trigger para logging
+</figcaption>
+<div aria-describedby="lst-trigger-logging-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="sourceCode" id="lst-trigger-logging"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-trigger-logging-1"><a href="#lst-trigger-logging-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Qué tablas se actualizaron</span></span>
+<span id="lst-trigger-logging-2"><a href="#lst-trigger-logging-2" aria-hidden="true" tabindex="-1"></a>updated_tables <span class="op">=</span> dbutils.widgets.get(<span class="st">"job.trigger.table_update.updated_tables"</span>)</span>
+<span id="lst-trigger-logging-3"><a href="#lst-trigger-logging-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Tablas actualizadas: </span><span class="sc">{</span>updated_tables<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="lst-trigger-logging-4"><a href="#lst-trigger-logging-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="lst-trigger-logging-5"><a href="#lst-trigger-logging-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Versión del commit que disparó el trigger</span></span>
+<span id="lst-trigger-logging-6"><a href="#lst-trigger-logging-6" aria-hidden="true" tabindex="-1"></a>trigger_version <span class="op">=</span> dbutils.widgets.get(</span>
+<span id="lst-trigger-logging-7"><a href="#lst-trigger-logging-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"job.trigger.table_update.mi_catalogo.mi_schema.clientes_bronze.version"</span></span>
+<span id="lst-trigger-logging-8"><a href="#lst-trigger-logging-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="lst-trigger-logging-9"><a href="#lst-trigger-logging-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Procesando desde versión: </span><span class="sc">{</span>trigger_version<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</figure>
+</div>
+</section>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">Gotchas</h2>
+<p><strong>1. El startup del cluster mata la latencia.</strong> Un Job Cluster tarda ~3-5 minutos en arrancar. Si tu trigger detecta datos en 1 minuto pero el cluster tarda 5 en prender, tu latencia real es de 6 minutos. <strong>Solución</strong>: Instance Pools o serverless compute.</p>
+<p><strong>2. File events no habilitados = modo degradado.</strong> Sin file events, estás limitado a 50 triggers y 10.000 archivos. Y la detección es por polling (listing de archivos), no por notificación. Habilitá file events en la external location — es gratis y es un one-time setup.</p>
+<p><strong>3. Overwrites son invisibles.</strong> Si tu proceso upstream sobreescribe archivos en vez de crear nuevos, el file arrival trigger no se entera. Cambiá la estrategia a archivos con timestamp en el nombre, o usá table update trigger sobre la tabla destino.</p>
+<p><strong>4. Views que disparan de más.</strong> Ya lo vimos: si monitoreás una view con table update trigger, cualquier cambio en las tablas subyacentes dispara el job, aunque la view no muestre datos nuevos. Usá tablas directas.</p>
+<p><strong>5. Serverless no soporta <code>ProcessingTime</code>.</strong> Si migrás a serverless compute y tu notebook usa <code>trigger(processingTime="10 seconds")</code>, va a fallar. Cambialo a <code>trigger(availableNow=True)</code>.</p>
+<p><strong>6. No uses All-Purpose Clusters para esto.</strong> Ya lo dijimos, pero vale repetir: si tu trigger dispara 4 veces al día y cada run tarda 15 minutos, con Job Cluster pagás 1 hora. Con All-Purpose pagás 24. La diferencia a fin de mes duele.</p>
+</section>
+<section id="cuándo-no-usar-jobs-para-streaming" class="level2">
+<h2 class="anchored" data-anchor-id="cuándo-no-usar-jobs-para-streaming">Cuándo NO usar Jobs para streaming</h2>
+<p>Jobs con triggers event-driven son ideales para <strong>streaming micro-batch</strong>: datos que llegan cada minutos/horas, latencia de minutos es aceptable.</p>
+<p>Pero no son la mejor opción siempre:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Escenario</th>
+<th>Mejor opción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Latencia sub-segundo (Kafka, IoT)</td>
+<td><strong>Lakeflow Declarative Pipelines</strong> (continuous mode)</td>
+</tr>
+<tr class="even">
+<td>Pipeline con quality gates y expectations</td>
+<td><strong>Lakeflow Declarative Pipelines</strong> (expectations)</td>
+</tr>
+<tr class="odd">
+<td>Orquestación cross-workspace o multi-cloud</td>
+<td><strong>Airflow</strong> / orquestador externo</td>
+</tr>
+<tr class="even">
+<td>ETL simple y frecuente (cada 5 min)</td>
+<td><strong>Jobs con trigger scheduled</strong> (más simple)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="referencias" class="level2">
+<h2 class="anchored" data-anchor-id="referencias">Referencias</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/jobs/triggers">Automating jobs with schedules and triggers — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/jobs/file-arrival-triggers">Trigger jobs when new files arrive — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/jobs/trigger-table-update">Trigger jobs when source tables are updated — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/jobs/continuous">Run jobs continuously — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/structured-streaming/triggers">Configure Structured Streaming trigger intervals — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ingestion/cloud-object-storage/auto-loader/">Auto Loader — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/delta/delta-change-data-feed">Use Delta Lake change data feed — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/compute/pool-index">Instance Pools — Azure Databricks</a></li>
+</ul>
+</section>
+<section id="otros-posts-de-la-serie" class="level2">
+<h2 class="anchored" data-anchor-id="otros-posts-de-la-serie">Otros posts de la serie</h2>
+<p>Si te sirvió este post, mirá los anteriores de <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — patrones avanzados de DABs, variables complejas, deploy multi-target.</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — Liquid Clustering, OPTIMIZE, VACUUM, y las 7 cosas que ojalá te hubieran dicho antes.</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — modelo de gobernanza, GRANTS heredados, row/column security.</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, ventanas, estado y los problemas que no te cuenta la documentación.</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — model registry unificado, lineage y deploy desde UC.</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — Feature Store, online tables, point-in-time lookups.</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker en Databricks</a> — DCS, golden containers, CI/CD con imágenes custom.</li>
+</ul>
+<hr>
+<p><em>Próxima semana: SQL Warehouses &amp; Serverless — compute on-demand que escala solo para analytics y BI.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

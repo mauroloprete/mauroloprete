@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2025-08-26">
+<meta name="description" content="Review del libro de Joe Reis y Matt Housley (O’Reilly, 2da ed.). Ciclo de vida del dato, arquitecturas clave, undercurrents y qué cambió en esta edición.">
+
+<title>Fundamentals of Data Engineering: las bases que todo ingeniero de datos necesita conocer – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/all.min.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Fundamentals of Data Engineering: las bases que todo ingeniero de datos necesita conocer – Mauro Loprete">
+<meta property="og:description" content="Review del libro de Joe Reis y Matt Housley (O’Reilly, 2da ed.). Ciclo de vida del dato, arquitecturas clave, undercurrents y qué cambió en esta edición.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/fundamentals-data-engineering/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Fundamentals of Data Engineering: las bases que todo ingeniero de datos necesita conocer – Mauro Loprete">
+<meta name="twitter:description" content="Review del libro de Joe Reis y Matt Housley (O’Reilly, 2da ed.). Ciclo de vida del dato, arquitecturas clave, undercurrents y qué cambió en esta edición.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/fundamentals-data-engineering/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#por-que-importa-este-libro" id="toc-por-que-importa-este-libro" class="nav-link active" data-scroll-target="#por-que-importa-este-libro"><i class="fa-solid fa-book" aria-label="book"></i> Por que importa este libro</a></li>
+  <li><a href="#el-ciclo-de-vida-del-dato" id="toc-el-ciclo-de-vida-del-dato" class="nav-link" data-scroll-target="#el-ciclo-de-vida-del-dato"><i class="fa-solid fa-arrows-spin" aria-label="arrows-spin"></i> El ciclo de vida del dato</a>
+  <ul class="collapse">
+  <li><a href="#generacion" id="toc-generacion" class="nav-link" data-scroll-target="#generacion">1. Generacion</a></li>
+  <li><a href="#almacenamiento" id="toc-almacenamiento" class="nav-link" data-scroll-target="#almacenamiento">2. Almacenamiento</a></li>
+  <li><a href="#ingestion" id="toc-ingestion" class="nav-link" data-scroll-target="#ingestion">3. Ingestion</a></li>
+  <li><a href="#transformacion" id="toc-transformacion" class="nav-link" data-scroll-target="#transformacion">4. Transformacion</a></li>
+  <li><a href="#serving" id="toc-serving" class="nav-link" data-scroll-target="#serving">5. Serving</a></li>
+  </ul></li>
+  <li><a href="#arquitecturas-cual-usar-y-cuando" id="toc-arquitecturas-cual-usar-y-cuando" class="nav-link" data-scroll-target="#arquitecturas-cual-usar-y-cuando"><i class="fa-solid fa-building" aria-label="building"></i> Arquitecturas: cual usar y cuando</a>
+  <ul class="collapse">
+  <li><a href="#tabla-comparativa" id="toc-tabla-comparativa" class="nav-link" data-scroll-target="#tabla-comparativa">Tabla comparativa</a></li>
+  </ul></li>
+  <li><a href="#los-undercurrents-lo-que-sostiene-todo" id="toc-los-undercurrents-lo-que-sostiene-todo" class="nav-link" data-scroll-target="#los-undercurrents-lo-que-sostiene-todo"><i class="fa-solid fa-water" aria-label="water"></i> Los undercurrents: lo que sostiene todo</a></li>
+  <li><a href="#que-cambio-en-la-2da-edicion" id="toc-que-cambio-en-la-2da-edicion" class="nav-link" data-scroll-target="#que-cambio-en-la-2da-edicion"><i class="fa-solid fa-code-compare" aria-label="code-compare"></i> Que cambio en la 2da edicion</a></li>
+  <li><a href="#mi-opinion-personal" id="toc-mi-opinion-personal" class="nav-link" data-scroll-target="#mi-opinion-personal"><i class="fa-solid fa-comments" aria-label="comments"></i> Mi opinion personal</a></li>
+  <li><a href="#links" id="toc-links" class="nav-link" data-scroll-target="#links"><i class="fa-solid fa-link" aria-label="link"></i> Links</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Fundamentals of Data Engineering: las bases que todo ingeniero de datos necesita conocer</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Podcast</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Book Review</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Review del libro de Joe Reis y Matt Housley (O’Reilly, 2da ed.). Ciclo de vida del dato, arquitecturas clave, undercurrents y qué cambió en esta edición.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">August 26, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Si tuvieras que recomendar <em>un solo libro</em> a alguien que arranca en ingenieria de datos, este es. <strong>Fundamentals of Data Engineering</strong> de Joe Reis y Matt Housley (O’Reilly, 2da edicion) no te ensena una herramienta puntual: te da el mapa completo de la disciplina. Es el libro que define el vocabulario comun que la industria necesitaba.</p>
+<p>En este post te comparto un resumen profundo del libro, lo que mas me resono y por que creo que deberia ser lectura obligatoria.</p>
+<section id="por-que-importa-este-libro" class="level2">
+<h2 class="anchored" data-anchor-id="por-que-importa-este-libro"><i class="fa-solid fa-book" aria-label="book"></i> Por que importa este libro</h2>
+<p>Antes de <em>Fundamentals</em>, la ingenieria de datos se aprendia a los golpes. Cada equipo reinventaba definiciones, cada vendor te vendia su stack como <em>la</em> solucion, y no existia un framework comun para pensar el problema de punta a punta.</p>
+<p>Reis y Housley lograron algo dificil: escribir un libro que no envejece con la tecnologia. En vez de atarse a Spark, Kafka o Snowflake, proponen un modelo mental que aplica sin importar que herramientas uses. Si manana aparece una nueva base de datos o un nuevo motor de procesamiento, el ciclo de vida del dato sigue siendo el mismo.</p>
+</section>
+<section id="el-ciclo-de-vida-del-dato" class="level2">
+<h2 class="anchored" data-anchor-id="el-ciclo-de-vida-del-dato"><i class="fa-solid fa-arrows-spin" aria-label="arrows-spin"></i> El ciclo de vida del dato</h2>
+<p>El corazon del libro es el <strong>Data Engineering Lifecycle</strong>, un framework de cinco etapas que describe como fluyen los datos desde que nacen hasta que generan valor:</p>
+<section id="generacion" class="level3">
+<h3 class="anchored" data-anchor-id="generacion">1. Generacion</h3>
+<p>Aca es donde nacen los datos: aplicaciones, IoT, APIs, bases transaccionales, eventos de usuario. Lo clave no es solo <em>que</em> se genera, sino <em>como</em> lo genera el sistema fuente. Preguntas que tenes que hacerte: esta fuente es confiable? Puedo asumir un schema estable? Que pasa si el schema cambia sin aviso?</p>
+</section>
+<section id="almacenamiento" class="level3">
+<h3 class="anchored" data-anchor-id="almacenamiento">2. Almacenamiento</h3>
+<p>No existe una solucion unica. Object storage, data warehouses, data lakes, bases columnar, bases key-value: cada una tiene trade-offs de costo, latencia y complejidad. El libro insiste en que la decision de almacenamiento <em>no es independiente</em> del resto del ciclo: afecta directamente como vas a ingestar y transformar.</p>
+</section>
+<section id="ingestion" class="level3">
+<h3 class="anchored" data-anchor-id="ingestion">3. Ingestion</h3>
+<p>Mover datos de A a B parece simple hasta que no lo es. Batch vs streaming, push vs pull, CDC vs full load. Reis y Housley dedican un capitulo entero a las trampas: que hacer cuando la fuente es lenta, cuando los datos llegan desordenados, cuando necesitas exactamente-una-vez (y por que eso es mas dificil de lo que parece).</p>
+</section>
+<section id="transformacion" class="level3">
+<h3 class="anchored" data-anchor-id="transformacion">4. Transformacion</h3>
+<p>Desde un <code>SELECT</code> simple hasta pipelines de feature engineering con decenas de pasos. La transformacion es donde los datos crudos se convierten en algo util. El libro cubre el espectro completo: SQL transforms, dbt-style ELT, transformaciones en streaming, y el eterno debate batch vs micro-batch.</p>
+</section>
+<section id="serving" class="level3">
+<h3 class="anchored" data-anchor-id="serving">5. Serving</h3>
+<p>El final del ciclo: poner los datos donde los necesitan. Dashboards para analistas, APIs para aplicaciones, feature stores para modelos de ML, datasets para data scientists. Aca el libro hace una distincion importante: serving no es solo <em>entregar</em> datos, es entregarlos con la calidad, latencia y formato que cada consumidor necesita.</p>
+</section>
+</section>
+<section id="arquitecturas-cual-usar-y-cuando" class="level2">
+<h2 class="anchored" data-anchor-id="arquitecturas-cual-usar-y-cuando"><i class="fa-solid fa-building" aria-label="building"></i> Arquitecturas: cual usar y cuando</h2>
+<p>El libro cubre las cuatro arquitecturas mas relevantes hoy. Aca va un resumen con una tabla comparativa:</p>
+<p><strong>Lambda</strong>: dos caminos paralelos, uno batch y uno real-time, que convergen en una capa de serving. Fue la primera respuesta seria al problema de combinar datos historicos con datos frescos. El problema: mantener dos pipelines con logica duplicada es caro y fragil. Usala solo si tenes requerimientos muy distintos de latencia para historico vs real-time y no podes unificar.</p>
+<p><strong>Kappa</strong>: simplifica Lambda usando <em>un solo</em> pipeline de streaming que procesa todo. Los datos se persisten en un log inmutable (tipo Kafka) y se reprocesan si hace falta. Elegante en teoria, pero en la practica requiere infraestructura de streaming madura y no siempre es cost-effective para workloads puramente batch.</p>
+<p><strong>Medallion (Bronze / Silver / Gold)</strong>: la arquitectura que popularizo Databricks. Los datos entran crudos a Bronze, se limpian en Silver y se modelan para consumo en Gold. Es simple de entender, facil de implementar y escala bien. Si arrancas un proyecto greenfield hoy, probablemente sea tu mejor punto de partida.</p>
+<p><strong>Data Mesh</strong>: no es una arquitectura tecnica sino un modelo organizacional. Cada dominio de negocio es dueno de sus datos y los expone como <em>data products</em>. Requiere madurez organizacional alta y una plataforma self-service solida por debajo. No es para todos, pero resuelve problemas reales en organizaciones grandes donde el equipo central de datos es cuello de botella.</p>
+<section id="tabla-comparativa" class="level3">
+<h3 class="anchored" data-anchor-id="tabla-comparativa">Tabla comparativa</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Arquitectura</th>
+<th>Complejidad</th>
+<th>Mejor para</th>
+<th>Riesgo principal</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Lambda</td>
+<td>Alta</td>
+<td>Combinar batch + real-time con requisitos distintos</td>
+<td>Logica duplicada, mantenimiento doble</td>
+</tr>
+<tr class="even">
+<td>Kappa</td>
+<td>Media-Alta</td>
+<td>Pipelines unificados sobre streaming</td>
+<td>Costo de infra streaming, reprocesamiento pesado</td>
+</tr>
+<tr class="odd">
+<td>Medallion</td>
+<td>Baja-Media</td>
+<td>Data lakes / lakehouses modernos</td>
+<td>Puede volverse rigida sin buena gobernanza</td>
+</tr>
+<tr class="even">
+<td>Data Mesh</td>
+<td>Alta (organizacional)</td>
+<td>Empresas grandes con multiples dominios</td>
+<td>Requiere madurez, plataforma self-service</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="los-undercurrents-lo-que-sostiene-todo" class="level2">
+<h2 class="anchored" data-anchor-id="los-undercurrents-lo-que-sostiene-todo"><i class="fa-solid fa-water" aria-label="water"></i> Los undercurrents: lo que sostiene todo</h2>
+<p>Reis y Housley introducen el concepto de <strong>undercurrents</strong> (corrientes subterraneas): seis areas transversales que atraviesan <em>todas</em> las etapas del ciclo de vida. Si ignoras cualquiera de ellas, tu pipeline va a funcionar… hasta que no.</p>
+<ul>
+<li><p><strong>Security</strong>: no es un feature que agregas al final. Encriptacion, control de acceso, principio de minimo privilegio: todo tiene que estar desde el diseno. Un data breach borra anos de trabajo en segundos.</p></li>
+<li><p><strong>Data Management</strong>: calidad de datos, linaje, catalogos, metadata. Sin data management, tus pipelines producen datos que nadie confia. Y datos que nadie confia son datos que nadie usa.</p></li>
+<li><p><strong>DataOps</strong>: la adaptacion de DevOps al mundo de datos. CI/CD para pipelines, testing automatizado, observabilidad, alertas. Si tu pipeline se rompe a las 3 AM y nadie se entera hasta las 10, tenes un problema de DataOps.</p></li>
+<li><p><strong>Data Architecture</strong>: las decisiones de diseno de alto nivel. Como se conectan los sistemas, donde vive cada dato, que contratos existen entre equipos. Una mala arquitectura no se arregla con mejor codigo.</p></li>
+<li><p><strong>Orchestration</strong>: coordinar dependencias entre pipelines, manejar reintentos, gestionar estado. Airflow, Prefect, Dagster, Databricks Workflows: la herramienta importa menos que entender <em>que</em> necesitas orquestar y <em>por que</em>.</p></li>
+<li><p><strong>Software Engineering</strong>: escribir buen codigo, testear, versionar, documentar. Que trabajes con datos no te exime de las buenas practicas de ingenieria de software. El libro es enfatico: un data engineer es, ante todo, un ingeniero.</p></li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Consejo
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si tenes que priorizar, arranca por DataOps y Data Management. Son las dos areas donde mas retorno vas a ver con menor inversion inicial.</p>
+</div>
+</div>
+</section>
+<section id="que-cambio-en-la-2da-edicion" class="level2">
+<h2 class="anchored" data-anchor-id="que-cambio-en-la-2da-edicion"><i class="fa-solid fa-code-compare" aria-label="code-compare"></i> Que cambio en la 2da edicion</h2>
+<p>La segunda edicion no es un parche cosmético. Hay cambios de fondo que reflejan como evoluciono la industria entre 2022 y 2024:</p>
+<ul>
+<li><p><strong>Streaming-first</strong>: la primera edicion trataba streaming como un caso avanzado. La segunda lo presenta como una opcion de primera clase. El mensaje es claro: si tu herramienta soporta streaming, al menos evalua si lo necesitas antes de asumir que batch alcanza.</p></li>
+<li><p><strong>Cloud-native por default</strong>: se nota que los autores dejaron de asumir que alguien arranca on-premise. Los ejemplos, patrones y recomendaciones asumen que estas en la nube (o en camino).</p></li>
+<li><p><strong>Gobernanza como pilar</strong>: Unity Catalog, Purview, Collibra, open-source governance: la segunda edicion le da a la gobernanza el peso que merece. Ya no es un capitulo opcional sino parte integral del lifecycle.</p></li>
+<li><p><strong>Lakehouse como arquitectura de referencia</strong>: la convergencia de data lake + data warehouse aparece con mucha mas fuerza. El concepto de lakehouse paso de ser marketing a ser la recomendacion practica.</p></li>
+</ul>
+</section>
+<section id="mi-opinion-personal" class="level2">
+<h2 class="anchored" data-anchor-id="mi-opinion-personal"><i class="fa-solid fa-comments" aria-label="comments"></i> Mi opinion personal</h2>
+<p>Lo que mas me resono del libro es la insistencia en que <strong>la tecnologia es lo que menos importa</strong>. Suena contradictorio viniendo de un libro tecnico, pero es exacto: las herramientas cambian cada dos anos, los principios no. Si entendes bien el ciclo de vida y los undercurrents, podes adaptarte a cualquier stack.</p>
+<p>Lo que le agregaria: mas ejemplos concretos de decision-making. El libro es excelente explicando <em>que</em> son las cosas, pero a veces le falta el “y en la practica, cuando tengo que elegir entre X e Y, como decido?”. Casos reales de empresas con trade-offs explicitos harian que el contenido baje a tierra mas rapido.</p>
+<p><strong>Quien deberia leerlo</strong>: cualquier persona que trabaje con datos. Si sos data engineer junior, es tu biblia. Si sos senior, te ordena ideas que ya tenes sueltas. Si sos data scientist, analytics engineer o incluso product manager en un equipo de datos, te va a dar contexto que te falta para entender por que las cosas son como son.</p>
+</section>
+<section id="links" class="level2">
+<h2 class="anchored" data-anchor-id="links"><i class="fa-solid fa-link" aria-label="link"></i> Links</h2>
+<ul>
+<li><i class="fa-solid fa-book" aria-label="book"></i> <a href="https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/">Fundamentals of Data Engineering, 2nd Edition — O’Reilly</a></li>
+<li><i class="fa-solid fa-headphones" aria-label="headphones"></i> <a href="https://open.spotify.com/episode/30ad7lO8tRqMMHJy3i776u">Escuchar el episodio en Spotify</a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
