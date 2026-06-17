@@ -1,0 +1,227 @@
+---
+title: "DAIS 2026: todo lo que Databricks anunció (y lo que significa para tu stack)"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-06-16"
+draft: false
+categories: [Data Engineering, Data Architecture, Databricks Tips, MLOps]
+description: "Lakehouse//RT, LTAP, Genie One, CustomerLake, Lakewatch, OpenSharing y más. Resumen completo del Data + AI Summit 2026 desde la virtualidad, con links a cada anuncio."
+image: cover.png
+---
+
+Martes de noche, scrolleando LinkedIn como un desquiciado. El feed era 90% Data + AI Summit 2026. Fotos en el Moscone Center, keynote highlights, 30,000 personas allá y yo acá en Uruguay tratando de separar lo importante del hype.
+
+No fui presencial. Armé este resumen entre la transmisión virtual, el [blog de announcements de Databricks](https://www.databricks.com/blog/category/platform/announcements?categories=announcements), los press releases y la catarata de posts de la comunidad en LinkedIn. Si te pasó como a mí que abriste el feed y no sabías por dónde empezar, acá va todo junto con links para que profundices en lo que te interese. Los ordené de mayor a menor según lo que a mí me pareció más impactante o directamente me voló la cabeza — así que el ranking es subjetivo y discutible, como tiene que ser.
+
+::: callout-note
+## TL;DR
+
+-   **Lakehouse//RT** + motor Reyden: analítica real-time sub-100ms directo sobre Delta/Iceberg.
+-   **LTAP**: unifica OLTP + analítica eliminando ETL entre sistemas. Esto es grande.
+-   **Lakebase Search**: vector + full-text search nativo en Postgres.
+-   **Genie One** y toda la familia: ZeroOps, Ontology, MCP App, Code, Flow, App Builder.
+-   **CustomerLake**: Databricks entra en martech con un CDP agentic.
+-   **Lakewatch**: SIEM agentic + compra de Panther Labs y Quotient AI.
+-   **OpenSharing** + **Apps on Marketplace**: compartir agent skills y correr apps de terceros.
+-   **Unity Catalog** y **AI Gateway** con Catalog Federation, Governance Hub, cost controls.
+-   Apps nativas **iOS/Android** para Genie.
+-   **Forward Deployed Engineering**: nueva org de ingeniería embebida.
+:::
+
+------------------------------------------------------------------------
+
+## El keynote
+
+Ali Ghodsi, Matei Zaharia, Reynold Xin y Arsalan Tavakoli-Shiraji arrancaron el show. De invitados: [Satya Nadella](https://www.databricks.com/company/newsroom/press-releases/databricks-announces-2026-data-ai-summit-keynote-lineup-and) con un fireside chat pregrabado, [Greg Brockman](https://www.databricks.com/company/newsroom/press-releases/databricks-announces-2026-data-ai-summit-keynote-lineup-and) de OpenAI y [Magesh Bagavathi](https://www.databricks.com/company/newsroom/press-releases/databricks-announces-2026-data-ai-summit-keynote-lineup-and) de PepsiCo como Chief Data & AI Officer.
+
+El mensaje de fondo: no importa qué modelo gana el benchmark de la semana. Lo que importa es qué infraestructura te deja **correr AI en producción de verdad**. [SiliconANGLE](https://siliconangle.com/2026/06/16/agi-moment-databricks-new-releases-zero-support-deployment-ai-agents/) lo puso bien: el foco es madurez operacional, no demos de lab. Y con esa premisa, salió una avalancha de productos.
+
+------------------------------------------------------------------------
+
+## 1. Lakehouse//RT y el motor Reyden
+
+El que más ruido hizo en mi feed, lejos. [Lakehouse//RT](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-lakehousert-bring-real-time-analytics-directly) es analítica real-time directamente sobre datos gobernados en Delta Lake e Iceberg — sin copiar nada a un sistema de serving separado.
+
+El motor que lo hace posible se llama **Reyden**, por "Reynold's Dream Engine" (sí, es un guiño a Reynold Xin). Lo demostró en vivo: latencia consistente por debajo de 100ms con miles de agentes AI pegándole a la misma query en simultáneo. Su frase textual: *"None of the other existing systems can do that."* Ambicioso, pero la demo pareció respaldar bastante.
+
+Hasta ahora, si necesitabas real-time tenías que montar Redis, Druid, Pinot o lo que fuera y mantener una copia de los datos ahí. Lakehouse//RT promete que eso ya no hace falta. [Sigma ya se sumó como launch partner](https://www.businesswire.com/news/home/20260616620602/en/Sigma-Named-2026-Databricks-ISV-Business-Intelligence-Partner-of-the-Year-and-Joins-as-Launch-Partner-for-LakehouseRT-Databricks-New-Real-Time-Lakehouse), así que la integración con BI parece ser el primer caso de uso fuerte. Todavía está en beta.
+
+([Press release](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-lakehousert-bring-real-time-analytics-directly) · [Blog](https://www.databricks.com/blog/introducing-lakehousert-real-time-performance-unified-lakehouse))
+
+------------------------------------------------------------------------
+
+## 2. LTAP: adiós al ETL entre operacional y analítico
+
+Si Lakehouse//RT fue el más ruidoso, [LTAP](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical) es el que más me interesó a nivel arquitectónico. LTAP significa Lake Transactional/Analytical Processing, y la idea es tan simple como ambiciosa: Lakebase (el Postgres serverless de Databricks) escribe los datos transaccionales **directamente en Delta e Iceberg** desde el punto de escritura. No después, no con un job ETL de por medio. Desde el momento cero.
+
+Pensalo un segundo. El pipeline que sincroniza tu base operacional con tu warehouse — ese que siempre se rompe a las 3 AM — deja de existir. Son el mismo dato en el mismo storage. OLTP y analítica sobre la misma capa, mismo modelo de gobernanza.
+
+Además Lakebase trajo novedades propias bastante interesantes: disaster recovery cross-cloud, branching estilo Git para experimentar contra datos de producción, y operaciones autónomas donde agentes monitorean la salud de la base, detectan slowdowns y proponen índices. También metieron vector search integrado, con lo cual te ahorrás tener un Pinecone o Weaviate al lado.
+
+Ghodsi lo resumió con una frase que me quedó dando vueltas: *"Agents write code, make calls, and run loops at a pace human teams never could."*
+
+Lo de LTAP es, para mí, el anuncio más silenciosamente transformador del Summit. Si funciona como prometen, hay una cantidad enorme de pipelines que van a dejar de tener razón de ser.
+
+([Press release](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical) · [VentureBeat](https://venturebeat.com/data/databricks-says-it-solved-the-decades-old-data-pipeline-problem-thats-been-slowing-ai-agents) · [Constellation Research](https://www.constellationr.com/insights/news/databricks-targets-transactional-data-customer-data-use-cases-context-ai-agent))
+
+### Lakebase Search
+
+Dentro de los anuncios de Lakebase, este merece mención aparte: [Lakebase Search](https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres) mete retrieval híbrido — vector y full-text — nativo dentro de Postgres. Dos extensiones: `lakebase_vector` (pgvector con indexing avanzado) y `lakebase_text` (BM25). El loop completo del agente (retrieve → reason → act → remember) corre sobre un solo backend. Beta en AWS y Azure.
+
+------------------------------------------------------------------------
+
+## 3. La familia Genie: esto explotó
+
+Acá Databricks fue con todo. Y cuando digo todo, digo **ocho productos** bajo el paraguas Genie. [Genie One](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-genie-one-all-new-agentic-coworker-every-team) es el coworker agentic central — no un chatbot que te tira SQL, sino algo que trabaja con datos estructurados, no estructurados, analíticos y operacionales. Ghodsi fue directo: *"computes whereas other agents recite."*
+
+La familia completa:
+
+| Producto | Qué hace |
+|------------------------------------|------------------------------------|
+| **Genie One** | Coworker general-purpose para cualquier equipo |
+| **Genie Agents** | Construir y deployar agentes reutilizables, gobernados por Unity Catalog |
+| **Genie App Builder** | No-code para crear apps enterprise con datos live |
+| **Genie Flow** | Evolución de LakeFlow Designer |
+| **Genie Code** | Agente autónomo de data engineering — ya genera \~60% de los pipelines nuevos |
+| **Genie ZeroOps** | Monitoreo autónomo de pipelines, jobs, tablas y modelos (Private Preview) |
+| **Genie Ontology** | Capa de contexto live que aprende del negocio continuamente |
+| **Genie MCP App** | Conecta agentes AI externos a Genie vía MCP |
+
+: {.striped .hover}
+
+([Press release](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-genie-one-all-new-agentic-coworker-every-team) · [Blog](https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents) · [Genie Code + Lakeflow](https://www.databricks.com/blog/agentic-data-engineering-genie-code-and-lakeflow))
+
+De estos, los que más me llamaron la atención:
+
+**Genie Ontology** es probablemente el concepto más ambicioso. Es una [capa de conocimiento organizacional que se auto-actualiza](https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents): un grafo que conecta datos, documentos, tags, personas, apps y reuniones. Se engancha a más de 50 aplicaciones — Google Drive, Jira, Slack, Confluence, SharePoint — y extrae contexto de forma continua. La comparación que usaron en el keynote: el PageRank de Google pero para datos enterprise. Suena marketinero, pero la idea de que el agente no solo accede a tus datos sino que *entiende* las relaciones entre ellos... si sale bien, cambia la calidad de las respuestas de forma sustancial.
+
+[**Genie ZeroOps**](https://www.databricks.com/blog/introducing-genie-zeroops) es un agente background que monitorea tus assets, investiga causas raíz y propone fixes. Vos configurás qué puede tocar y qué no, y se mueve dentro de tus permisos de Unity Catalog. La promesa es eliminar el overhead de administración de bases de datos — provisioning, query tuning, resolución de incidentes. Todavía en Private Preview, así que habrá que ver cómo se comporta con workloads reales.
+
+**Genie MCP App** es para los que ya armaron agentes propios con LangChain, CrewAI o lo que sea: les permite consumir Genie Spaces [vía Model Context Protocol](https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents) sin tener que migrar nada. Los costos se gobiernan desde Unity AI Gateway.
+
+### Genie en el bolsillo
+
+Ah, y lanzaron [apps nativas para iOS y Android](https://docs.databricks.com/aws/en/genie-one/mobile). No es un viewer de dashboards — es Genie One completo en el celular. Preguntas en lenguaje natural, dashboards mobile, follow-up conversacional, Databricks Apps. Alertas e insights desde cualquier lugar.
+
+------------------------------------------------------------------------
+
+## 4. CustomerLake: Databricks entra en martech
+
+No lo vi venir. Con [CustomerLake](https://www.databricks.com/company/newsroom/press-releases/databricks-enters-marketing-industry-customerlake-agentic-customer) Databricks mete un pie firme en el mercado de Customer Data Platforms. Identity resolution, audience building, campaign automation, activación — todo dentro del Lakehouse, gobernado por Unity Catalog.
+
+La propuesta: agentes que analizan comportamiento de clientes, deciden segmentaciones y actúan. Personalización 1:1 a escala. Están en Private Preview con HP, Circle K, AB InBev y Getnet by Santander como primeros clientes.
+
+Hay algo interesante acá a nivel estratégico: Databricks está diciendo "tu CDP no necesita ser un producto aparte, puede vivir donde ya están tus datos". Es la misma lógica que aplican con Lakewatch para seguridad. Van comiendo categorías de software especializadas y las absorben en la plataforma.
+
+([Press release](https://www.databricks.com/company/newsroom/press-releases/databricks-enters-marketing-industry-customerlake-agentic-customer) · [MarTech](https://martech.org/databricks-unveils-customerlake-its-agentic-cdp/))
+
+------------------------------------------------------------------------
+
+## 5. Lakewatch + adquisiciones
+
+Siguiendo con la lógica de absorber categorías, [Lakewatch](https://www.databricks.com/company/newsroom/press-releases/databricks-enters-security-market-launch-lakewatch-new-open-agentic) es el SIEM lakehouse-native. Agentes de seguridad que automatizan detección y respuesta a amenazas, análisis de traces de AI Gateway para detectar actividad sospechosa, violaciones de PII, acceso indebido. Formato abierto, sin vendor lock-in.
+
+Para darle peso, anunciaron dos adquisiciones: [**Panther Labs**](https://www.databricks.com/company/newsroom/press-releases/databricks-agrees-acquire-panther-further-establishing-security) (plataforma de security operations, la usan entre otros Anthropic) y **Quotient AI** (evaluación y reinforcement learning para agentes, que se integra en Genie y Genie Code). Panther refuerza Lakewatch; Quotient refuerza la calidad de los agentes. Las dos compras hacen sentido juntas.
+
+------------------------------------------------------------------------
+
+## 6. OpenSharing y Apps on Marketplace
+
+[OpenSharing](https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing) es la evolución de Delta Sharing. Ahora bajo la Linux Foundation, y lo nuevo es que no solo compartís tablas — compartís agent skills, modelos de AI y datos no estructurados. Zero-copy, soporte Iceberg IRC. Los partners de storage ya incluyen MinIO, Qumulo y Everpure, con Cohesity, HPE, NetApp, Nutanix, Rubrik y VAST Data en camino. OpenAI lo endorsó. Amadeus, Atlassian, LSEG, SAP y Stripe ya lo usan. Ya está en GitHub.
+
+Del otro lado, [Apps on Marketplace](https://www.databricks.com/blog/announcing-apps-databricks-marketplace) (Public Preview) te deja instalar y correr apps de terceros directamente en tu workspace. Tus datos no se mueven, las apps corren dentro de tu entorno con Unity Catalog. Para los ISVs, es un canal de distribución directo a la base de clientes de Databricks.
+
+([Press release OpenSharing](https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing) · [Blog OpenSharing + Marketplace](https://www.databricks.com/blog/announcing-new-opensharing-and-marketplace-capabilities-ai-era) · [Blog Apps on Marketplace](https://www.databricks.com/blog/announcing-apps-databricks-marketplace) · [StorageNewsletter](https://www.storagenewsletter.com/2026/06/16/data-ai-summit-2026-databricks-announces-opensharing/))
+
+------------------------------------------------------------------------
+
+## 7. Gobernanza: Unity Catalog, AI Gateway y Agent Bricks
+
+Estos tres van juntos porque son el pegamento que hace que todo lo anterior funcione en producción.
+
+[**Unity Catalog**](https://www.databricks.com/blog/whats-new-unity-catalog-data-ai-summit-2026) sumó Catalog Federation (gobernar AWS Glue o Hive Metastore sin copiar datos), Domains en Public Preview para organizar assets por área de negocio, Metrics (KPIs como objetos gobernados y consultables), Glossary para contexto de negocio, y Governance Hub en Public Preview — un dashboard centralizado para ver la postura de gobernanza y priorizar remediaciones.
+
+[**Unity AI Gateway**](https://www.databricks.com/blog/ai-governance-data-ai-summit-2026-whats-new-unity-ai-gateway) ahora gobierna todo lo que es AI: modelos, agentes, tools, skills, internos y externos. Sumaron cost controls con budget tracking, smart routing entre modelos, y gobernanza de MCP tools. [Escribí sobre AI Gateway la semana pasada](/blog/posts/databricks-tips-10-ai-gateway/) y con estas novedades el post cobra todavía más sentido.
+
+[**Agent Bricks**](https://www.databricks.com/blog/agent-bricks-dais-2026) sigue escalando: más de 100,000 agentes construidos y procesando más de un cuatrillón de tokens por año. La arquitectura es identity-first — modelos + contexto enterprise + tool execution, todo gobernado.
+
+------------------------------------------------------------------------
+
+## 8. MLflow 3.0, Azure y Databricks Apps
+
+Tres cosas que no quiero dejar afuera aunque son más incrementales:
+
+**MLflow 3.0** sumó agent tracing nativo, tracking de conversaciones multi-turn y soporte integrado de AI Gateway. La dirección es clara: MLflow se está convirtiendo en la capa de observabilidad para agentes, no solo para modelos clásicos.
+
+Para los que laburamos en [**Azure**](https://www.databricks.com/blog/unifying-data-and-governance-agentic-era-whats-new-azure-databricks), las novedades fueron específicas: Genie para Microsoft Teams y M365 Copilot (Beta), un Excel Add-in nativo, ingesta nativa de Excel (chau conversiones manuales) y un Managed SharePoint Connector para automatizar procesamiento de archivos.
+
+**Databricks Apps** apuntó a production-readiness del runtime hospedado para Streamlit, Gradio y Python custom. Deployar apps gobernadas y conectadas a Unity Catalog sin armar infra propia.
+
+------------------------------------------------------------------------
+
+## 9. Forward Deployed Engineering
+
+Este no es un producto, pero me pareció relevante. [Forward Deployed Engineering](https://www.databricks.com/blog/forward-deployed-engineering-delivering-business-outcomes-ai) es la nueva organización de Databricks que reemplaza el modelo clásico de Professional Services. En vez de consultores que te migran y se van, son equipos de ingeniería embebidos con OKRs compartidos y pricing por milestones. 1,900 clientes ya laburaron con estos equipos en los últimos 12 meses. Es un reconocimiento interesante: el producto solo no alcanza, necesitás acompañamiento para llevar AI a producción.
+
+------------------------------------------------------------------------
+
+## Qué me queda de todo esto
+
+Seguir el Summit desde la virtualidad tiene sus cosas. Podés filtrar el ruido, pausar, releer. Pero te perdés las demos en vivo y las charlas de pasillo donde salen las cosas buenas.
+
+Lo que me llevo después de digerir todo esto:
+
+**Databricks va por todo el stack.** Ya no es solo el Lakehouse. Con CustomerLake entran en martech, con Lakewatch en seguridad, con Genie One apuntan a business users, con LTAP van por lo operacional. Están compitiendo en categorías donde antes ni aparecían.
+
+**Los agentes son la narrativa central.** No hay un solo producto nuevo que no tenga un componente "agentic". ZeroOps, CustomerLake, Lakewatch, Agent Bricks, Lakebase autónomo — todo gira alrededor de agentes que monitorean, deciden y actúan. Me pregunto cuánto de esto es producción real hoy y cuánto es la dirección a 12 meses. Pero la apuesta es clara.
+
+**La gobernanza es el moat.** Unity Catalog + AI Gateway como plano único para datos, modelos, agentes, tools y skills. Cualquier vendor puede hacer una demo de un agente inteligente; lo difícil es hacerlo funcionar gobernado, seguro y con control de costos dentro de una organización grande. Ahí es donde Databricks está apostando fuerte.
+
+**LTAP puede cambiar el juego.** Eliminar el ETL entre el sistema operacional y el analítico es un cambio de paradigma. Si funciona como prometen, hay una cantidad significativa de pipelines que van a dejar de tener razón de ser. Voy a estar siguiendo de cerca cómo maduran los casos de uso reales.
+
+------------------------------------------------------------------------
+
+## Todas las referencias
+
+Dejo todos los links que usé por si querés profundizar en algo puntual.
+
+**Press releases**
+
+-   [Lakehouse//RT](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-lakehousert-bring-real-time-analytics-directly)
+-   [LTAP](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical)
+-   [Genie One](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-genie-one-all-new-agentic-coworker-every-team)
+-   [CustomerLake](https://www.databricks.com/company/newsroom/press-releases/databricks-enters-marketing-industry-customerlake-agentic-customer)
+-   [Lakewatch](https://www.databricks.com/company/newsroom/press-releases/databricks-enters-security-market-launch-lakewatch-new-open-agentic)
+-   [Panther Labs](https://www.databricks.com/company/newsroom/press-releases/databricks-agrees-acquire-panther-further-establishing-security)
+-   [OpenSharing](https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing)
+
+**Blogs de Databricks**
+
+-   [Lakehouse//RT](https://www.databricks.com/blog/introducing-lakehousert-real-time-performance-unified-lakehouse)
+-   [Genie One, Ontology y Agents](https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents)
+-   [Genie ZeroOps](https://www.databricks.com/blog/introducing-genie-zeroops)
+-   [Genie Code + Lakeflow](https://www.databricks.com/blog/agentic-data-engineering-genie-code-and-lakeflow)
+-   [Agent Bricks](https://www.databricks.com/blog/agent-bricks-dais-2026)
+-   [Unity Catalog](https://www.databricks.com/blog/whats-new-unity-catalog-data-ai-summit-2026)
+-   [Unity AI Gateway](https://www.databricks.com/blog/ai-governance-data-ai-summit-2026-whats-new-unity-ai-gateway)
+-   [Azure Databricks](https://www.databricks.com/blog/unifying-data-and-governance-agentic-era-whats-new-azure-databricks)
+-   [Lakebase Search](https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres)
+-   [OpenSharing + Marketplace](https://www.databricks.com/blog/announcing-new-opensharing-and-marketplace-capabilities-ai-era)
+-   [Apps on Marketplace](https://www.databricks.com/blog/announcing-apps-databricks-marketplace)
+-   [Forward Deployed Engineering](https://www.databricks.com/blog/forward-deployed-engineering-delivering-business-outcomes-ai)
+
+**Cobertura externa**
+
+-   [SiliconANGLE — The AGI moment?](https://siliconangle.com/2026/06/16/agi-moment-databricks-new-releases-zero-support-deployment-ai-agents/)
+-   [VentureBeat — LTAP](https://venturebeat.com/data/databricks-says-it-solved-the-decades-old-data-pipeline-problem-thats-been-slowing-ai-agents)
+-   [Constellation Research](https://www.constellationr.com/insights/news/databricks-targets-transactional-data-customer-data-use-cases-context-ai-agent)
+-   [SG Analytics — 5 Themes](https://www.sganalytics.com/blog/databricks-data-ai-summit/)
+-   [MarTech — CustomerLake](https://martech.org/databricks-unveils-customerlake-its-agentic-cdp/)
+-   [StorageNewsletter — OpenSharing](https://www.storagenewsletter.com/2026/06/16/data-ai-summit-2026-databricks-announces-opensharing/)
+-   [TechnoSports — Genie One](https://technosports.co.in/databricks-genie-one-is-the-ai-coworker/)
+-   [Sigma + Lakehouse//RT](https://www.businesswire.com/news/home/20260616620602/en/Sigma-Named-2026-Databricks-ISV-Business-Intelligence-Partner-of-the-Year-and-Joins-as-Launch-Partner-for-LakehouseRT-Databricks-New-Real-Time-Lakehouse)
+
+**Documentación**
+
+-   [Genie Mobile](https://docs.databricks.com/aws/en/genie-one/mobile)

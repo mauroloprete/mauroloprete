@@ -11,7 +11,240 @@
 <description>Tips de Databricks, Data Engineering, MLOps y procesamiento de encuestas.</description>
 <language>es</language>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Sun, 14 Jun 2026 03:00:00 GMT</lastBuildDate>
+<lastBuildDate>Tue, 16 Jun 2026 03:00:00 GMT</lastBuildDate>
+<item>
+  <title>DAIS 2026: todo lo que Databricks anunció (y lo que significa para tu stack)</title>
+  <dc:creator>Mauro Loprete</dc:creator>
+  <link>https://mauroloprete.github.io/mauroloprete/blog/posts/dais-2026-recap/</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>Martes de noche, scrolleando LinkedIn como un desquiciado. El feed era 90% Data + AI Summit 2026. Fotos en el Moscone Center, keynote highlights, 30,000 personas allá y yo acá en Uruguay tratando de separar lo importante del hype.</p>
+<p>No fui presencial. Armé este resumen entre la transmisión virtual, el <a href="https://www.databricks.com/blog/category/platform/announcements?categories=announcements">blog de announcements de Databricks</a>, los press releases y la catarata de posts de la comunidad en LinkedIn. Si te pasó como a mí que abriste el feed y no sabías por dónde empezar, acá va todo junto con links para que profundices en lo que te interese. Los ordené de mayor a menor según lo que a mí me pareció más impactante o directamente me voló la cabeza — así que el ranking es subjetivo y discutible, como tiene que ser.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Lakehouse//RT</strong> + motor Reyden: analítica real-time sub-100ms directo sobre Delta/Iceberg.</li>
+<li><strong>LTAP</strong>: unifica OLTP + analítica eliminando ETL entre sistemas. Esto es grande.</li>
+<li><strong>Lakebase Search</strong>: vector + full-text search nativo en Postgres.</li>
+<li><strong>Genie One</strong> y toda la familia: ZeroOps, Ontology, MCP App, Code, Flow, App Builder.</li>
+<li><strong>CustomerLake</strong>: Databricks entra en martech con un CDP agentic.</li>
+<li><strong>Lakewatch</strong>: SIEM agentic + compra de Panther Labs y Quotient AI.</li>
+<li><strong>OpenSharing</strong> + <strong>Apps on Marketplace</strong>: compartir agent skills y correr apps de terceros.</li>
+<li><strong>Unity Catalog</strong> y <strong>AI Gateway</strong> con Catalog Federation, Governance Hub, cost controls.</li>
+<li>Apps nativas <strong>iOS/Android</strong> para Genie.</li>
+<li><strong>Forward Deployed Engineering</strong>: nueva org de ingeniería embebida.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="el-keynote" class="level2">
+<h2 class="anchored" data-anchor-id="el-keynote">El keynote</h2>
+<p>Ali Ghodsi, Matei Zaharia, Reynold Xin y Arsalan Tavakoli-Shiraji arrancaron el show. De invitados: <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-announces-2026-data-ai-summit-keynote-lineup-and">Satya Nadella</a> con un fireside chat pregrabado, <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-announces-2026-data-ai-summit-keynote-lineup-and">Greg Brockman</a> de OpenAI y <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-announces-2026-data-ai-summit-keynote-lineup-and">Magesh Bagavathi</a> de PepsiCo como Chief Data &amp; AI Officer.</p>
+<p>El mensaje de fondo: no importa qué modelo gana el benchmark de la semana. Lo que importa es qué infraestructura te deja <strong>correr AI en producción de verdad</strong>. <a href="https://siliconangle.com/2026/06/16/agi-moment-databricks-new-releases-zero-support-deployment-ai-agents/">SiliconANGLE</a> lo puso bien: el foco es madurez operacional, no demos de lab. Y con esa premisa, salió una avalancha de productos.</p>
+<hr>
+</section>
+<section id="lakehousert-y-el-motor-reyden" class="level2">
+<h2 class="anchored" data-anchor-id="lakehousert-y-el-motor-reyden">1. Lakehouse//RT y el motor Reyden</h2>
+<p>El que más ruido hizo en mi feed, lejos. <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-lakehousert-bring-real-time-analytics-directly">Lakehouse//RT</a> es analítica real-time directamente sobre datos gobernados en Delta Lake e Iceberg — sin copiar nada a un sistema de serving separado.</p>
+<p>El motor que lo hace posible se llama <strong>Reyden</strong>, por “Reynold’s Dream Engine” (sí, es un guiño a Reynold Xin). Lo demostró en vivo: latencia consistente por debajo de 100ms con miles de agentes AI pegándole a la misma query en simultáneo. Su frase textual: <em>“None of the other existing systems can do that.”</em> Ambicioso, pero la demo pareció respaldar bastante.</p>
+<p>Hasta ahora, si necesitabas real-time tenías que montar Redis, Druid, Pinot o lo que fuera y mantener una copia de los datos ahí. Lakehouse//RT promete que eso ya no hace falta. <a href="https://www.businesswire.com/news/home/20260616620602/en/Sigma-Named-2026-Databricks-ISV-Business-Intelligence-Partner-of-the-Year-and-Joins-as-Launch-Partner-for-LakehouseRT-Databricks-New-Real-Time-Lakehouse">Sigma ya se sumó como launch partner</a>, así que la integración con BI parece ser el primer caso de uso fuerte. Todavía está en beta.</p>
+<p>(<a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-lakehousert-bring-real-time-analytics-directly">Press release</a> · <a href="https://www.databricks.com/blog/introducing-lakehousert-real-time-performance-unified-lakehouse">Blog</a>)</p>
+<hr>
+</section>
+<section id="ltap-adiós-al-etl-entre-operacional-y-analítico" class="level2">
+<h2 class="anchored" data-anchor-id="ltap-adiós-al-etl-entre-operacional-y-analítico">2. LTAP: adiós al ETL entre operacional y analítico</h2>
+<p>Si Lakehouse//RT fue el más ruidoso, <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical">LTAP</a> es el que más me interesó a nivel arquitectónico. LTAP significa Lake Transactional/Analytical Processing, y la idea es tan simple como ambiciosa: Lakebase (el Postgres serverless de Databricks) escribe los datos transaccionales <strong>directamente en Delta e Iceberg</strong> desde el punto de escritura. No después, no con un job ETL de por medio. Desde el momento cero.</p>
+<p>Pensalo un segundo. El pipeline que sincroniza tu base operacional con tu warehouse — ese que siempre se rompe a las 3 AM — deja de existir. Son el mismo dato en el mismo storage. OLTP y analítica sobre la misma capa, mismo modelo de gobernanza.</p>
+<p>Además Lakebase trajo novedades propias bastante interesantes: disaster recovery cross-cloud, branching estilo Git para experimentar contra datos de producción, y operaciones autónomas donde agentes monitorean la salud de la base, detectan slowdowns y proponen índices. También metieron vector search integrado, con lo cual te ahorrás tener un Pinecone o Weaviate al lado.</p>
+<p>Ghodsi lo resumió con una frase que me quedó dando vueltas: <em>“Agents write code, make calls, and run loops at a pace human teams never could.”</em></p>
+<p>Lo de LTAP es, para mí, el anuncio más silenciosamente transformador del Summit. Si funciona como prometen, hay una cantidad enorme de pipelines que van a dejar de tener razón de ser.</p>
+<p>(<a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical">Press release</a> · <a href="https://venturebeat.com/data/databricks-says-it-solved-the-decades-old-data-pipeline-problem-thats-been-slowing-ai-agents">VentureBeat</a> · <a href="https://www.constellationr.com/insights/news/databricks-targets-transactional-data-customer-data-use-cases-context-ai-agent">Constellation Research</a>)</p>
+<section id="lakebase-search" class="level3">
+<h3 class="anchored" data-anchor-id="lakebase-search">Lakebase Search</h3>
+<p>Dentro de los anuncios de Lakebase, este merece mención aparte: <a href="https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres">Lakebase Search</a> mete retrieval híbrido — vector y full-text — nativo dentro de Postgres. Dos extensiones: <code>lakebase_vector</code> (pgvector con indexing avanzado) y <code>lakebase_text</code> (BM25). El loop completo del agente (retrieve → reason → act → remember) corre sobre un solo backend. Beta en AWS y Azure.</p>
+<hr>
+</section>
+</section>
+<section id="la-familia-genie-esto-explotó" class="level2">
+<h2 class="anchored" data-anchor-id="la-familia-genie-esto-explotó">3. La familia Genie: esto explotó</h2>
+<p>Acá Databricks fue con todo. Y cuando digo todo, digo <strong>ocho productos</strong> bajo el paraguas Genie. <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-genie-one-all-new-agentic-coworker-every-team">Genie One</a> es el coworker agentic central — no un chatbot que te tira SQL, sino algo que trabaja con datos estructurados, no estructurados, analíticos y operacionales. Ghodsi fue directo: <em>“computes whereas other agents recite.”</em></p>
+<p>La familia completa:</p>
+<table class="table-striped table-hover caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Producto</th>
+<th>Qué hace</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Genie One</strong></td>
+<td>Coworker general-purpose para cualquier equipo</td>
+</tr>
+<tr class="even">
+<td><strong>Genie Agents</strong></td>
+<td>Construir y deployar agentes reutilizables, gobernados por Unity Catalog</td>
+</tr>
+<tr class="odd">
+<td><strong>Genie App Builder</strong></td>
+<td>No-code para crear apps enterprise con datos live</td>
+</tr>
+<tr class="even">
+<td><strong>Genie Flow</strong></td>
+<td>Evolución de LakeFlow Designer</td>
+</tr>
+<tr class="odd">
+<td><strong>Genie Code</strong></td>
+<td>Agente autónomo de data engineering — ya genera ~60% de los pipelines nuevos</td>
+</tr>
+<tr class="even">
+<td><strong>Genie ZeroOps</strong></td>
+<td>Monitoreo autónomo de pipelines, jobs, tablas y modelos (Private Preview)</td>
+</tr>
+<tr class="odd">
+<td><strong>Genie Ontology</strong></td>
+<td>Capa de contexto live que aprende del negocio continuamente</td>
+</tr>
+<tr class="even">
+<td><strong>Genie MCP App</strong></td>
+<td>Conecta agentes AI externos a Genie vía MCP</td>
+</tr>
+</tbody>
+</table>
+<p>(<a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-genie-one-all-new-agentic-coworker-every-team">Press release</a> · <a href="https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents">Blog</a> · <a href="https://www.databricks.com/blog/agentic-data-engineering-genie-code-and-lakeflow">Genie Code + Lakeflow</a>)</p>
+<p>De estos, los que más me llamaron la atención:</p>
+<p><strong>Genie Ontology</strong> es probablemente el concepto más ambicioso. Es una <a href="https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents">capa de conocimiento organizacional que se auto-actualiza</a>: un grafo que conecta datos, documentos, tags, personas, apps y reuniones. Se engancha a más de 50 aplicaciones — Google Drive, Jira, Slack, Confluence, SharePoint — y extrae contexto de forma continua. La comparación que usaron en el keynote: el PageRank de Google pero para datos enterprise. Suena marketinero, pero la idea de que el agente no solo accede a tus datos sino que <em>entiende</em> las relaciones entre ellos… si sale bien, cambia la calidad de las respuestas de forma sustancial.</p>
+<p><a href="https://www.databricks.com/blog/introducing-genie-zeroops"><strong>Genie ZeroOps</strong></a> es un agente background que monitorea tus assets, investiga causas raíz y propone fixes. Vos configurás qué puede tocar y qué no, y se mueve dentro de tus permisos de Unity Catalog. La promesa es eliminar el overhead de administración de bases de datos — provisioning, query tuning, resolución de incidentes. Todavía en Private Preview, así que habrá que ver cómo se comporta con workloads reales.</p>
+<p><strong>Genie MCP App</strong> es para los que ya armaron agentes propios con LangChain, CrewAI o lo que sea: les permite consumir Genie Spaces <a href="https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents">vía Model Context Protocol</a> sin tener que migrar nada. Los costos se gobiernan desde Unity AI Gateway.</p>
+<section id="genie-en-el-bolsillo" class="level3">
+<h3 class="anchored" data-anchor-id="genie-en-el-bolsillo">Genie en el bolsillo</h3>
+<p>Ah, y lanzaron <a href="https://docs.databricks.com/aws/en/genie-one/mobile">apps nativas para iOS y Android</a>. No es un viewer de dashboards — es Genie One completo en el celular. Preguntas en lenguaje natural, dashboards mobile, follow-up conversacional, Databricks Apps. Alertas e insights desde cualquier lugar.</p>
+<hr>
+</section>
+</section>
+<section id="customerlake-databricks-entra-en-martech" class="level2">
+<h2 class="anchored" data-anchor-id="customerlake-databricks-entra-en-martech">4. CustomerLake: Databricks entra en martech</h2>
+<p>No lo vi venir. Con <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-enters-marketing-industry-customerlake-agentic-customer">CustomerLake</a> Databricks mete un pie firme en el mercado de Customer Data Platforms. Identity resolution, audience building, campaign automation, activación — todo dentro del Lakehouse, gobernado por Unity Catalog.</p>
+<p>La propuesta: agentes que analizan comportamiento de clientes, deciden segmentaciones y actúan. Personalización 1:1 a escala. Están en Private Preview con HP, Circle K, AB InBev y Getnet by Santander como primeros clientes.</p>
+<p>Hay algo interesante acá a nivel estratégico: Databricks está diciendo “tu CDP no necesita ser un producto aparte, puede vivir donde ya están tus datos”. Es la misma lógica que aplican con Lakewatch para seguridad. Van comiendo categorías de software especializadas y las absorben en la plataforma.</p>
+<p>(<a href="https://www.databricks.com/company/newsroom/press-releases/databricks-enters-marketing-industry-customerlake-agentic-customer">Press release</a> · <a href="https://martech.org/databricks-unveils-customerlake-its-agentic-cdp/">MarTech</a>)</p>
+<hr>
+</section>
+<section id="lakewatch-adquisiciones" class="level2">
+<h2 class="anchored" data-anchor-id="lakewatch-adquisiciones">5. Lakewatch + adquisiciones</h2>
+<p>Siguiendo con la lógica de absorber categorías, <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-enters-security-market-launch-lakewatch-new-open-agentic">Lakewatch</a> es el SIEM lakehouse-native. Agentes de seguridad que automatizan detección y respuesta a amenazas, análisis de traces de AI Gateway para detectar actividad sospechosa, violaciones de PII, acceso indebido. Formato abierto, sin vendor lock-in.</p>
+<p>Para darle peso, anunciaron dos adquisiciones: <a href="https://www.databricks.com/company/newsroom/press-releases/databricks-agrees-acquire-panther-further-establishing-security"><strong>Panther Labs</strong></a> (plataforma de security operations, la usan entre otros Anthropic) y <strong>Quotient AI</strong> (evaluación y reinforcement learning para agentes, que se integra en Genie y Genie Code). Panther refuerza Lakewatch; Quotient refuerza la calidad de los agentes. Las dos compras hacen sentido juntas.</p>
+<hr>
+</section>
+<section id="opensharing-y-apps-on-marketplace" class="level2">
+<h2 class="anchored" data-anchor-id="opensharing-y-apps-on-marketplace">6. OpenSharing y Apps on Marketplace</h2>
+<p><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing">OpenSharing</a> es la evolución de Delta Sharing. Ahora bajo la Linux Foundation, y lo nuevo es que no solo compartís tablas — compartís agent skills, modelos de AI y datos no estructurados. Zero-copy, soporte Iceberg IRC. Los partners de storage ya incluyen MinIO, Qumulo y Everpure, con Cohesity, HPE, NetApp, Nutanix, Rubrik y VAST Data en camino. OpenAI lo endorsó. Amadeus, Atlassian, LSEG, SAP y Stripe ya lo usan. Ya está en GitHub.</p>
+<p>Del otro lado, <a href="https://www.databricks.com/blog/announcing-apps-databricks-marketplace">Apps on Marketplace</a> (Public Preview) te deja instalar y correr apps de terceros directamente en tu workspace. Tus datos no se mueven, las apps corren dentro de tu entorno con Unity Catalog. Para los ISVs, es un canal de distribución directo a la base de clientes de Databricks.</p>
+<p>(<a href="https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing">Press release OpenSharing</a> · <a href="https://www.databricks.com/blog/announcing-new-opensharing-and-marketplace-capabilities-ai-era">Blog OpenSharing + Marketplace</a> · <a href="https://www.databricks.com/blog/announcing-apps-databricks-marketplace">Blog Apps on Marketplace</a> · <a href="https://www.storagenewsletter.com/2026/06/16/data-ai-summit-2026-databricks-announces-opensharing/">StorageNewsletter</a>)</p>
+<hr>
+</section>
+<section id="gobernanza-unity-catalog-ai-gateway-y-agent-bricks" class="level2">
+<h2 class="anchored" data-anchor-id="gobernanza-unity-catalog-ai-gateway-y-agent-bricks">7. Gobernanza: Unity Catalog, AI Gateway y Agent Bricks</h2>
+<p>Estos tres van juntos porque son el pegamento que hace que todo lo anterior funcione en producción.</p>
+<p><a href="https://www.databricks.com/blog/whats-new-unity-catalog-data-ai-summit-2026"><strong>Unity Catalog</strong></a> sumó Catalog Federation (gobernar AWS Glue o Hive Metastore sin copiar datos), Domains en Public Preview para organizar assets por área de negocio, Metrics (KPIs como objetos gobernados y consultables), Glossary para contexto de negocio, y Governance Hub en Public Preview — un dashboard centralizado para ver la postura de gobernanza y priorizar remediaciones.</p>
+<p><a href="https://www.databricks.com/blog/ai-governance-data-ai-summit-2026-whats-new-unity-ai-gateway"><strong>Unity AI Gateway</strong></a> ahora gobierna todo lo que es AI: modelos, agentes, tools, skills, internos y externos. Sumaron cost controls con budget tracking, smart routing entre modelos, y gobernanza de MCP tools. <a href="../../../blog/posts/databricks-tips-10-ai-gateway/">Escribí sobre AI Gateway la semana pasada</a> y con estas novedades el post cobra todavía más sentido.</p>
+<p><a href="https://www.databricks.com/blog/agent-bricks-dais-2026"><strong>Agent Bricks</strong></a> sigue escalando: más de 100,000 agentes construidos y procesando más de un cuatrillón de tokens por año. La arquitectura es identity-first — modelos + contexto enterprise + tool execution, todo gobernado.</p>
+<hr>
+</section>
+<section id="mlflow-3.0-azure-y-databricks-apps" class="level2">
+<h2 class="anchored" data-anchor-id="mlflow-3.0-azure-y-databricks-apps">8. MLflow 3.0, Azure y Databricks Apps</h2>
+<p>Tres cosas que no quiero dejar afuera aunque son más incrementales:</p>
+<p><strong>MLflow 3.0</strong> sumó agent tracing nativo, tracking de conversaciones multi-turn y soporte integrado de AI Gateway. La dirección es clara: MLflow se está convirtiendo en la capa de observabilidad para agentes, no solo para modelos clásicos.</p>
+<p>Para los que laburamos en <a href="https://www.databricks.com/blog/unifying-data-and-governance-agentic-era-whats-new-azure-databricks"><strong>Azure</strong></a>, las novedades fueron específicas: Genie para Microsoft Teams y M365 Copilot (Beta), un Excel Add-in nativo, ingesta nativa de Excel (chau conversiones manuales) y un Managed SharePoint Connector para automatizar procesamiento de archivos.</p>
+<p><strong>Databricks Apps</strong> apuntó a production-readiness del runtime hospedado para Streamlit, Gradio y Python custom. Deployar apps gobernadas y conectadas a Unity Catalog sin armar infra propia.</p>
+<hr>
+</section>
+<section id="forward-deployed-engineering" class="level2">
+<h2 class="anchored" data-anchor-id="forward-deployed-engineering">9. Forward Deployed Engineering</h2>
+<p>Este no es un producto, pero me pareció relevante. <a href="https://www.databricks.com/blog/forward-deployed-engineering-delivering-business-outcomes-ai">Forward Deployed Engineering</a> es la nueva organización de Databricks que reemplaza el modelo clásico de Professional Services. En vez de consultores que te migran y se van, son equipos de ingeniería embebidos con OKRs compartidos y pricing por milestones. 1,900 clientes ya laburaron con estos equipos en los últimos 12 meses. Es un reconocimiento interesante: el producto solo no alcanza, necesitás acompañamiento para llevar AI a producción.</p>
+<hr>
+</section>
+<section id="qué-me-queda-de-todo-esto" class="level2">
+<h2 class="anchored" data-anchor-id="qué-me-queda-de-todo-esto">Qué me queda de todo esto</h2>
+<p>Seguir el Summit desde la virtualidad tiene sus cosas. Podés filtrar el ruido, pausar, releer. Pero te perdés las demos en vivo y las charlas de pasillo donde salen las cosas buenas.</p>
+<p>Lo que me llevo después de digerir todo esto:</p>
+<p><strong>Databricks va por todo el stack.</strong> Ya no es solo el Lakehouse. Con CustomerLake entran en martech, con Lakewatch en seguridad, con Genie One apuntan a business users, con LTAP van por lo operacional. Están compitiendo en categorías donde antes ni aparecían.</p>
+<p><strong>Los agentes son la narrativa central.</strong> No hay un solo producto nuevo que no tenga un componente “agentic”. ZeroOps, CustomerLake, Lakewatch, Agent Bricks, Lakebase autónomo — todo gira alrededor de agentes que monitorean, deciden y actúan. Me pregunto cuánto de esto es producción real hoy y cuánto es la dirección a 12 meses. Pero la apuesta es clara.</p>
+<p><strong>La gobernanza es el moat.</strong> Unity Catalog + AI Gateway como plano único para datos, modelos, agentes, tools y skills. Cualquier vendor puede hacer una demo de un agente inteligente; lo difícil es hacerlo funcionar gobernado, seguro y con control de costos dentro de una organización grande. Ahí es donde Databricks está apostando fuerte.</p>
+<p><strong>LTAP puede cambiar el juego.</strong> Eliminar el ETL entre el sistema operacional y el analítico es un cambio de paradigma. Si funciona como prometen, hay una cantidad significativa de pipelines que van a dejar de tener razón de ser. Voy a estar siguiendo de cerca cómo maduran los casos de uso reales.</p>
+<hr>
+</section>
+<section id="todas-las-referencias" class="level2">
+<h2 class="anchored" data-anchor-id="todas-las-referencias">Todas las referencias</h2>
+<p>Dejo todos los links que usé por si querés profundizar en algo puntual.</p>
+<p><strong>Press releases</strong></p>
+<ul>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-lakehousert-bring-real-time-analytics-directly">Lakehouse//RT</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical">LTAP</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-genie-one-all-new-agentic-coworker-every-team">Genie One</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-enters-marketing-industry-customerlake-agentic-customer">CustomerLake</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-enters-security-market-launch-lakewatch-new-open-agentic">Lakewatch</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-agrees-acquire-panther-further-establishing-security">Panther Labs</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing">OpenSharing</a></li>
+</ul>
+<p><strong>Blogs de Databricks</strong></p>
+<ul>
+<li><a href="https://www.databricks.com/blog/introducing-lakehousert-real-time-performance-unified-lakehouse">Lakehouse//RT</a></li>
+<li><a href="https://www.databricks.com/blog/introducing-genie-one-genie-ontology-and-genie-agents">Genie One, Ontology y Agents</a></li>
+<li><a href="https://www.databricks.com/blog/introducing-genie-zeroops">Genie ZeroOps</a></li>
+<li><a href="https://www.databricks.com/blog/agentic-data-engineering-genie-code-and-lakeflow">Genie Code + Lakeflow</a></li>
+<li><a href="https://www.databricks.com/blog/agent-bricks-dais-2026">Agent Bricks</a></li>
+<li><a href="https://www.databricks.com/blog/whats-new-unity-catalog-data-ai-summit-2026">Unity Catalog</a></li>
+<li><a href="https://www.databricks.com/blog/ai-governance-data-ai-summit-2026-whats-new-unity-ai-gateway">Unity AI Gateway</a></li>
+<li><a href="https://www.databricks.com/blog/unifying-data-and-governance-agentic-era-whats-new-azure-databricks">Azure Databricks</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres">Lakebase Search</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-new-opensharing-and-marketplace-capabilities-ai-era">OpenSharing + Marketplace</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-apps-databricks-marketplace">Apps on Marketplace</a></li>
+<li><a href="https://www.databricks.com/blog/forward-deployed-engineering-delivering-business-outcomes-ai">Forward Deployed Engineering</a></li>
+</ul>
+<p><strong>Cobertura externa</strong></p>
+<ul>
+<li><a href="https://siliconangle.com/2026/06/16/agi-moment-databricks-new-releases-zero-support-deployment-ai-agents/">SiliconANGLE — The AGI moment?</a></li>
+<li><a href="https://venturebeat.com/data/databricks-says-it-solved-the-decades-old-data-pipeline-problem-thats-been-slowing-ai-agents">VentureBeat — LTAP</a></li>
+<li><a href="https://www.constellationr.com/insights/news/databricks-targets-transactional-data-customer-data-use-cases-context-ai-agent">Constellation Research</a></li>
+<li><a href="https://www.sganalytics.com/blog/databricks-data-ai-summit/">SG Analytics — 5 Themes</a></li>
+<li><a href="https://martech.org/databricks-unveils-customerlake-its-agentic-cdp/">MarTech — CustomerLake</a></li>
+<li><a href="https://www.storagenewsletter.com/2026/06/16/data-ai-summit-2026-databricks-announces-opensharing/">StorageNewsletter — OpenSharing</a></li>
+<li><a href="https://technosports.co.in/databricks-genie-one-is-the-ai-coworker/">TechnoSports — Genie One</a></li>
+<li><a href="https://www.businesswire.com/news/home/20260616620602/en/Sigma-Named-2026-Databricks-ISV-Business-Intelligence-Partner-of-the-Year-and-Joins-as-Launch-Partner-for-LakehouseRT-Databricks-New-Real-Time-Lakehouse">Sigma + Lakehouse//RT</a></li>
+</ul>
+<p><strong>Documentación</strong></p>
+<ul>
+<li><a href="https://docs.databricks.com/aws/en/genie-one/mobile">Genie Mobile</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>Data Engineering</category>
+  <category>Data Architecture</category>
+  <category>Databricks Tips</category>
+  <category>MLOps</category>
+  <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/dais-2026-recap/</guid>
+  <pubDate>Tue, 16 Jun 2026 03:00:00 GMT</pubDate>
+  <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/dais-2026-recap/cover.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>Omnigent: el meta-harness open source para orquestar todos tus agentes AI</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -21459,65 +21692,6 @@ Consejo
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/fundamentals-data-engineering/</guid>
   <pubDate>Tue, 26 Aug 2025 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/fundamentals-data-engineering/cover.png" medium="image" type="image/png" height="81" width="144"/>
-</item>
-<item>
-  <title>Spark de Ideas: la chispa de la ingeniería de datos en español</title>
-  <dc:creator>Mauro Loprete</dc:creator>
-  <link>https://mauroloprete.github.io/mauroloprete/blog/posts/spark-de-ideas-intro/</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>Si buscás “data engineering” en Spotify, vas a encontrar decenas de podcasts en inglés. Ahora buscá en español: el panorama es bastante más flaco. <strong>Spark de Ideas</strong> nace para cubrir ese hueco — un podcast en español sobre ingeniería de datos, pensado para gente que labura (o quiere laburar) con datos en la región.</p>
-<section id="por-qué-un-podcast-en-español" class="level2">
-<h2 class="anchored" data-anchor-id="por-qué-un-podcast-en-español">Por qué un podcast en español</h2>
-<p>La mayoría del contenido de calidad sobre data engineering está en inglés: libros, conferencias, blogs técnicos, podcasts. Y está bien — el inglés es parte del laburo. Pero hay una diferencia enorme entre leer documentación en inglés y poder escuchar a alguien explicar un concepto en tu idioma, con ejemplos que te resultan cercanos y un lenguaje sin vueltas.</p>
-<p>No se trata de reemplazar el contenido en inglés, sino de complementarlo. De tener un espacio donde se hable de arquitecturas de datos, de decisiones de diseño en producción y de carrera profesional sin que el idioma sea una barrera más.</p>
-</section>
-<section id="de-qué-se-trata-el-podcast" class="level2">
-<h2 class="anchored" data-anchor-id="de-qué-se-trata-el-podcast">De qué se trata el podcast</h2>
-<p>Spark de Ideas cubre cuatro ejes principales:</p>
-<ul>
-<li><p><i class="fa-solid fa-book" aria-label="book"></i> <strong>Libros clave del área</strong> — resúmenes y opiniones sobre lecturas como <em>Fundamentals of Data Engineering</em>, <em>Designing Data-Intensive Applications</em>, <em>The Data Warehouse Toolkit</em> y otros que te dan la base teórica que después aplicás en el día a día.</p></li>
-<li><p><i class="fa-solid fa-layer-group" aria-label="layer-group"></i> <strong>Arquitecturas y patrones de datos</strong> — Medallion, Data Mesh, Lambda vs Kappa, modelado dimensional, data contracts. Qué problemas resuelve cada enfoque y cuándo tiene sentido usarlo (y cuándo no).</p></li>
-<li><p><i class="fa-solid fa-terminal" aria-label="terminal"></i> <strong>Casos reales de producción</strong> — lecciones aprendidas de proyectos reales: pipelines que se rompieron a las 3 AM, migraciones que salieron bien (y otras que no tanto), decisiones de diseño que parecían buenas hasta que escalaron.</p></li>
-<li><p><i class="fa-solid fa-road" aria-label="road"></i> <strong>Carrera y crecimiento profesional</strong> — qué aprender primero, cómo armar un roadmap de estudio, certificaciones que valen la pena, y el tipo de cosas que nadie te dice cuando arrancás en datos.</p></li>
-</ul>
-</section>
-<section id="qué-temas-se-vienen" class="level2">
-<h2 class="anchored" data-anchor-id="qué-temas-se-vienen">Qué temas se vienen</h2>
-<p>Los primeros episodios van a cubrir terreno fundamental: una reseña de <em>Fundamentals of Data Engineering</em> de Reis y Housley, un recorrido por patrones de diseño para pipelines, buenas prácticas de DataOps, y una guía honesta sobre qué priorizaría aprender si tuviera que arrancar de cero.</p>
-<p>Después de eso, la idea es ir entrando en temas más específicos: Delta Lake en profundidad, Unity Catalog, Structured Streaming, data contracts como framework, modelado de datos (Medallion vs Vault vs Kimball), y lo que pida la comunidad.</p>
-<p>No hay un calendario rígido — prefiero publicar episodios bien pensados antes que llenar de contenido por llenar.</p>
-</section>
-<section id="para-quién-es" class="level2">
-<h2 class="anchored" data-anchor-id="para-quién-es">Para quién es</h2>
-<p>Spark de Ideas está pensado para:</p>
-<ul>
-<li><strong>Data Engineers</strong> que quieren profundizar en arquitecturas y buenas prácticas.</li>
-<li><strong>Analytics Engineers</strong> que trabajan con dbt, SQL y modelado de datos.</li>
-<li><strong>Data Architects</strong> interesados en discusiones sobre diseño y gobernanza.</li>
-<li><strong>Gente que está empezando en datos</strong> y necesita un mapa para no perderse entre tantas herramientas y buzzwords.</li>
-</ul>
-<p>No hace falta ser experto para escuchar. La idea es que cada episodio te deje algo concreto, ya sea un concepto nuevo, una herramienta para probar o una forma distinta de pensar un problema.</p>
-</section>
-<section id="cómo-seguir-el-podcast" class="level2">
-<h2 class="anchored" data-anchor-id="cómo-seguir-el-podcast">Cómo seguir el podcast</h2>
-<p><i class="fa-brands fa-spotify" aria-label="spotify"></i> <a href="https://open.spotify.com/episode/51NO311VGA6hG9xYdKX3JM"><strong>Escuchar en Spotify</strong></a></p>
-<p>Buscá “Spark de Ideas” en tu plataforma de podcasts favorita, o entrá directo al link de arriba. Si el contenido te sirve, compartilo con alguien que esté en la misma — la mejor forma de hacer crecer la comunidad es el boca a boca.</p>
-<hr>
-<p><em>Primer episodio disponible. Dale play y contame qué te pareció.</em></p>
-
-
-</section>
-
- ]]></description>
-  <category>Podcast</category>
-  <category>Data Engineering</category>
-  <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/spark-de-ideas-intro/</guid>
-  <pubDate>Mon, 18 Aug 2025 03:00:00 GMT</pubDate>
-  <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/spark-de-ideas-intro/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>
