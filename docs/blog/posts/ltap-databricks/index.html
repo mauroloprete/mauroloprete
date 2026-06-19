@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-06-19">
+<meta name="description" content="LTAP unifica OLTP y OLAP en una sola copia de datos sobre Delta e Iceberg. Qué es, cómo funciona, en qué se diferencia de HTAP y Zero ETL, y un ejemplo concreto de cómo cambiaría tu stack.">
+
+<title>LTAP: Databricks quiere eliminar el ETL entre tu base y tu warehouse – Mauro Loprete</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+<script src="../../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="LTAP: Databricks quiere eliminar el ETL entre tu base y tu warehouse – Mauro Loprete">
+<meta property="og:description" content="LTAP unifica OLTP y OLAP en una sola copia de datos sobre Delta e Iceberg. Qué es, cómo funciona, en qué se diferencia de HTAP y Zero ETL, y un ejemplo concreto de cómo cambiaría tu stack.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/ltap-databricks/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="LTAP: Databricks quiere eliminar el ETL entre tu base y tu warehouse – Mauro Loprete">
+<meta name="twitter:description" content="LTAP unifica OLTP y OLAP en una sola copia de datos sobre Delta e Iceberg. Qué es, cómo funciona, en qué se diferencia de HTAP y Zero ETL, y un ejemplo concreto de cómo cambiaría tu stack.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/ltap-databricks/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#qué-es-ltap" id="toc-qué-es-ltap" class="nav-link active" data-scroll-target="#qué-es-ltap">Qué es LTAP</a></li>
+  <li><a href="#los-componentes" id="toc-los-componentes" class="nav-link" data-scroll-target="#los-componentes">Los componentes</a></li>
+  <li><a href="#las-tres-propiedades-que-lo-definen" id="toc-las-tres-propiedades-que-lo-definen" class="nav-link" data-scroll-target="#las-tres-propiedades-que-lo-definen">Las tres propiedades que lo definen</a>
+  <ul class="collapse">
+  <li><a href="#gobernanza-unificada" id="toc-gobernanza-unificada" class="nav-link" data-scroll-target="#gobernanza-unificada">1. Gobernanza unificada</a></li>
+  <li><a href="#sin-trade-offs-de-performance" id="toc-sin-trade-offs-de-performance" class="nav-link" data-scroll-target="#sin-trade-offs-de-performance">2. Sin trade-offs de performance</a></li>
+  <li><a href="#sin-pipelines-etl" id="toc-sin-pipelines-etl" class="nav-link" data-scroll-target="#sin-pipelines-etl">3. Sin pipelines ETL</a></li>
+  </ul></li>
+  <li><a href="#cómo-se-diferencia-de-htap-y-zero-etl" id="toc-cómo-se-diferencia-de-htap-y-zero-etl" class="nav-link" data-scroll-target="#cómo-se-diferencia-de-htap-y-zero-etl">Cómo se diferencia de HTAP y Zero ETL</a></li>
+  <li><a href="#ejemplo-concreto-cómo-cambiaría-tu-stack" id="toc-ejemplo-concreto-cómo-cambiaría-tu-stack" class="nav-link" data-scroll-target="#ejemplo-concreto-cómo-cambiaría-tu-stack">Ejemplo concreto: cómo cambiaría tu stack</a>
+  <ul class="collapse">
+  <li><a href="#antes-el-pipeline-clásico" id="toc-antes-el-pipeline-clásico" class="nav-link" data-scroll-target="#antes-el-pipeline-clásico">ANTES: el pipeline clásico</a></li>
+  <li><a href="#después-con-ltap" id="toc-después-con-ltap" class="nav-link" data-scroll-target="#después-con-ltap">DESPUÉS: con LTAP</a></li>
+  </ul></li>
+  <li><a href="#por-qué-los-agentes-ai-necesitan-esto" id="toc-por-qué-los-agentes-ai-necesitan-esto" class="nav-link" data-scroll-target="#por-qué-los-agentes-ai-necesitan-esto">Por qué los agentes AI necesitan esto</a></li>
+  <li><a href="#lo-que-viene-con-lakebase" id="toc-lo-que-viene-con-lakebase" class="nav-link" data-scroll-target="#lo-que-viene-con-lakebase">Lo que viene con Lakebase</a>
+  <ul class="collapse">
+  <li><a href="#disaster-recovery-cross-cloud" id="toc-disaster-recovery-cross-cloud" class="nav-link" data-scroll-target="#disaster-recovery-cross-cloud">Disaster Recovery cross-cloud</a></li>
+  <li><a href="#branching-estilo-git" id="toc-branching-estilo-git" class="nav-link" data-scroll-target="#branching-estilo-git">Branching estilo Git</a></li>
+  <li><a href="#operaciones-autónomas" id="toc-operaciones-autónomas" class="nav-link" data-scroll-target="#operaciones-autónomas">Operaciones autónomas</a></li>
+  <li><a href="#lakebase-search" id="toc-lakebase-search" class="nav-link" data-scroll-target="#lakebase-search">Lakebase Search</a></li>
+  </ul></li>
+  <li><a href="#quién-ya-lo-usa" id="toc-quién-ya-lo-usa" class="nav-link" data-scroll-target="#quién-ya-lo-usa">Quién ya lo usa</a></li>
+  <li><a href="#lo-que-todavía-no-sabemos" id="toc-lo-que-todavía-no-sabemos" class="nav-link" data-scroll-target="#lo-que-todavía-no-sabemos">Lo que todavía no sabemos</a></li>
+  <li><a href="#mi-lectura" id="toc-mi-lectura" class="nav-link" data-scroll-target="#mi-lectura">Mi lectura</a></li>
+  <li><a href="#referencias" id="toc-referencias" class="nav-link" data-scroll-target="#referencias">Referencias</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">LTAP: Databricks quiere eliminar el ETL entre tu base y tu warehouse</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Data Architecture</div>
+    <div class="quarto-category">Databricks Tips</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    LTAP unifica OLTP y OLAP en una sola copia de datos sobre Delta e Iceberg. Qué es, cómo funciona, en qué se diferencia de HTAP y Zero ETL, y un ejemplo concreto de cómo cambiaría tu stack.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 19, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Si trabajás en data engineering, hay un pipeline que conocés de memoria: el que sincroniza tu base operacional con tu warehouse analítico. Ese que tiene Debezium, Kafka, un Structured Streaming que a veces se cuelga, y un job de dbt que corre a las 4 AM. Ese que cuando se rompe, te enterás porque el dashboard del CEO está vacío.</p>
+<p>En el <a href="https://www.databricks.com/dataaisummit">Data + AI Summit 2026</a>, Databricks anunció algo que apunta directamente a ese pipeline: <strong>LTAP</strong> (Lake Transactional/Analytical Processing). La promesa es que ese pipeline deje de existir. No que se simplifique, no que se automatice — que directamente no haga falta.</p>
+<p>En el <a href="../../../blog/posts/dais-2026-recap/">recap que armé del Summit</a> lo puse como el anuncio más silenciosamente transformador. Acá lo desarmo en profundidad.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>LTAP</strong> = Lake Transactional/Analytical Processing. Unifica OLTP y OLAP sobre una sola copia de datos.</li>
+<li><strong>Lakebase</strong> (Postgres serverless) escribe directamente en Delta e Iceberg. Sin ETL, sin réplicas.</li>
+<li>Elimina tres categorías de infra: <strong>CDC/ETL</strong> de ida, <strong>Reverse ETL</strong> de vuelta, y <strong>serving layers</strong> de cache.</li>
+<li>Los <strong>agentes AI</strong> se benefician directamente: read + reason + write sobre un solo backend, sin cruzar fronteras OLTP/OLAP.</li>
+<li>No es HTAP (que sacrifica performance) ni Zero ETL (que oculta el pipeline). Es unificación en la capa de storage.</li>
+<li>Estado actual: <strong>coming soon</strong> — todavía no está GA.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="qué-es-ltap" class="level2">
+<h2 class="anchored" data-anchor-id="qué-es-ltap">Qué es LTAP</h2>
+<p>LTAP significa <strong>Lake Transactional/Analytical Processing</strong>. Es una arquitectura que combina <a href="https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres">Lakebase</a> (el Postgres serverless de Databricks, que corre sobre object storage abierto) con el Lakehouse, bajo un solo modelo de gobernanza, un solo source of truth y una sola capa de storage.</p>
+<p>La idea central: los datos transaccionales se escriben <strong>directamente en Delta e Iceberg desde el punto de escritura</strong>. No después, no con un CDC de por medio, no con un job batch nocturno. Desde el momento cero.</p>
+<p>Ali Ghodsi lo dijo en el keynote:</p>
+<blockquote class="blockquote">
+<p><em>“For forty years we’ve lived with a separation between OLTP and OLAP… For the first time, we think we’ve cracked the unification code.”</em></p>
+<p>— Ali Ghodsi, CEO de Databricks — DAIS 2026 Keynote</p>
+</blockquote>
+<p>Cuarenta años. Desde que se inventaron los data warehouses, la industria asumió que los datos operacionales y los analíticos viven en mundos separados y que necesitás un pipeline para conectarlos. LTAP dice que no.</p>
+<hr>
+</section>
+<section id="los-componentes" class="level2">
+<h2 class="anchored" data-anchor-id="los-componentes">Los componentes</h2>
+<p>LTAP no es un producto nuevo — es la convergencia de piezas que Databricks viene construyendo:</p>
+<table class="table-striped table-hover caption-top table">
+<caption>Componentes de la arquitectura LTAP</caption>
+<colgroup>
+<col style="width: 20%">
+<col style="width: 18%">
+<col style="width: 62%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Componente</th>
+<th style="text-align: left;">Tipo</th>
+<th style="text-align: left;">Rol en LTAP</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Lakebase</strong></td>
+<td style="text-align: left;">Motor transaccional</td>
+<td style="text-align: left;">Postgres serverless sobre object storage abierto. 12M launches/día.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Lakehouse</strong></td>
+<td style="text-align: left;">Motor analítico</td>
+<td style="text-align: left;">SQL Warehouses, Spark, notebooks — lo que ya conocés.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Unity Catalog</strong></td>
+<td style="text-align: left;">Gobernanza</td>
+<td style="text-align: left;">Un modelo de identidad, permisos y auditoría para ambos mundos.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Lakehouse//RT</strong></td>
+<td style="text-align: left;">Serving real-time</td>
+<td style="text-align: left;">Queries sub-milisegundo sobre datos gobernados en Delta/Iceberg.</td>
+</tr>
+</tbody>
+</table>
+<p>El truco está en que Lakebase y el Lakehouse ahora comparten <strong>la misma copia de datos</strong> en los mismos formatos abiertos. Antes, cada sistema mantenía su propia copia. LTAP cierra esa brecha.</p>
+<hr>
+</section>
+<section id="las-tres-propiedades-que-lo-definen" class="level2">
+<h2 class="anchored" data-anchor-id="las-tres-propiedades-que-lo-definen">Las tres propiedades que lo definen</h2>
+<p>Databricks define LTAP con tres propiedades. Las tres importan:</p>
+<section id="gobernanza-unificada" class="level3">
+<h3 class="anchored" data-anchor-id="gobernanza-unificada">1. Gobernanza unificada</h3>
+<p>Todos los datos — operacionales, analíticos, streaming — viven en open object storage, en formatos abiertos (Delta, Iceberg), sin transformación. Un solo modelo de identidad, permisos y auditoría a través de Unity Catalog.</p>
+<p>Esto suena a marketing, pero pensalo en la práctica: hoy tu Postgres tiene sus roles y permisos, tu warehouse tiene los suyos, y mantenés esa duplicación a mano. Con LTAP, son los mismos datos gobernados una sola vez.</p>
+</section>
+<section id="sin-trade-offs-de-performance" class="level3">
+<h3 class="anchored" data-anchor-id="sin-trade-offs-de-performance">2. Sin trade-offs de performance</h3>
+<p>Acá es donde LTAP se diferencia de HTAP (ya llego a eso). Los workloads transaccionales corren en Postgres estándar con ACID completo. Los workloads analíticos escalan en el Lakehouse completo. <strong>Cada uno escala de forma independiente</strong>, sin mover datos entre sistemas.</p>
+<p>No estás forzando un motor a hacer todo. Tenés dos motores especializados que comparten la misma capa de storage.</p>
+</section>
+<section id="sin-pipelines-etl" class="level3">
+<h3 class="anchored" data-anchor-id="sin-pipelines-etl">3. Sin pipelines ETL</h3>
+<p>Los datos operacionales son inmediatamente consultables para analítica. Sin réplicas, sin conectores, sin CDC. El dato que tu app escribe en Lakebase es el mismo que tu analista consulta en el warehouse.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Esto no significa que dbt, las transformaciones o el modelado dejen de existir. Lo que desaparece es <strong>el pipeline de sincronización</strong> entre la fuente operacional y el warehouse. Tus modelos Silver y Gold siguen teniendo sentido — lo que no tenés es el Bronze que copia datos de Postgres a Delta.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="cómo-se-diferencia-de-htap-y-zero-etl" class="level2">
+<h2 class="anchored" data-anchor-id="cómo-se-diferencia-de-htap-y-zero-etl">Cómo se diferencia de HTAP y Zero ETL</h2>
+<p>Esto lo preguntaron bastante en LinkedIn y la respuesta importa, porque no es lo mismo.</p>
+<table class="table-striped table-hover caption-top table">
+<caption>HTAP vs Zero ETL vs LTAP</caption>
+<colgroup>
+<col style="width: 12%">
+<col style="width: 25%">
+<col style="width: 15%">
+<col style="width: 20%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Enfoque</th>
+<th style="text-align: left;">Arquitectura</th>
+<th style="text-align: left;">Motores</th>
+<th style="text-align: left;">ETL</th>
+<th style="text-align: left;">Problema principal</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>HTAP</strong></td>
+<td style="text-align: left;">Un solo motor para todo</td>
+<td style="text-align: left;">1 (compartido)</td>
+<td style="text-align: left;">No hay</td>
+<td style="text-align: left;">Colapsa aislamiento de workloads. Performance degradada en ambos lados.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Zero ETL</strong></td>
+<td style="text-align: left;">Sistemas separados con sync automático</td>
+<td style="text-align: left;">2 (separados)</td>
+<td style="text-align: left;">Oculto (CDC automatizado)</td>
+<td style="text-align: left;">Sigue habiendo réplicas, latencia y dos copias de datos.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>LTAP</strong></td>
+<td style="text-align: left;">Dos motores, una sola capa de storage</td>
+<td style="text-align: left;">2 (especializados)</td>
+<td style="text-align: left;">Eliminado</td>
+<td style="text-align: left;">Unificación real en el storage, no en el engine.</td>
+</tr>
+</tbody>
+</table>
+<p>La diferencia clave: HTAP intentó meter todo en un motor y nadie lo usó en producción seria porque un query analítico pesado te mataba las transacciones. Zero ETL (como el de AWS entre Aurora y Redshift) automatiza la copia, pero seguís teniendo dos copias con latencia entre ellas.</p>
+<p>LTAP toma otro camino: mantiene motores separados (Postgres para OLTP, Lakehouse para OLAP) pero los sienta sobre la misma capa de storage. El dato es uno solo. No hay copia, no hay sincronización, no hay pipeline que se pueda romper.</p>
+<hr>
+</section>
+<section id="ejemplo-concreto-cómo-cambiaría-tu-stack" class="level2">
+<h2 class="anchored" data-anchor-id="ejemplo-concreto-cómo-cambiaría-tu-stack">Ejemplo concreto: cómo cambiaría tu stack</h2>
+<p>Bajemos esto a tierra con un caso que cualquier data engineer conoce.</p>
+<section id="antes-el-pipeline-clásico" class="level3">
+<h3 class="anchored" data-anchor-id="antes-el-pipeline-clásico">ANTES: el pipeline clásico</h3>
+<p>Tenés una app que corre sobre Postgres. Los datos de transacciones, usuarios, productos — todo vive ahí. Y necesitás esos datos en tu warehouse para analítica, dashboards, modelos de ML.</p>
+<p>El pipeline típico:</p>
+<div class="cell" data-fig-width="8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px', 'fontFamily': 'Helvetica', 'primaryColor': '#593196', 'primaryTextColor': '#fff', 'lineColor': '#94a3b8', 'primaryBorderColor': '#7c4dbd'}}}%%
+flowchart TD
+    PG("&lt;b&gt;Postgres&lt;/b&gt;&lt;br&gt;&lt;small&gt;OLTP&lt;/small&gt;")
+    CDC("&lt;b&gt;Debezium&lt;/b&gt;&lt;br&gt;&lt;small&gt;CDC / WAL&lt;/small&gt;")
+    KAFKA("&lt;b&gt;Kafka / Event Hub&lt;/b&gt;&lt;br&gt;&lt;small&gt;Mensajería&lt;/small&gt;")
+    SS("&lt;b&gt;Spark Structured Streaming&lt;/b&gt;&lt;br&gt;&lt;small&gt;Ingesta&lt;/small&gt;")
+    BRONZE("&lt;b&gt;Delta Lake&lt;/b&gt;&lt;br&gt;&lt;small&gt;Bronze&lt;/small&gt;")
+    DBT("&lt;b&gt;dbt&lt;/b&gt;&lt;br&gt;&lt;small&gt;Silver → Gold&lt;/small&gt;")
+    DASH("&lt;b&gt;Dashboards / ML&lt;/b&gt;")
+    RETL("&lt;b&gt;Reverse ETL&lt;/b&gt;&lt;br&gt;&lt;small&gt;Census, Hightouch...&lt;/small&gt;")
+    SERVE("&lt;b&gt;CRM, Redis, Serving&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving / API cache&lt;/small&gt;")
+
+    PG --&gt; CDC --&gt; KAFKA --&gt; SS --&gt; BRONZE --&gt; DBT
+    DBT --&gt; DASH
+    DBT --&gt; RETL --&gt; SERVE
+
+    style PG fill:#1e293b,stroke:#334155,color:#fff,stroke-width:1.5px
+    style CDC fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style KAFKA fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style SS fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style RETL fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style BRONZE fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DBT fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DASH fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+    style SERVE fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Lo que eso implica en la práctica:</p>
+<ul>
+<li><strong>Debezium</strong> monitoreando el WAL de Postgres. Se cuelga, pierde eventos, hay que reconfigurarlo.</li>
+<li><strong>Kafka</strong> con su propio cluster, retention policies, schema registry, particiones. Otro sistema que mantener.</li>
+<li><strong>Structured Streaming</strong> con checkpoints, watermarks, jobs que fallan a las 3 AM y nadie se entera hasta las 9.</li>
+<li><strong>Reverse ETL</strong> para empujar datos de Gold de vuelta a los sistemas operacionales: CRM, marketing, APIs. Otra herramienta, otro sync, otra fuente de desincronización.</li>
+<li><strong>Serving layer</strong> separada (Redis, Elasticsearch, Pinot) para queries de baja latencia que el warehouse no puede resolver.</li>
+<li><strong>Latencia</strong>: entre que el dato se escribe en Postgres y llega a Gold, pueden pasar minutos u horas. Y si encima tiene que volver al sistema operacional vía Reverse ETL, sumale otro ciclo.</li>
+<li><strong>Desincronización</strong>: si un job falla, tu dashboard muestra datos de ayer. O peor: datos parciales. Y el CRM tiene una versión distinta a la del warehouse.</li>
+<li><strong>Infra</strong>: estás manteniendo Postgres + Kafka + Spark Streaming + Delta Lake + herramienta de Reverse ETL + serving layer. Seis sistemas con sus propios failure modes.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si esto te suena, no estás solo. Es el estado del arte en la mayoría de las empresas. Y funciona… hasta que no funciona.</p>
+</div>
+</div>
+</section>
+<section id="después-con-ltap" class="level3">
+<h3 class="anchored" data-anchor-id="después-con-ltap">DESPUÉS: con LTAP</h3>
+<div class="cell" data-fig-width="8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px', 'fontFamily': 'Helvetica', 'primaryColor': '#FFA166', 'primaryTextColor': '#1e293b', 'lineColor': '#94a3b8', 'primaryBorderColor': '#e8854a'}}}%%
+flowchart TD
+    LB("&lt;b&gt;Lakebase&lt;/b&gt;&lt;br&gt;&lt;small&gt;Postgres serverless&lt;/small&gt;")
+    UC("&lt;b&gt;Unity Catalog&lt;/b&gt;&lt;br&gt;&lt;small&gt;Gobernanza unificada&lt;/small&gt;")
+    DBT2("&lt;b&gt;dbt&lt;/b&gt;&lt;br&gt;&lt;small&gt;Silver → Gold&lt;/small&gt;")
+    RT("&lt;b&gt;Lakehouse//RT&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving sub-ms&lt;/small&gt;")
+    APPS("&lt;b&gt;Apps / APIs&lt;/b&gt;&lt;br&gt;&lt;small&gt;Leen directo&lt;/small&gt;")
+    AGENTS("&lt;b&gt;Agentes AI&lt;/b&gt;&lt;br&gt;&lt;small&gt;Read + reason + write&lt;/small&gt;")
+    DASH2("&lt;b&gt;Dashboards / ML&lt;/b&gt;")
+
+    LB -- "escribe directo en Delta / Iceberg" --&gt; UC
+    UC --&gt; DBT2 --&gt; DASH2
+    UC --&gt; RT
+    UC --&gt; APPS
+    UC --&gt; AGENTS
+
+    style LB fill:#1e293b,stroke:#334155,color:#fff,stroke-width:1.5px
+    style UC fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DBT2 fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style RT fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style AGENTS fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style APPS fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+    style DASH2 fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Lo que cambia:</p>
+<ul>
+<li><strong>No hay Debezium</strong>. No hay CDC. Lakebase escribe nativamente en Delta/Iceberg.</li>
+<li><strong>No hay Kafka</strong>. No hay sistema de mensajería intermedio.</li>
+<li><strong>No hay Structured Streaming</strong> para ingestar. El dato ya está en el lake.</li>
+<li><strong>No hay Reverse ETL</strong>. La app y el warehouse leen del mismo storage. Si tu modelo Gold calcula un score de churn y querés usarlo en la app, no necesitás empujarlo de vuelta — ya está ahí, accesible desde Lakebase.</li>
+<li><strong>No hay serving layer separada</strong>. Lakehouse//RT resuelve queries sub-milisegundo directamente sobre los datos gobernados. No necesitás Redis ni Pinot como cache intermedio.</li>
+<li><strong>Latencia cero</strong> entre la escritura operacional y la disponibilidad analítica. Es el mismo dato.</li>
+<li><strong>Un solo sistema de gobernanza</strong>. Unity Catalog para permisos, lineage, auditoría.</li>
+<li><strong>dbt sigue existiendo</strong> — pero transforma datos que ya están en Delta, no datos que tuvieron que viajar por tres sistemas para llegar.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Pensalo así: no desaparece el modelado ni la transformación. Lo que desaparece es <strong>la logística</strong> de mover datos de ida y vuelta entre mundos. ETL para traer, Reverse ETL para devolver, serving layer para cachear. Y esa logística es donde se van la mayoría de las horas de on-call y los incidentes de las 3 AM.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="por-qué-los-agentes-ai-necesitan-esto" class="level2">
+<h2 class="anchored" data-anchor-id="por-qué-los-agentes-ai-necesitan-esto">Por qué los agentes AI necesitan esto</h2>
+<p>Reynold Xin lo dijo en el keynote:</p>
+<blockquote class="blockquote">
+<p><em>“The agents really prefer a much simpler stack, because they can move way faster.”</em></p>
+<p>— Reynold Xin, Co-founder de Databricks — DAIS 2026 Keynote</p>
+</blockquote>
+<p>Y no es una frase de marketing — hay una razón técnica concreta.</p>
+<p>Un agente AI típico necesita hacer tres cosas:</p>
+<ol type="1">
+<li><strong>Leer datos históricos</strong> para tomar contexto (analítico — OLAP)</li>
+<li><strong>Razonar</strong> sobre esos datos</li>
+<li><strong>Escribir el resultado</strong> en el sistema operacional para que la app actúe (transaccional — OLTP)</li>
+</ol>
+<p>Con el stack clásico, los pasos 1 y 3 viven en mundos separados. El agente tiene que hablar con el warehouse para leer y con la base operacional para escribir, cruzando la frontera OLTP/OLAP en cada ciclo. Y si el resultado de la acción tiene que estar disponible para analítica (para monitorear qué hizo el agente), necesitás esperar a que el pipeline de CDC lo traiga de vuelta al warehouse.</p>
+<p>Con LTAP, el agente opera sobre un solo backend:</p>
+<ul>
+<li>Lee datos históricos y analíticos → Lakehouse (misma copia de datos)</li>
+<li>Escribe resultados operacionales → Lakebase (misma copia de datos)</li>
+<li>El resultado es inmediatamente consultable para analítica, sin esperar a ningún pipeline</li>
+<li>Con Lakebase Search, el retrieval (vector + full-text) también corre en el mismo backend</li>
+</ul>
+<p>El loop completo — <strong>retrieve → reason → act → remember</strong> — pasa sobre una sola capa de storage. No hay latencia de sincronización entre lo que el agente hizo y lo que el sistema de monitoreo puede ver.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Esto explica por qué Databricks está empujando LTAP tan fuerte en el contexto de su plataforma agentic. Si tenés Genie, Agent Bricks, o agentes custom corriendo en producción, cada milisegundo de latencia y cada pipeline intermedio es fricción. LTAP elimina esa fricción de raíz.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="lo-que-viene-con-lakebase" class="level2">
+<h2 class="anchored" data-anchor-id="lo-que-viene-con-lakebase">Lo que viene con Lakebase</h2>
+<p>Además de LTAP, Lakebase trajo features propios que vale la pena conocer:</p>
+<section id="disaster-recovery-cross-cloud" class="level3">
+<h3 class="anchored" data-anchor-id="disaster-recovery-cross-cloud">Disaster Recovery cross-cloud</h3>
+<p>Replicación entre nubes y regiones. Si tu Lakebase en AWS US-East se cae, tenés failover a otra región o incluso a Azure. Para quienes están construyendo arquitecturas multi-cloud, esto es significativo.</p>
+</section>
+<section id="branching-estilo-git" class="level3">
+<h3 class="anchored" data-anchor-id="branching-estilo-git">Branching estilo Git</h3>
+<p>Snapshots y branches sobre tus datos de producción. Querés probar una migración de schema? Creás un branch, experimentás, y si sale bien hacés merge. Si sale mal, descartás. Sin tocar producción.</p>
+</section>
+<section id="operaciones-autónomas" class="level3">
+<h3 class="anchored" data-anchor-id="operaciones-autónomas">Operaciones autónomas</h3>
+<p>Agentes que monitorean la salud de la base, detectan slowdowns, proponen índices y asisten en recovery. La idea de Databricks es que la administración de la base de datos se automatice progresivamente. Lo mismo que Genie ZeroOps hace para pipelines, pero para la base transaccional.</p>
+</section>
+<section id="lakebase-search" class="level3">
+<h3 class="anchored" data-anchor-id="lakebase-search">Lakebase Search</h3>
+<p>Retrieval híbrido — vector y full-text — nativo dentro de Postgres. Dos extensiones:</p>
+<ul>
+<li><code>lakebase_vector</code>: pgvector con indexing avanzado para embeddings</li>
+<li><code>lakebase_text</code>: BM25 para búsqueda full-text clásica</li>
+</ul>
+<p>El loop completo de un agente (retrieve → reason → act → remember) puede correr sobre un solo backend. Te ahorrás montar un Pinecone o Weaviate al lado.</p>
+<hr>
+</section>
+</section>
+<section id="quién-ya-lo-usa" class="level2">
+<h2 class="anchored" data-anchor-id="quién-ya-lo-usa">Quién ya lo usa</h2>
+<p>Lakebase (la base de LTAP) ya está en producción con clientes grandes:</p>
+<ul>
+<li><strong>Block</strong> (Square, Cash App)</li>
+<li><strong>Superhuman</strong> (email)</li>
+<li><strong>Zillow</strong> (real estate)</li>
+<li><strong>Ensemble Health Partners</strong> — manejan más de 2 PB de datos de revenue cycle en salud</li>
+</ul>
+<p>La quote de Ensemble resume bien el caso de uso enterprise:</p>
+<blockquote class="blockquote">
+<p><em>“Lakebase and LTAP extend that foundation by unifying operational and analytical workloads on a single layer, giving our RCM-native AI the real-time access it needs to perform in live operations.”</em></p>
+<p>— Ensemble Health Partners (2+ PB de datos de revenue cycle en salud)</p>
+</blockquote>
+<hr>
+</section>
+<section id="lo-que-todavía-no-sabemos" class="level2">
+<h2 class="anchored" data-anchor-id="lo-que-todavía-no-sabemos">Lo que todavía no sabemos</h2>
+<p>Hay que ser honestos: LTAP fue anunciado como <strong>“coming soon”</strong>. No está GA. Y hay preguntas que todavía no tienen respuesta pública:</p>
+<ol type="1">
+<li><strong>Performance real en producción</strong>: ¿cuánto overhead tiene escribir en Delta/Iceberg desde Postgres comparado con un Postgres puro? Los benchmarks de producción todavía no se publicaron.</li>
+<li><strong>Compatibilidad con Postgres existente</strong>: ¿podés migrar tu Postgres actual a Lakebase sin fricción? ¿Qué extensiones soporta?</li>
+<li><strong>Latencia de lectura analítica</strong>: si un agente escribe un registro y otro lo quiere leer para analítica al instante, ¿cuál es la latencia real?</li>
+<li><strong>Pricing</strong>: Lakebase + Lakehouse sobre los mismos datos, ¿cómo se factura? ¿Es más barato que mantener Postgres + CDC + Kafka + warehouse por separado?</li>
+<li><strong>Lock-in</strong>: los datos están en formatos abiertos (Delta/Iceberg), pero Lakebase es un servicio de Databricks. Si mañana querés migrar, ¿qué tan viable es?</li>
+</ol>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Cada vez que un vendor dice “eliminamos el ETL”, hay que preguntarse: ¿lo eliminaste o lo moviste adentro de tu plataforma? Con LTAP, la respuesta parece ser que genuinamente lo eliminan al unificar el storage. Pero hasta que no haya benchmarks independientes y casos de uso en producción abierta, hay que mantener un escepticismo sano.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="mi-lectura" class="level2">
+<h2 class="anchored" data-anchor-id="mi-lectura">Mi lectura</h2>
+<p>LTAP me parece el anuncio más relevante del DAIS 2026 a nivel arquitectónico. No por lo que hace hoy (que todavía no está GA), sino por lo que implica si funciona como prometen.</p>
+<p>Reynold Xin lo dijo bien: <em>“The agents really prefer a much simpler stack.”</em> Y tiene razón — no solo los agentes. Cualquiera que haya mantenido un pipeline de sincronización OLTP → OLAP sabe que la complejidad está en la logística, no en la lógica de negocio.</p>
+<p>Si LTAP cumple, hay una cantidad significativa de infraestructura que va a dejar de tener razón de ser. Debezium, Kafka Connect para CDC, Structured Streaming como paso de ingesta, las tablas Bronze que son copias crudas de la fuente, las herramientas de Reverse ETL, las serving layers de cache — todo eso se simplifica drásticamente.</p>
+<p>¿Significa que los data engineers nos quedamos sin trabajo? No.&nbsp;Significa que dejamos de gastar tiempo en plomería y podemos enfocarnos en lo que realmente importa: modelado, calidad de datos, y construir productos de datos que generen valor.</p>
+<p>Voy a estar siguiendo de cerca cómo avanza. Cuando salga en GA, planeo hacer un benchmark real comparando el stack clásico contra LTAP. Stay tuned.</p>
+<hr>
+</section>
+<section id="referencias" class="level2">
+<h2 class="anchored" data-anchor-id="referencias">Referencias</h2>
+<ul>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical">Press release — LTAP</a></li>
+<li><a href="https://venturebeat.com/data/databricks-says-it-solved-the-decades-old-data-pipeline-problem-thats-been-slowing-ai-agents">VentureBeat — Databricks says it solved the decades-old data pipeline problem</a></li>
+<li><a href="https://www.hpcwire.com/bigdatawire/2026/06/17/ai-is-breaking-traditional-data-architectures-databricks-thinks-ltap-is-the-fix/">BigDATAwire — AI Is Breaking Traditional Data Architectures</a></li>
+<li><a href="https://www.blocksandfiles.com/data-management/2026/06/18/databricks-expands-lakehouse-to-unify-olap-and-oltp/5258373">Blocks and Files — Databricks expands Lakehouse to unify OLAP and OLTP</a></li>
+<li><a href="https://aiweekly.co/alerts/databricks-ltap-eliminates-etl-for-ai-workloads">AI Weekly — LTAP eliminates ETL for AI workloads</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres">Lakebase Search — Blog</a></li>
+<li><a href="../../../blog/posts/dais-2026-recap/">DAIS 2026 Recap — Spark de Ideas</a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<script src="https://giscus.app/client.js" data-repo="mauroloprete/mauroloprete" data-repo-id="R_kgDORVoiEQ" data-category="Announcements" data-category-id="DIC_kwDORVoiEc4C_LKu" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light_protanopia" data-lang="../../../es" crossorigin="anonymous" data-loading="lazy" async="">
+</script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

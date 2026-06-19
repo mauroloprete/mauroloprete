@@ -1,0 +1,324 @@
+---
+title: "LTAP: Databricks quiere eliminar el ETL entre tu base y tu warehouse"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-06-19"
+draft: false
+categories: [Data Engineering, Data Architecture, Databricks Tips]
+description: "LTAP unifica OLTP y OLAP en una sola copia de datos sobre Delta e Iceberg. Qué es, cómo funciona, en qué se diferencia de HTAP y Zero ETL, y un ejemplo concreto de cómo cambiaría tu stack."
+image: cover.png
+---
+
+Si trabajás en data engineering, hay un pipeline que conocés de memoria: el que sincroniza tu base operacional con tu warehouse analítico. Ese que tiene Debezium, Kafka, un Structured Streaming que a veces se cuelga, y un job de dbt que corre a las 4 AM. Ese que cuando se rompe, te enterás porque el dashboard del CEO está vacío.
+
+En el [Data + AI Summit 2026](https://www.databricks.com/dataaisummit), Databricks anunció algo que apunta directamente a ese pipeline: **LTAP** (Lake Transactional/Analytical Processing). La promesa es que ese pipeline deje de existir. No que se simplifique, no que se automatice — que directamente no haga falta.
+
+En el [recap que armé del Summit](/blog/posts/dais-2026-recap/) lo puse como el anuncio más silenciosamente transformador. Acá lo desarmo en profundidad.
+
+::: callout-note
+## TL;DR
+
+-   **LTAP** = Lake Transactional/Analytical Processing. Unifica OLTP y OLAP sobre una sola copia de datos.
+-   **Lakebase** (Postgres serverless) escribe directamente en Delta e Iceberg. Sin ETL, sin réplicas.
+-   Elimina tres categorías de infra: **CDC/ETL** de ida, **Reverse ETL** de vuelta, y **serving layers** de cache.
+-   Los **agentes AI** se benefician directamente: read + reason + write sobre un solo backend, sin cruzar fronteras OLTP/OLAP.
+-   No es HTAP (que sacrifica performance) ni Zero ETL (que oculta el pipeline). Es unificación en la capa de storage.
+-   Estado actual: **coming soon** — todavía no está GA.
+:::
+
+------------------------------------------------------------------------
+
+## Qué es LTAP
+
+LTAP significa **Lake Transactional/Analytical Processing**. Es una arquitectura que combina [Lakebase](https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres) (el Postgres serverless de Databricks, que corre sobre object storage abierto) con el Lakehouse, bajo un solo modelo de gobernanza, un solo source of truth y una sola capa de storage.
+
+La idea central: los datos transaccionales se escriben **directamente en Delta e Iceberg desde el punto de escritura**. No después, no con un CDC de por medio, no con un job batch nocturno. Desde el momento cero.
+
+Ali Ghodsi lo dijo en el keynote:
+
+> *"For forty years we've lived with a separation between OLTP and OLAP... For the first time, we think we've cracked the unification code."*
+>
+> --- Ali Ghodsi, CEO de Databricks — DAIS 2026 Keynote
+
+Cuarenta años. Desde que se inventaron los data warehouses, la industria asumió que los datos operacionales y los analíticos viven en mundos separados y que necesitás un pipeline para conectarlos. LTAP dice que no.
+
+------------------------------------------------------------------------
+
+## Los componentes
+
+LTAP no es un producto nuevo — es la convergencia de piezas que Databricks viene construyendo:
+
+| Componente | Tipo | Rol en LTAP |
+|:---|:---|:---|
+| **Lakebase** | Motor transaccional | Postgres serverless sobre object storage abierto. 12M launches/día. |
+| **Lakehouse** | Motor analítico | SQL Warehouses, Spark, notebooks — lo que ya conocés. |
+| **Unity Catalog** | Gobernanza | Un modelo de identidad, permisos y auditoría para ambos mundos. |
+| **Lakehouse//RT** | Serving real-time | Queries sub-milisegundo sobre datos gobernados en Delta/Iceberg. |
+
+: Componentes de la arquitectura LTAP {.striped .hover tbl-colwidths="[20,18,62]"}
+
+El truco está en que Lakebase y el Lakehouse ahora comparten **la misma copia de datos** en los mismos formatos abiertos. Antes, cada sistema mantenía su propia copia. LTAP cierra esa brecha.
+
+------------------------------------------------------------------------
+
+## Las tres propiedades que lo definen
+
+Databricks define LTAP con tres propiedades. Las tres importan:
+
+### 1. Gobernanza unificada
+
+Todos los datos — operacionales, analíticos, streaming — viven en open object storage, en formatos abiertos (Delta, Iceberg), sin transformación. Un solo modelo de identidad, permisos y auditoría a través de Unity Catalog.
+
+Esto suena a marketing, pero pensalo en la práctica: hoy tu Postgres tiene sus roles y permisos, tu warehouse tiene los suyos, y mantenés esa duplicación a mano. Con LTAP, son los mismos datos gobernados una sola vez.
+
+### 2. Sin trade-offs de performance
+
+Acá es donde LTAP se diferencia de HTAP (ya llego a eso). Los workloads transaccionales corren en Postgres estándar con ACID completo. Los workloads analíticos escalan en el Lakehouse completo. **Cada uno escala de forma independiente**, sin mover datos entre sistemas.
+
+No estás forzando un motor a hacer todo. Tenés dos motores especializados que comparten la misma capa de storage.
+
+### 3. Sin pipelines ETL
+
+Los datos operacionales son inmediatamente consultables para analítica. Sin réplicas, sin conectores, sin CDC. El dato que tu app escribe en Lakebase es el mismo que tu analista consulta en el warehouse.
+
+::: callout-important
+Esto no significa que dbt, las transformaciones o el modelado dejen de existir. Lo que desaparece es **el pipeline de sincronización** entre la fuente operacional y el warehouse. Tus modelos Silver y Gold siguen teniendo sentido — lo que no tenés es el Bronze que copia datos de Postgres a Delta.
+:::
+
+------------------------------------------------------------------------
+
+## Cómo se diferencia de HTAP y Zero ETL
+
+Esto lo preguntaron bastante en LinkedIn y la respuesta importa, porque no es lo mismo.
+
+| Enfoque | Arquitectura | Motores | ETL | Problema principal |
+|:---|:---|:---|:---|:---|
+| **HTAP** | Un solo motor para todo | 1 (compartido) | No hay | Colapsa aislamiento de workloads. Performance degradada en ambos lados. |
+| **Zero ETL** | Sistemas separados con sync automático | 2 (separados) | Oculto (CDC automatizado) | Sigue habiendo réplicas, latencia y dos copias de datos. |
+| **LTAP** | Dos motores, una sola capa de storage | 2 (especializados) | Eliminado | Unificación real en el storage, no en el engine. |
+
+: HTAP vs Zero ETL vs LTAP {.striped .hover tbl-colwidths="[12,25,15,20,28]"}
+
+La diferencia clave: HTAP intentó meter todo en un motor y nadie lo usó en producción seria porque un query analítico pesado te mataba las transacciones. Zero ETL (como el de AWS entre Aurora y Redshift) automatiza la copia, pero seguís teniendo dos copias con latencia entre ellas.
+
+LTAP toma otro camino: mantiene motores separados (Postgres para OLTP, Lakehouse para OLAP) pero los sienta sobre la misma capa de storage. El dato es uno solo. No hay copia, no hay sincronización, no hay pipeline que se pueda romper.
+
+------------------------------------------------------------------------
+
+## Ejemplo concreto: cómo cambiaría tu stack
+
+Bajemos esto a tierra con un caso que cualquier data engineer conoce.
+
+### ANTES: el pipeline clásico
+
+Tenés una app que corre sobre Postgres. Los datos de transacciones, usuarios, productos — todo vive ahí. Y necesitás esos datos en tu warehouse para analítica, dashboards, modelos de ML.
+
+El pipeline típico:
+
+```{mermaid}
+%%| fig-width: 8
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px', 'fontFamily': 'Helvetica', 'primaryColor': '#593196', 'primaryTextColor': '#fff', 'lineColor': '#94a3b8', 'primaryBorderColor': '#7c4dbd'}}}%%
+flowchart TD
+    PG("<b>Postgres</b><br><small>OLTP</small>")
+    CDC("<b>Debezium</b><br><small>CDC / WAL</small>")
+    KAFKA("<b>Kafka / Event Hub</b><br><small>Mensajería</small>")
+    SS("<b>Spark Structured Streaming</b><br><small>Ingesta</small>")
+    BRONZE("<b>Delta Lake</b><br><small>Bronze</small>")
+    DBT("<b>dbt</b><br><small>Silver → Gold</small>")
+    DASH("<b>Dashboards / ML</b>")
+    RETL("<b>Reverse ETL</b><br><small>Census, Hightouch...</small>")
+    SERVE("<b>CRM, Redis, Serving</b><br><small>Serving / API cache</small>")
+
+    PG --> CDC --> KAFKA --> SS --> BRONZE --> DBT
+    DBT --> DASH
+    DBT --> RETL --> SERVE
+
+    style PG fill:#1e293b,stroke:#334155,color:#fff,stroke-width:1.5px
+    style CDC fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style KAFKA fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style SS fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style RETL fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style BRONZE fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DBT fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DASH fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+    style SERVE fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+```
+
+Lo que eso implica en la práctica:
+
+-   **Debezium** monitoreando el WAL de Postgres. Se cuelga, pierde eventos, hay que reconfigurarlo.
+-   **Kafka** con su propio cluster, retention policies, schema registry, particiones. Otro sistema que mantener.
+-   **Structured Streaming** con checkpoints, watermarks, jobs que fallan a las 3 AM y nadie se entera hasta las 9.
+-   **Reverse ETL** para empujar datos de Gold de vuelta a los sistemas operacionales: CRM, marketing, APIs. Otra herramienta, otro sync, otra fuente de desincronización.
+-   **Serving layer** separada (Redis, Elasticsearch, Pinot) para queries de baja latencia que el warehouse no puede resolver.
+-   **Latencia**: entre que el dato se escribe en Postgres y llega a Gold, pueden pasar minutos u horas. Y si encima tiene que volver al sistema operacional vía Reverse ETL, sumale otro ciclo.
+-   **Desincronización**: si un job falla, tu dashboard muestra datos de ayer. O peor: datos parciales. Y el CRM tiene una versión distinta a la del warehouse.
+-   **Infra**: estás manteniendo Postgres + Kafka + Spark Streaming + Delta Lake + herramienta de Reverse ETL + serving layer. Seis sistemas con sus propios failure modes.
+
+::: callout-warning
+Si esto te suena, no estás solo. Es el estado del arte en la mayoría de las empresas. Y funciona... hasta que no funciona.
+:::
+
+### DESPUÉS: con LTAP
+
+```{mermaid}
+%%| fig-width: 8
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px', 'fontFamily': 'Helvetica', 'primaryColor': '#FFA166', 'primaryTextColor': '#1e293b', 'lineColor': '#94a3b8', 'primaryBorderColor': '#e8854a'}}}%%
+flowchart TD
+    LB("<b>Lakebase</b><br><small>Postgres serverless</small>")
+    UC("<b>Unity Catalog</b><br><small>Gobernanza unificada</small>")
+    DBT2("<b>dbt</b><br><small>Silver → Gold</small>")
+    RT("<b>Lakehouse//RT</b><br><small>Serving sub-ms</small>")
+    APPS("<b>Apps / APIs</b><br><small>Leen directo</small>")
+    AGENTS("<b>Agentes AI</b><br><small>Read + reason + write</small>")
+    DASH2("<b>Dashboards / ML</b>")
+
+    LB -- "escribe directo en Delta / Iceberg" --> UC
+    UC --> DBT2 --> DASH2
+    UC --> RT
+    UC --> APPS
+    UC --> AGENTS
+
+    style LB fill:#1e293b,stroke:#334155,color:#fff,stroke-width:1.5px
+    style UC fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DBT2 fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style RT fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style AGENTS fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style APPS fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+    style DASH2 fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+```
+
+Lo que cambia:
+
+-   **No hay Debezium**. No hay CDC. Lakebase escribe nativamente en Delta/Iceberg.
+-   **No hay Kafka**. No hay sistema de mensajería intermedio.
+-   **No hay Structured Streaming** para ingestar. El dato ya está en el lake.
+-   **No hay Reverse ETL**. La app y el warehouse leen del mismo storage. Si tu modelo Gold calcula un score de churn y querés usarlo en la app, no necesitás empujarlo de vuelta — ya está ahí, accesible desde Lakebase.
+-   **No hay serving layer separada**. Lakehouse//RT resuelve queries sub-milisegundo directamente sobre los datos gobernados. No necesitás Redis ni Pinot como cache intermedio.
+-   **Latencia cero** entre la escritura operacional y la disponibilidad analítica. Es el mismo dato.
+-   **Un solo sistema de gobernanza**. Unity Catalog para permisos, lineage, auditoría.
+-   **dbt sigue existiendo** — pero transforma datos que ya están en Delta, no datos que tuvieron que viajar por tres sistemas para llegar.
+
+::: callout-tip
+Pensalo así: no desaparece el modelado ni la transformación. Lo que desaparece es **la logística** de mover datos de ida y vuelta entre mundos. ETL para traer, Reverse ETL para devolver, serving layer para cachear. Y esa logística es donde se van la mayoría de las horas de on-call y los incidentes de las 3 AM.
+:::
+
+------------------------------------------------------------------------
+
+## Por qué los agentes AI necesitan esto
+
+Reynold Xin lo dijo en el keynote:
+
+> *"The agents really prefer a much simpler stack, because they can move way faster."*
+>
+> --- Reynold Xin, Co-founder de Databricks — DAIS 2026 Keynote
+
+Y no es una frase de marketing — hay una razón técnica concreta.
+
+Un agente AI típico necesita hacer tres cosas:
+
+1.  **Leer datos históricos** para tomar contexto (analítico — OLAP)
+2.  **Razonar** sobre esos datos
+3.  **Escribir el resultado** en el sistema operacional para que la app actúe (transaccional — OLTP)
+
+Con el stack clásico, los pasos 1 y 3 viven en mundos separados. El agente tiene que hablar con el warehouse para leer y con la base operacional para escribir, cruzando la frontera OLTP/OLAP en cada ciclo. Y si el resultado de la acción tiene que estar disponible para analítica (para monitorear qué hizo el agente), necesitás esperar a que el pipeline de CDC lo traiga de vuelta al warehouse.
+
+Con LTAP, el agente opera sobre un solo backend:
+
+-   Lee datos históricos y analíticos → Lakehouse (misma copia de datos)
+-   Escribe resultados operacionales → Lakebase (misma copia de datos)
+-   El resultado es inmediatamente consultable para analítica, sin esperar a ningún pipeline
+-   Con Lakebase Search, el retrieval (vector + full-text) también corre en el mismo backend
+
+El loop completo — **retrieve → reason → act → remember** — pasa sobre una sola capa de storage. No hay latencia de sincronización entre lo que el agente hizo y lo que el sistema de monitoreo puede ver.
+
+::: callout-note
+Esto explica por qué Databricks está empujando LTAP tan fuerte en el contexto de su plataforma agentic. Si tenés Genie, Agent Bricks, o agentes custom corriendo en producción, cada milisegundo de latencia y cada pipeline intermedio es fricción. LTAP elimina esa fricción de raíz.
+:::
+
+------------------------------------------------------------------------
+
+## Lo que viene con Lakebase
+
+Además de LTAP, Lakebase trajo features propios que vale la pena conocer:
+
+### Disaster Recovery cross-cloud
+
+Replicación entre nubes y regiones. Si tu Lakebase en AWS US-East se cae, tenés failover a otra región o incluso a Azure. Para quienes están construyendo arquitecturas multi-cloud, esto es significativo.
+
+### Branching estilo Git
+
+Snapshots y branches sobre tus datos de producción. Querés probar una migración de schema? Creás un branch, experimentás, y si sale bien hacés merge. Si sale mal, descartás. Sin tocar producción.
+
+### Operaciones autónomas
+
+Agentes que monitorean la salud de la base, detectan slowdowns, proponen índices y asisten en recovery. La idea de Databricks es que la administración de la base de datos se automatice progresivamente. Lo mismo que Genie ZeroOps hace para pipelines, pero para la base transaccional.
+
+### Lakebase Search
+
+Retrieval híbrido — vector y full-text — nativo dentro de Postgres. Dos extensiones:
+
+-   `lakebase_vector`: pgvector con indexing avanzado para embeddings
+-   `lakebase_text`: BM25 para búsqueda full-text clásica
+
+El loop completo de un agente (retrieve → reason → act → remember) puede correr sobre un solo backend. Te ahorrás montar un Pinecone o Weaviate al lado.
+
+------------------------------------------------------------------------
+
+## Quién ya lo usa
+
+Lakebase (la base de LTAP) ya está en producción con clientes grandes:
+
+-   **Block** (Square, Cash App)
+-   **Superhuman** (email)
+-   **Zillow** (real estate)
+-   **Ensemble Health Partners** — manejan más de 2 PB de datos de revenue cycle en salud
+
+La quote de Ensemble resume bien el caso de uso enterprise:
+
+> *"Lakebase and LTAP extend that foundation by unifying operational and analytical workloads on a single layer, giving our RCM-native AI the real-time access it needs to perform in live operations."*
+>
+> --- Ensemble Health Partners (2+ PB de datos de revenue cycle en salud)
+
+------------------------------------------------------------------------
+
+## Lo que todavía no sabemos
+
+Hay que ser honestos: LTAP fue anunciado como **"coming soon"**. No está GA. Y hay preguntas que todavía no tienen respuesta pública:
+
+1.  **Performance real en producción**: ¿cuánto overhead tiene escribir en Delta/Iceberg desde Postgres comparado con un Postgres puro? Los benchmarks de producción todavía no se publicaron.
+2.  **Compatibilidad con Postgres existente**: ¿podés migrar tu Postgres actual a Lakebase sin fricción? ¿Qué extensiones soporta?
+3.  **Latencia de lectura analítica**: si un agente escribe un registro y otro lo quiere leer para analítica al instante, ¿cuál es la latencia real?
+4.  **Pricing**: Lakebase + Lakehouse sobre los mismos datos, ¿cómo se factura? ¿Es más barato que mantener Postgres + CDC + Kafka + warehouse por separado?
+5.  **Lock-in**: los datos están en formatos abiertos (Delta/Iceberg), pero Lakebase es un servicio de Databricks. Si mañana querés migrar, ¿qué tan viable es?
+
+::: callout-important
+Cada vez que un vendor dice "eliminamos el ETL", hay que preguntarse: ¿lo eliminaste o lo moviste adentro de tu plataforma? Con LTAP, la respuesta parece ser que genuinamente lo eliminan al unificar el storage. Pero hasta que no haya benchmarks independientes y casos de uso en producción abierta, hay que mantener un escepticismo sano.
+:::
+
+------------------------------------------------------------------------
+
+## Mi lectura
+
+LTAP me parece el anuncio más relevante del DAIS 2026 a nivel arquitectónico. No por lo que hace hoy (que todavía no está GA), sino por lo que implica si funciona como prometen.
+
+Reynold Xin lo dijo bien: *"The agents really prefer a much simpler stack."* Y tiene razón — no solo los agentes. Cualquiera que haya mantenido un pipeline de sincronización OLTP → OLAP sabe que la complejidad está en la logística, no en la lógica de negocio.
+
+Si LTAP cumple, hay una cantidad significativa de infraestructura que va a dejar de tener razón de ser. Debezium, Kafka Connect para CDC, Structured Streaming como paso de ingesta, las tablas Bronze que son copias crudas de la fuente, las herramientas de Reverse ETL, las serving layers de cache — todo eso se simplifica drásticamente.
+
+¿Significa que los data engineers nos quedamos sin trabajo? No. Significa que dejamos de gastar tiempo en plomería y podemos enfocarnos en lo que realmente importa: modelado, calidad de datos, y construir productos de datos que generen valor.
+
+Voy a estar siguiendo de cerca cómo avanza. Cuando salga en GA, planeo hacer un benchmark real comparando el stack clásico contra LTAP. Stay tuned.
+
+------------------------------------------------------------------------
+
+## Referencias
+
+-   [Press release — LTAP](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical)
+-   [VentureBeat — Databricks says it solved the decades-old data pipeline problem](https://venturebeat.com/data/databricks-says-it-solved-the-decades-old-data-pipeline-problem-thats-been-slowing-ai-agents)
+-   [BigDATAwire — AI Is Breaking Traditional Data Architectures](https://www.hpcwire.com/bigdatawire/2026/06/17/ai-is-breaking-traditional-data-architectures-databricks-thinks-ltap-is-the-fix/)
+-   [Blocks and Files — Databricks expands Lakehouse to unify OLAP and OLTP](https://www.blocksandfiles.com/data-management/2026/06/18/databricks-expands-lakehouse-to-unify-olap-and-oltp/5258373)
+-   [AI Weekly — LTAP eliminates ETL for AI workloads](https://aiweekly.co/alerts/databricks-ltap-eliminates-etl-for-ai-workloads)
+-   [Lakebase Search — Blog](https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres)
+-   [DAIS 2026 Recap — Spark de Ideas](/blog/posts/dais-2026-recap/)

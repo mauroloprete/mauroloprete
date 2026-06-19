@@ -11,7 +11,444 @@
 <description>Tips de Databricks, Data Engineering, MLOps y procesamiento de encuestas.</description>
 <language>es</language>
 <generator>quarto-1.6.39</generator>
-<lastBuildDate>Wed, 17 Jun 2026 03:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 19 Jun 2026 03:00:00 GMT</lastBuildDate>
+<item>
+  <title>LTAP: Databricks quiere eliminar el ETL entre tu base y tu warehouse</title>
+  <dc:creator>Mauro Loprete</dc:creator>
+  <link>https://mauroloprete.github.io/mauroloprete/blog/posts/ltap-databricks/</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>Si trabajás en data engineering, hay un pipeline que conocés de memoria: el que sincroniza tu base operacional con tu warehouse analítico. Ese que tiene Debezium, Kafka, un Structured Streaming que a veces se cuelga, y un job de dbt que corre a las 4 AM. Ese que cuando se rompe, te enterás porque el dashboard del CEO está vacío.</p>
+<p>En el <a href="https://www.databricks.com/dataaisummit">Data + AI Summit 2026</a>, Databricks anunció algo que apunta directamente a ese pipeline: <strong>LTAP</strong> (Lake Transactional/Analytical Processing). La promesa es que ese pipeline deje de existir. No que se simplifique, no que se automatice — que directamente no haga falta.</p>
+<p>En el <a href="../../../blog/posts/dais-2026-recap/">recap que armé del Summit</a> lo puse como el anuncio más silenciosamente transformador. Acá lo desarmo en profundidad.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>LTAP</strong> = Lake Transactional/Analytical Processing. Unifica OLTP y OLAP sobre una sola copia de datos.</li>
+<li><strong>Lakebase</strong> (Postgres serverless) escribe directamente en Delta e Iceberg. Sin ETL, sin réplicas.</li>
+<li>Elimina tres categorías de infra: <strong>CDC/ETL</strong> de ida, <strong>Reverse ETL</strong> de vuelta, y <strong>serving layers</strong> de cache.</li>
+<li>Los <strong>agentes AI</strong> se benefician directamente: read + reason + write sobre un solo backend, sin cruzar fronteras OLTP/OLAP.</li>
+<li>No es HTAP (que sacrifica performance) ni Zero ETL (que oculta el pipeline). Es unificación en la capa de storage.</li>
+<li>Estado actual: <strong>coming soon</strong> — todavía no está GA.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="qué-es-ltap" class="level2">
+<h2 class="anchored" data-anchor-id="qué-es-ltap">Qué es LTAP</h2>
+<p>LTAP significa <strong>Lake Transactional/Analytical Processing</strong>. Es una arquitectura que combina <a href="https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres">Lakebase</a> (el Postgres serverless de Databricks, que corre sobre object storage abierto) con el Lakehouse, bajo un solo modelo de gobernanza, un solo source of truth y una sola capa de storage.</p>
+<p>La idea central: los datos transaccionales se escriben <strong>directamente en Delta e Iceberg desde el punto de escritura</strong>. No después, no con un CDC de por medio, no con un job batch nocturno. Desde el momento cero.</p>
+<p>Ali Ghodsi lo dijo en el keynote:</p>
+<blockquote class="blockquote">
+<p><em>“For forty years we’ve lived with a separation between OLTP and OLAP… For the first time, we think we’ve cracked the unification code.”</em></p>
+<p>— Ali Ghodsi, CEO de Databricks — DAIS 2026 Keynote</p>
+</blockquote>
+<p>Cuarenta años. Desde que se inventaron los data warehouses, la industria asumió que los datos operacionales y los analíticos viven en mundos separados y que necesitás un pipeline para conectarlos. LTAP dice que no.</p>
+<hr>
+</section>
+<section id="los-componentes" class="level2">
+<h2 class="anchored" data-anchor-id="los-componentes">Los componentes</h2>
+<p>LTAP no es un producto nuevo — es la convergencia de piezas que Databricks viene construyendo:</p>
+<table class="table-striped table-hover caption-top table">
+<caption>Componentes de la arquitectura LTAP</caption>
+<colgroup>
+<col style="width: 20%">
+<col style="width: 18%">
+<col style="width: 62%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Componente</th>
+<th style="text-align: left;">Tipo</th>
+<th style="text-align: left;">Rol en LTAP</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Lakebase</strong></td>
+<td style="text-align: left;">Motor transaccional</td>
+<td style="text-align: left;">Postgres serverless sobre object storage abierto. 12M launches/día.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Lakehouse</strong></td>
+<td style="text-align: left;">Motor analítico</td>
+<td style="text-align: left;">SQL Warehouses, Spark, notebooks — lo que ya conocés.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Unity Catalog</strong></td>
+<td style="text-align: left;">Gobernanza</td>
+<td style="text-align: left;">Un modelo de identidad, permisos y auditoría para ambos mundos.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Lakehouse//RT</strong></td>
+<td style="text-align: left;">Serving real-time</td>
+<td style="text-align: left;">Queries sub-milisegundo sobre datos gobernados en Delta/Iceberg.</td>
+</tr>
+</tbody>
+</table>
+<p>El truco está en que Lakebase y el Lakehouse ahora comparten <strong>la misma copia de datos</strong> en los mismos formatos abiertos. Antes, cada sistema mantenía su propia copia. LTAP cierra esa brecha.</p>
+<hr>
+</section>
+<section id="las-tres-propiedades-que-lo-definen" class="level2">
+<h2 class="anchored" data-anchor-id="las-tres-propiedades-que-lo-definen">Las tres propiedades que lo definen</h2>
+<p>Databricks define LTAP con tres propiedades. Las tres importan:</p>
+<section id="gobernanza-unificada" class="level3">
+<h3 class="anchored" data-anchor-id="gobernanza-unificada">1. Gobernanza unificada</h3>
+<p>Todos los datos — operacionales, analíticos, streaming — viven en open object storage, en formatos abiertos (Delta, Iceberg), sin transformación. Un solo modelo de identidad, permisos y auditoría a través de Unity Catalog.</p>
+<p>Esto suena a marketing, pero pensalo en la práctica: hoy tu Postgres tiene sus roles y permisos, tu warehouse tiene los suyos, y mantenés esa duplicación a mano. Con LTAP, son los mismos datos gobernados una sola vez.</p>
+</section>
+<section id="sin-trade-offs-de-performance" class="level3">
+<h3 class="anchored" data-anchor-id="sin-trade-offs-de-performance">2. Sin trade-offs de performance</h3>
+<p>Acá es donde LTAP se diferencia de HTAP (ya llego a eso). Los workloads transaccionales corren en Postgres estándar con ACID completo. Los workloads analíticos escalan en el Lakehouse completo. <strong>Cada uno escala de forma independiente</strong>, sin mover datos entre sistemas.</p>
+<p>No estás forzando un motor a hacer todo. Tenés dos motores especializados que comparten la misma capa de storage.</p>
+</section>
+<section id="sin-pipelines-etl" class="level3">
+<h3 class="anchored" data-anchor-id="sin-pipelines-etl">3. Sin pipelines ETL</h3>
+<p>Los datos operacionales son inmediatamente consultables para analítica. Sin réplicas, sin conectores, sin CDC. El dato que tu app escribe en Lakebase es el mismo que tu analista consulta en el warehouse.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Esto no significa que dbt, las transformaciones o el modelado dejen de existir. Lo que desaparece es <strong>el pipeline de sincronización</strong> entre la fuente operacional y el warehouse. Tus modelos Silver y Gold siguen teniendo sentido — lo que no tenés es el Bronze que copia datos de Postgres a Delta.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="cómo-se-diferencia-de-htap-y-zero-etl" class="level2">
+<h2 class="anchored" data-anchor-id="cómo-se-diferencia-de-htap-y-zero-etl">Cómo se diferencia de HTAP y Zero ETL</h2>
+<p>Esto lo preguntaron bastante en LinkedIn y la respuesta importa, porque no es lo mismo.</p>
+<table class="table-striped table-hover caption-top table">
+<caption>HTAP vs Zero ETL vs LTAP</caption>
+<colgroup>
+<col style="width: 12%">
+<col style="width: 25%">
+<col style="width: 15%">
+<col style="width: 20%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Enfoque</th>
+<th style="text-align: left;">Arquitectura</th>
+<th style="text-align: left;">Motores</th>
+<th style="text-align: left;">ETL</th>
+<th style="text-align: left;">Problema principal</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>HTAP</strong></td>
+<td style="text-align: left;">Un solo motor para todo</td>
+<td style="text-align: left;">1 (compartido)</td>
+<td style="text-align: left;">No hay</td>
+<td style="text-align: left;">Colapsa aislamiento de workloads. Performance degradada en ambos lados.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Zero ETL</strong></td>
+<td style="text-align: left;">Sistemas separados con sync automático</td>
+<td style="text-align: left;">2 (separados)</td>
+<td style="text-align: left;">Oculto (CDC automatizado)</td>
+<td style="text-align: left;">Sigue habiendo réplicas, latencia y dos copias de datos.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>LTAP</strong></td>
+<td style="text-align: left;">Dos motores, una sola capa de storage</td>
+<td style="text-align: left;">2 (especializados)</td>
+<td style="text-align: left;">Eliminado</td>
+<td style="text-align: left;">Unificación real en el storage, no en el engine.</td>
+</tr>
+</tbody>
+</table>
+<p>La diferencia clave: HTAP intentó meter todo en un motor y nadie lo usó en producción seria porque un query analítico pesado te mataba las transacciones. Zero ETL (como el de AWS entre Aurora y Redshift) automatiza la copia, pero seguís teniendo dos copias con latencia entre ellas.</p>
+<p>LTAP toma otro camino: mantiene motores separados (Postgres para OLTP, Lakehouse para OLAP) pero los sienta sobre la misma capa de storage. El dato es uno solo. No hay copia, no hay sincronización, no hay pipeline que se pueda romper.</p>
+<hr>
+</section>
+<section id="ejemplo-concreto-cómo-cambiaría-tu-stack" class="level2">
+<h2 class="anchored" data-anchor-id="ejemplo-concreto-cómo-cambiaría-tu-stack">Ejemplo concreto: cómo cambiaría tu stack</h2>
+<p>Bajemos esto a tierra con un caso que cualquier data engineer conoce.</p>
+<section id="antes-el-pipeline-clásico" class="level3">
+<h3 class="anchored" data-anchor-id="antes-el-pipeline-clásico">ANTES: el pipeline clásico</h3>
+<p>Tenés una app que corre sobre Postgres. Los datos de transacciones, usuarios, productos — todo vive ahí. Y necesitás esos datos en tu warehouse para analítica, dashboards, modelos de ML.</p>
+<p>El pipeline típico:</p>
+<div class="cell" data-fig-width="8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px', 'fontFamily': 'Helvetica', 'primaryColor': '#593196', 'primaryTextColor': '#fff', 'lineColor': '#94a3b8', 'primaryBorderColor': '#7c4dbd'}}}%%
+flowchart TD
+    PG("&lt;b&gt;Postgres&lt;/b&gt;&lt;br&gt;&lt;small&gt;OLTP&lt;/small&gt;")
+    CDC("&lt;b&gt;Debezium&lt;/b&gt;&lt;br&gt;&lt;small&gt;CDC / WAL&lt;/small&gt;")
+    KAFKA("&lt;b&gt;Kafka / Event Hub&lt;/b&gt;&lt;br&gt;&lt;small&gt;Mensajería&lt;/small&gt;")
+    SS("&lt;b&gt;Spark Structured Streaming&lt;/b&gt;&lt;br&gt;&lt;small&gt;Ingesta&lt;/small&gt;")
+    BRONZE("&lt;b&gt;Delta Lake&lt;/b&gt;&lt;br&gt;&lt;small&gt;Bronze&lt;/small&gt;")
+    DBT("&lt;b&gt;dbt&lt;/b&gt;&lt;br&gt;&lt;small&gt;Silver → Gold&lt;/small&gt;")
+    DASH("&lt;b&gt;Dashboards / ML&lt;/b&gt;")
+    RETL("&lt;b&gt;Reverse ETL&lt;/b&gt;&lt;br&gt;&lt;small&gt;Census, Hightouch...&lt;/small&gt;")
+    SERVE("&lt;b&gt;CRM, Redis, Serving&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving / API cache&lt;/small&gt;")
+
+    PG --&gt; CDC --&gt; KAFKA --&gt; SS --&gt; BRONZE --&gt; DBT
+    DBT --&gt; DASH
+    DBT --&gt; RETL --&gt; SERVE
+
+    style PG fill:#1e293b,stroke:#334155,color:#fff,stroke-width:1.5px
+    style CDC fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style KAFKA fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style SS fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style RETL fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style BRONZE fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DBT fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DASH fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+    style SERVE fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Lo que eso implica en la práctica:</p>
+<ul>
+<li><strong>Debezium</strong> monitoreando el WAL de Postgres. Se cuelga, pierde eventos, hay que reconfigurarlo.</li>
+<li><strong>Kafka</strong> con su propio cluster, retention policies, schema registry, particiones. Otro sistema que mantener.</li>
+<li><strong>Structured Streaming</strong> con checkpoints, watermarks, jobs que fallan a las 3 AM y nadie se entera hasta las 9.</li>
+<li><strong>Reverse ETL</strong> para empujar datos de Gold de vuelta a los sistemas operacionales: CRM, marketing, APIs. Otra herramienta, otro sync, otra fuente de desincronización.</li>
+<li><strong>Serving layer</strong> separada (Redis, Elasticsearch, Pinot) para queries de baja latencia que el warehouse no puede resolver.</li>
+<li><strong>Latencia</strong>: entre que el dato se escribe en Postgres y llega a Gold, pueden pasar minutos u horas. Y si encima tiene que volver al sistema operacional vía Reverse ETL, sumale otro ciclo.</li>
+<li><strong>Desincronización</strong>: si un job falla, tu dashboard muestra datos de ayer. O peor: datos parciales. Y el CRM tiene una versión distinta a la del warehouse.</li>
+<li><strong>Infra</strong>: estás manteniendo Postgres + Kafka + Spark Streaming + Delta Lake + herramienta de Reverse ETL + serving layer. Seis sistemas con sus propios failure modes.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si esto te suena, no estás solo. Es el estado del arte en la mayoría de las empresas. Y funciona… hasta que no funciona.</p>
+</div>
+</div>
+</section>
+<section id="después-con-ltap" class="level3">
+<h3 class="anchored" data-anchor-id="después-con-ltap">DESPUÉS: con LTAP</h3>
+<div class="cell" data-fig-width="8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '14px', 'fontFamily': 'Helvetica', 'primaryColor': '#FFA166', 'primaryTextColor': '#1e293b', 'lineColor': '#94a3b8', 'primaryBorderColor': '#e8854a'}}}%%
+flowchart TD
+    LB("&lt;b&gt;Lakebase&lt;/b&gt;&lt;br&gt;&lt;small&gt;Postgres serverless&lt;/small&gt;")
+    UC("&lt;b&gt;Unity Catalog&lt;/b&gt;&lt;br&gt;&lt;small&gt;Gobernanza unificada&lt;/small&gt;")
+    DBT2("&lt;b&gt;dbt&lt;/b&gt;&lt;br&gt;&lt;small&gt;Silver → Gold&lt;/small&gt;")
+    RT("&lt;b&gt;Lakehouse//RT&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving sub-ms&lt;/small&gt;")
+    APPS("&lt;b&gt;Apps / APIs&lt;/b&gt;&lt;br&gt;&lt;small&gt;Leen directo&lt;/small&gt;")
+    AGENTS("&lt;b&gt;Agentes AI&lt;/b&gt;&lt;br&gt;&lt;small&gt;Read + reason + write&lt;/small&gt;")
+    DASH2("&lt;b&gt;Dashboards / ML&lt;/b&gt;")
+
+    LB -- "escribe directo en Delta / Iceberg" --&gt; UC
+    UC --&gt; DBT2 --&gt; DASH2
+    UC --&gt; RT
+    UC --&gt; APPS
+    UC --&gt; AGENTS
+
+    style LB fill:#1e293b,stroke:#334155,color:#fff,stroke-width:1.5px
+    style UC fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style DBT2 fill:#FFA166,stroke:#e8854a,color:#1e293b,stroke-width:1.5px
+    style RT fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style AGENTS fill:#593196,stroke:#7c4dbd,color:#fff,stroke-width:1.5px
+    style APPS fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+    style DASH2 fill:#f1f5f9,stroke:#e2e8f0,color:#1e293b,stroke-width:1.5px
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Lo que cambia:</p>
+<ul>
+<li><strong>No hay Debezium</strong>. No hay CDC. Lakebase escribe nativamente en Delta/Iceberg.</li>
+<li><strong>No hay Kafka</strong>. No hay sistema de mensajería intermedio.</li>
+<li><strong>No hay Structured Streaming</strong> para ingestar. El dato ya está en el lake.</li>
+<li><strong>No hay Reverse ETL</strong>. La app y el warehouse leen del mismo storage. Si tu modelo Gold calcula un score de churn y querés usarlo en la app, no necesitás empujarlo de vuelta — ya está ahí, accesible desde Lakebase.</li>
+<li><strong>No hay serving layer separada</strong>. Lakehouse//RT resuelve queries sub-milisegundo directamente sobre los datos gobernados. No necesitás Redis ni Pinot como cache intermedio.</li>
+<li><strong>Latencia cero</strong> entre la escritura operacional y la disponibilidad analítica. Es el mismo dato.</li>
+<li><strong>Un solo sistema de gobernanza</strong>. Unity Catalog para permisos, lineage, auditoría.</li>
+<li><strong>dbt sigue existiendo</strong> — pero transforma datos que ya están en Delta, no datos que tuvieron que viajar por tres sistemas para llegar.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Pensalo así: no desaparece el modelado ni la transformación. Lo que desaparece es <strong>la logística</strong> de mover datos de ida y vuelta entre mundos. ETL para traer, Reverse ETL para devolver, serving layer para cachear. Y esa logística es donde se van la mayoría de las horas de on-call y los incidentes de las 3 AM.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="por-qué-los-agentes-ai-necesitan-esto" class="level2">
+<h2 class="anchored" data-anchor-id="por-qué-los-agentes-ai-necesitan-esto">Por qué los agentes AI necesitan esto</h2>
+<p>Reynold Xin lo dijo en el keynote:</p>
+<blockquote class="blockquote">
+<p><em>“The agents really prefer a much simpler stack, because they can move way faster.”</em></p>
+<p>— Reynold Xin, Co-founder de Databricks — DAIS 2026 Keynote</p>
+</blockquote>
+<p>Y no es una frase de marketing — hay una razón técnica concreta.</p>
+<p>Un agente AI típico necesita hacer tres cosas:</p>
+<ol type="1">
+<li><strong>Leer datos históricos</strong> para tomar contexto (analítico — OLAP)</li>
+<li><strong>Razonar</strong> sobre esos datos</li>
+<li><strong>Escribir el resultado</strong> en el sistema operacional para que la app actúe (transaccional — OLTP)</li>
+</ol>
+<p>Con el stack clásico, los pasos 1 y 3 viven en mundos separados. El agente tiene que hablar con el warehouse para leer y con la base operacional para escribir, cruzando la frontera OLTP/OLAP en cada ciclo. Y si el resultado de la acción tiene que estar disponible para analítica (para monitorear qué hizo el agente), necesitás esperar a que el pipeline de CDC lo traiga de vuelta al warehouse.</p>
+<p>Con LTAP, el agente opera sobre un solo backend:</p>
+<ul>
+<li>Lee datos históricos y analíticos → Lakehouse (misma copia de datos)</li>
+<li>Escribe resultados operacionales → Lakebase (misma copia de datos)</li>
+<li>El resultado es inmediatamente consultable para analítica, sin esperar a ningún pipeline</li>
+<li>Con Lakebase Search, el retrieval (vector + full-text) también corre en el mismo backend</li>
+</ul>
+<p>El loop completo — <strong>retrieve → reason → act → remember</strong> — pasa sobre una sola capa de storage. No hay latencia de sincronización entre lo que el agente hizo y lo que el sistema de monitoreo puede ver.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Esto explica por qué Databricks está empujando LTAP tan fuerte en el contexto de su plataforma agentic. Si tenés Genie, Agent Bricks, o agentes custom corriendo en producción, cada milisegundo de latencia y cada pipeline intermedio es fricción. LTAP elimina esa fricción de raíz.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="lo-que-viene-con-lakebase" class="level2">
+<h2 class="anchored" data-anchor-id="lo-que-viene-con-lakebase">Lo que viene con Lakebase</h2>
+<p>Además de LTAP, Lakebase trajo features propios que vale la pena conocer:</p>
+<section id="disaster-recovery-cross-cloud" class="level3">
+<h3 class="anchored" data-anchor-id="disaster-recovery-cross-cloud">Disaster Recovery cross-cloud</h3>
+<p>Replicación entre nubes y regiones. Si tu Lakebase en AWS US-East se cae, tenés failover a otra región o incluso a Azure. Para quienes están construyendo arquitecturas multi-cloud, esto es significativo.</p>
+</section>
+<section id="branching-estilo-git" class="level3">
+<h3 class="anchored" data-anchor-id="branching-estilo-git">Branching estilo Git</h3>
+<p>Snapshots y branches sobre tus datos de producción. Querés probar una migración de schema? Creás un branch, experimentás, y si sale bien hacés merge. Si sale mal, descartás. Sin tocar producción.</p>
+</section>
+<section id="operaciones-autónomas" class="level3">
+<h3 class="anchored" data-anchor-id="operaciones-autónomas">Operaciones autónomas</h3>
+<p>Agentes que monitorean la salud de la base, detectan slowdowns, proponen índices y asisten en recovery. La idea de Databricks es que la administración de la base de datos se automatice progresivamente. Lo mismo que Genie ZeroOps hace para pipelines, pero para la base transaccional.</p>
+</section>
+<section id="lakebase-search" class="level3">
+<h3 class="anchored" data-anchor-id="lakebase-search">Lakebase Search</h3>
+<p>Retrieval híbrido — vector y full-text — nativo dentro de Postgres. Dos extensiones:</p>
+<ul>
+<li><code>lakebase_vector</code>: pgvector con indexing avanzado para embeddings</li>
+<li><code>lakebase_text</code>: BM25 para búsqueda full-text clásica</li>
+</ul>
+<p>El loop completo de un agente (retrieve → reason → act → remember) puede correr sobre un solo backend. Te ahorrás montar un Pinecone o Weaviate al lado.</p>
+<hr>
+</section>
+</section>
+<section id="quién-ya-lo-usa" class="level2">
+<h2 class="anchored" data-anchor-id="quién-ya-lo-usa">Quién ya lo usa</h2>
+<p>Lakebase (la base de LTAP) ya está en producción con clientes grandes:</p>
+<ul>
+<li><strong>Block</strong> (Square, Cash App)</li>
+<li><strong>Superhuman</strong> (email)</li>
+<li><strong>Zillow</strong> (real estate)</li>
+<li><strong>Ensemble Health Partners</strong> — manejan más de 2 PB de datos de revenue cycle en salud</li>
+</ul>
+<p>La quote de Ensemble resume bien el caso de uso enterprise:</p>
+<blockquote class="blockquote">
+<p><em>“Lakebase and LTAP extend that foundation by unifying operational and analytical workloads on a single layer, giving our RCM-native AI the real-time access it needs to perform in live operations.”</em></p>
+<p>— Ensemble Health Partners (2+ PB de datos de revenue cycle en salud)</p>
+</blockquote>
+<hr>
+</section>
+<section id="lo-que-todavía-no-sabemos" class="level2">
+<h2 class="anchored" data-anchor-id="lo-que-todavía-no-sabemos">Lo que todavía no sabemos</h2>
+<p>Hay que ser honestos: LTAP fue anunciado como <strong>“coming soon”</strong>. No está GA. Y hay preguntas que todavía no tienen respuesta pública:</p>
+<ol type="1">
+<li><strong>Performance real en producción</strong>: ¿cuánto overhead tiene escribir en Delta/Iceberg desde Postgres comparado con un Postgres puro? Los benchmarks de producción todavía no se publicaron.</li>
+<li><strong>Compatibilidad con Postgres existente</strong>: ¿podés migrar tu Postgres actual a Lakebase sin fricción? ¿Qué extensiones soporta?</li>
+<li><strong>Latencia de lectura analítica</strong>: si un agente escribe un registro y otro lo quiere leer para analítica al instante, ¿cuál es la latencia real?</li>
+<li><strong>Pricing</strong>: Lakebase + Lakehouse sobre los mismos datos, ¿cómo se factura? ¿Es más barato que mantener Postgres + CDC + Kafka + warehouse por separado?</li>
+<li><strong>Lock-in</strong>: los datos están en formatos abiertos (Delta/Iceberg), pero Lakebase es un servicio de Databricks. Si mañana querés migrar, ¿qué tan viable es?</li>
+</ol>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Cada vez que un vendor dice “eliminamos el ETL”, hay que preguntarse: ¿lo eliminaste o lo moviste adentro de tu plataforma? Con LTAP, la respuesta parece ser que genuinamente lo eliminan al unificar el storage. Pero hasta que no haya benchmarks independientes y casos de uso en producción abierta, hay que mantener un escepticismo sano.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="mi-lectura" class="level2">
+<h2 class="anchored" data-anchor-id="mi-lectura">Mi lectura</h2>
+<p>LTAP me parece el anuncio más relevante del DAIS 2026 a nivel arquitectónico. No por lo que hace hoy (que todavía no está GA), sino por lo que implica si funciona como prometen.</p>
+<p>Reynold Xin lo dijo bien: <em>“The agents really prefer a much simpler stack.”</em> Y tiene razón — no solo los agentes. Cualquiera que haya mantenido un pipeline de sincronización OLTP → OLAP sabe que la complejidad está en la logística, no en la lógica de negocio.</p>
+<p>Si LTAP cumple, hay una cantidad significativa de infraestructura que va a dejar de tener razón de ser. Debezium, Kafka Connect para CDC, Structured Streaming como paso de ingesta, las tablas Bronze que son copias crudas de la fuente, las herramientas de Reverse ETL, las serving layers de cache — todo eso se simplifica drásticamente.</p>
+<p>¿Significa que los data engineers nos quedamos sin trabajo? No.&nbsp;Significa que dejamos de gastar tiempo en plomería y podemos enfocarnos en lo que realmente importa: modelado, calidad de datos, y construir productos de datos que generen valor.</p>
+<p>Voy a estar siguiendo de cerca cómo avanza. Cuando salga en GA, planeo hacer un benchmark real comparando el stack clásico contra LTAP. Stay tuned.</p>
+<hr>
+</section>
+<section id="referencias" class="level2">
+<h2 class="anchored" data-anchor-id="referencias">Referencias</h2>
+<ul>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-ltap-first-lake-transactionalanalytical">Press release — LTAP</a></li>
+<li><a href="https://venturebeat.com/data/databricks-says-it-solved-the-decades-old-data-pipeline-problem-thats-been-slowing-ai-agents">VentureBeat — Databricks says it solved the decades-old data pipeline problem</a></li>
+<li><a href="https://www.hpcwire.com/bigdatawire/2026/06/17/ai-is-breaking-traditional-data-architectures-databricks-thinks-ltap-is-the-fix/">BigDATAwire — AI Is Breaking Traditional Data Architectures</a></li>
+<li><a href="https://www.blocksandfiles.com/data-management/2026/06/18/databricks-expands-lakehouse-to-unify-olap-and-oltp/5258373">Blocks and Files — Databricks expands Lakehouse to unify OLAP and OLTP</a></li>
+<li><a href="https://aiweekly.co/alerts/databricks-ltap-eliminates-etl-for-ai-workloads">AI Weekly — LTAP eliminates ETL for AI workloads</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres">Lakebase Search — Blog</a></li>
+<li><a href="../../../blog/posts/dais-2026-recap/">DAIS 2026 Recap — Spark de Ideas</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <category>Data Engineering</category>
+  <category>Data Architecture</category>
+  <category>Databricks Tips</category>
+  <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/ltap-databricks/</guid>
+  <pubDate>Fri, 19 Jun 2026 03:00:00 GMT</pubDate>
+  <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/ltap-databricks/cover.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>DAIS 2026 Día 3: Genie Code for ML, Lakeflow Designer y Nadella x Ghodsi</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -20842,931 +21279,6 @@ font-style: inherit;">-- y además reordena los datos para queries más rápidas
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/data-engineering-design-patterns/</guid>
   <pubDate>Mon, 15 Sep 2025 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/data-engineering-design-patterns/cover.png" medium="image" type="image/png" height="81" width="144"/>
-</item>
-<item>
-  <title>DataOps: cómo llevar tus pipelines al siguiente nivel</title>
-  <dc:creator>Mauro Loprete</dc:creator>
-  <link>https://mauroloprete.github.io/mauroloprete/blog/posts/dataops-pipelines/</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>En este episodio del podcast hablo sobre DataOps: que es, por que no es simplemente “DevOps para datos”, y como puede transformar la forma en que construimos y mantenemos pipelines. Aca va una version expandida con ejemplos concretos y opiniones basadas en lo que vi funcionando (y fallando) en produccion.</p>
-<p><i class="fa-solid fa-podcast" aria-label="podcast"></i> <a href="https://open.spotify.com/episode/7wyLHHZroEG7JZ8YH2K9h0">Escuchar el episodio en Spotify</a></p>
-<section id="que-es-dataops-de-verdad" class="level2">
-<h2 class="anchored" data-anchor-id="que-es-dataops-de-verdad">Que es DataOps (de verdad)</h2>
-<p>DataOps es la aplicacion de principios de ingenieria de software — automatizacion, testing, CI/CD, monitoreo — al ciclo de vida de los datos. Pero ojo: no es comprar una herramienta ni instalar Airflow y declarar victoria.</p>
-<p>Una definicion practica: <strong>DataOps es un conjunto de practicas que buscan reducir el tiempo entre que un cambio en un pipeline se escribe y llega a produccion de forma confiable, testeada y observable.</strong></p>
-<p>Si tu proceso para deployar un pipeline es “abrir un notebook en produccion y correrlo a mano”, no estas haciendo DataOps. Si tu unica forma de saber que un pipeline fallo es que alguien te avisa por Slack, tampoco.</p>
-</section>
-<section id="dataops-vs-devops-primos-no-gemelos" class="level2">
-<h2 class="anchored" data-anchor-id="dataops-vs-devops-primos-no-gemelos">DataOps vs DevOps: primos, no gemelos</h2>
-<p>DevOps y DataOps comparten principios (automatizacion, feedback rapido, colaboracion entre equipos). Pero los datos tienen problemas que el software tradicional no tiene:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Dimension</th>
-<th>DevOps</th>
-<th>DataOps</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Que se versiona</td>
-<td>Codigo fuente</td>
-<td>Codigo + datos + schemas + configs</td>
-</tr>
-<tr class="even">
-<td>Estado</td>
-<td>Stateless (idealmente)</td>
-<td>Stateful siempre — los datos persisten</td>
-</tr>
-<tr class="odd">
-<td>Testing</td>
-<td>Unit tests, integration tests</td>
-<td>Todo lo anterior + calidad de datos, freshness, volumen</td>
-</tr>
-<tr class="even">
-<td>Falla tipica</td>
-<td>“No compila”</td>
-<td>“Compila perfecto, pero los datos estan mal”</td>
-</tr>
-<tr class="odd">
-<td>Schema</td>
-<td>API contracts fijos</td>
-<td>Schema drift constante — las fuentes cambian sin avisar</td>
-</tr>
-<tr class="even">
-<td>Dependencias</td>
-<td>Entre servicios</td>
-<td>Entre datasets, con temporalidad y orden de ejecucion</td>
-</tr>
-</tbody>
-</table>
-<p>La diferencia clave: <strong>en software, si el test pasa, el codigo funciona. En datos, el test puede pasar y los datos pueden seguir estando mal.</strong> Un pipeline de ingesta puede correr sin errores y traer filas duplicadas, campos vacios, o datos de hace tres dias porque la fuente se colgo.</p>
-</section>
-<section id="los-tres-pilares-de-dataops" class="level2">
-<h2 class="anchored" data-anchor-id="los-tres-pilares-de-dataops">Los tres pilares de DataOps</h2>
-<section id="automatizacion" class="level3">
-<h3 class="anchored" data-anchor-id="automatizacion">1. Automatizacion</h3>
-<p>Si haces algo mas de dos veces a mano, automatizalo. Esto incluye:</p>
-<p><strong>CI/CD para pipelines.</strong> Cada cambio en un pipeline deberia pasar por un proceso automatizado antes de llegar a produccion. Ejemplo con GitHub Actions y Databricks Asset Bundles:</p>
-<div id="lst-cicd-gha" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cicd-gha-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: CI/CD para pipelines con GitHub Actions y Databricks Asset Bundles
-</figcaption>
-<div aria-describedby="lst-cicd-gha-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cicd-gha" style="background: #f1f3f5;"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-cicd-gha-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># .github/workflows/deploy-pipeline.yml</span></span>
-<span id="lst-cicd-gha-2"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> Deploy Pipeline</span></span>
-<span id="lst-cicd-gha-3"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">on</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-cicd-gha-4"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">  </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">push</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-cicd-gha-5"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">branches</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">[</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">main</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">]</span></span>
-<span id="lst-cicd-gha-6"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">paths</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">[</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'pipelines/**'</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">]</span></span>
-<span id="lst-cicd-gha-7"></span>
-<span id="lst-cicd-gha-8"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">jobs</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-cicd-gha-9"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">  </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">validate-and-deploy</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-cicd-gha-10"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">runs-on</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> ubuntu-latest</span></span>
-<span id="lst-cicd-gha-11"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">steps</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-cicd-gha-12"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">      </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">uses</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> actions/checkout@v4</span></span>
-<span id="lst-cicd-gha-13"></span>
-<span id="lst-cicd-gha-14"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">      </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> Setup Databricks CLI</span></span>
-<span id="lst-cicd-gha-15"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">uses</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> databricks/setup-cli@main</span></span>
-<span id="lst-cicd-gha-16"></span>
-<span id="lst-cicd-gha-17"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">      </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> Validate bundle</span></span>
-<span id="lst-cicd-gha-18"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">run</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> databricks bundle validate</span></span>
-<span id="lst-cicd-gha-19"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">env</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-cicd-gha-20"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">          </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">DATABRICKS_HOST</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> ${{ secrets.DBX_HOST }}</span></span>
-<span id="lst-cicd-gha-21"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">          </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">DATABRICKS_TOKEN</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> ${{ secrets.DBX_TOKEN }}</span></span>
-<span id="lst-cicd-gha-22"></span>
-<span id="lst-cicd-gha-23"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">      </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> Run tests</span></span>
-<span id="lst-cicd-gha-24"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">run</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> databricks bundle run test_pipeline --no-wait</span></span>
-<span id="lst-cicd-gha-25"></span>
-<span id="lst-cicd-gha-26"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">      </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> Deploy to production</span></span>
-<span id="lst-cicd-gha-27"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">if</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> success()</span></span>
-<span id="lst-cicd-gha-28"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">run</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> databricks bundle deploy --target prod</span></span></code></pre></div>
-</div>
-</figure>
-</div>
-<p><strong>Tests automatizados de calidad de datos.</strong> No alcanza con testear que el pipeline no tire excepcion. Hay que testear los datos. Ejemplo con un test en PySpark:</p>
-<div id="lst-tests-quality" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-tests-quality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Tests automatizados de duplicados y freshness en PySpark
-</figcaption>
-<div aria-describedby="lst-tests-quality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-tests-quality" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-tests-quality-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> pyspark.sql <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> functions <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> F</span>
-<span id="lst-tests-quality-2"></span>
-<span id="lst-tests-quality-3"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> test_no_duplicates(df, key_columns):</span>
-<span id="lst-tests-quality-4">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">"""Valida que no haya duplicados por clave primaria."""</span></span>
-<span id="lst-tests-quality-5">    total <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> df.count()</span>
-<span id="lst-tests-quality-6">    distinct <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> df.select(key_columns).distinct().count()</span>
-<span id="lst-tests-quality-7">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">assert</span> total <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">==</span> distinct, (</span>
-<span id="lst-tests-quality-8">        <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Duplicados detectados: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>total<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> filas, "</span></span>
-<span id="lst-tests-quality-9">        <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>distinct<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> distintas por </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>key_columns<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span></span>
-<span id="lst-tests-quality-10">    )</span>
-<span id="lst-tests-quality-11"></span>
-<span id="lst-tests-quality-12"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> test_freshness(df, date_col, max_hours<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">24</span>):</span>
-<span id="lst-tests-quality-13">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">"""Valida que los datos no tengan mas de N horas de atraso."""</span></span>
-<span id="lst-tests-quality-14">    latest <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> df.agg(F.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">max</span>(date_col)).collect()[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="lst-tests-quality-15">    <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> datetime <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> datetime, timedelta</span>
-<span id="lst-tests-quality-16">    threshold <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> datetime.now() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> timedelta(hours<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>max_hours)</span>
-<span id="lst-tests-quality-17">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">assert</span> latest <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;=</span> threshold, (</span>
-<span id="lst-tests-quality-18">        <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Datos desactualizados: ultimo registro </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>latest<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">, "</span></span>
-<span id="lst-tests-quality-19">        <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"threshold </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>threshold<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span></span>
-<span id="lst-tests-quality-20">    )</span></code></pre></div>
-</div>
-</figure>
-</div>
-<p><strong>Validacion de schema.</strong> Si usas dbt, esto es nativo:</p>
-<div id="lst-dbt-tests" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dbt-tests-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Validación de schema y calidad con tests de dbt
-</figcaption>
-<div aria-describedby="lst-dbt-tests-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-dbt-tests" style="background: #f1f3f5;"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-dbt-tests-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># models/staging/stg_transactions.yml</span></span>
-<span id="lst-dbt-tests-2"><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">models</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-dbt-tests-3"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">  </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> stg_transactions</span></span>
-<span id="lst-dbt-tests-4"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">columns</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-dbt-tests-5"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">      </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> transaction_id</span></span>
-<span id="lst-dbt-tests-6"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">tests</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-dbt-tests-7"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">          </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> not_null</span></span>
-<span id="lst-dbt-tests-8"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">          </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> unique</span></span>
-<span id="lst-dbt-tests-9"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">      </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> amount</span></span>
-<span id="lst-dbt-tests-10"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">tests</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-dbt-tests-11"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">          </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> not_null</span></span>
-<span id="lst-dbt-tests-12"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">          </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">dbt_utils.accepted_range</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-dbt-tests-13"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">              </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">min_value</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span></span>
-<span id="lst-dbt-tests-14"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">              </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">max_value</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000000</span></span>
-<span id="lst-dbt-tests-15"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">      </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> status</span></span>
-<span id="lst-dbt-tests-16"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">        </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">tests</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-dbt-tests-17"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">          </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">-</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">accepted_values</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span></span>
-<span id="lst-dbt-tests-18"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">              </span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">values</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">:</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">[</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'completed'</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">,</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'pending'</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">,</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;"> </span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'failed'</span><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">]</span></span></code></pre></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="monitoreo-y-observabilidad" class="level3">
-<h3 class="anchored" data-anchor-id="monitoreo-y-observabilidad">2. Monitoreo y observabilidad</h3>
-<p>Automatizar sin monitorear es como manejar con los ojos cerrados. Los cuatro tipos de monitoreo que necesitas:</p>
-<ul>
-<li><strong>Calidad de datos</strong>: nulos inesperados, duplicados, valores fuera de rango, schema drift</li>
-<li><strong>Freshness / SLAs</strong>: los datos llegan a tiempo? la tabla Silver se actualizo antes de las 8 AM?</li>
-<li><strong>Performance</strong>: latencia del pipeline, tiempo de ejecucion, volumen procesado por batch</li>
-<li><strong>Costo</strong>: cuantos DBUs consumiste, cuanto compute estas quemando en OPTIMIZE innecesarios</li>
-</ul>
-<p>No necesitas una herramienta cara para arrancar. Un check basico en tu pipeline ya es monitoreo:</p>
-<div id="lst-monitoring" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-monitoring-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Monitoreo básico post-ejecución: volumen y nulidad por columna
-</figcaption>
-<div aria-describedby="lst-monitoring-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-monitoring" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-monitoring-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> logging</span>
-<span id="lst-monitoring-2"></span>
-<span id="lst-monitoring-3">logger <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> logging.getLogger(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"pipeline_monitor"</span>)</span>
-<span id="lst-monitoring-4"></span>
-<span id="lst-monitoring-5"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> monitor_pipeline_run(df, table_name, expected_min_rows<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>):</span>
-<span id="lst-monitoring-6">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">"""Monitoreo basico post-ejecucion."""</span></span>
-<span id="lst-monitoring-7">    row_count <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> df.count()</span>
-<span id="lst-monitoring-8">    null_pct <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (</span>
-<span id="lst-monitoring-9">        df.select(</span>
-<span id="lst-monitoring-10">            [F.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(F.col(c).isNull().cast(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"int"</span>)).alias(c)</span>
-<span id="lst-monitoring-11">             <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> c <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> df.columns]</span>
-<span id="lst-monitoring-12">        ).collect()[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>]</span>
-<span id="lst-monitoring-13">    )</span>
-<span id="lst-monitoring-14"></span>
-<span id="lst-monitoring-15">    logger.info(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"[</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>table_name<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">] Filas procesadas: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>row_count<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="lst-monitoring-16"></span>
-<span id="lst-monitoring-17">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> row_count <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&lt;</span> expected_min_rows:</span>
-<span id="lst-monitoring-18">        logger.warning(</span>
-<span id="lst-monitoring-19">            <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"[</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>table_name<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">] Volumen bajo: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>row_count<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;"> filas "</span></span>
-<span id="lst-monitoring-20">            <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"(esperado &gt;= </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>expected_min_rows<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">)"</span></span>
-<span id="lst-monitoring-21">        )</span>
-<span id="lst-monitoring-22"></span>
-<span id="lst-monitoring-23">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> col_name, null_count <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">zip</span>(df.columns, null_pct):</span>
-<span id="lst-monitoring-24">        pct <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (null_count <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">/</span> row_count <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">100</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> row_count <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">else</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span></span>
-<span id="lst-monitoring-25">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> pct <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span>:</span>
-<span id="lst-monitoring-26">            logger.warning(</span>
-<span id="lst-monitoring-27">                <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"[</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>table_name<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">] Alta nulidad en </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>col_name<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>pct<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">%"</span></span>
-<span id="lst-monitoring-28">            )</span></code></pre></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="colaboracion" class="level3">
-<h3 class="anchored" data-anchor-id="colaboracion">3. Colaboracion</h3>
-<p>Este es el pilar que mas se ignora. DataOps no es solo tooling — es como los equipos trabajan juntos.</p>
-<p><strong>Data Contracts entre equipos.</strong> El equipo de backend no puede cambiar el tipo de una columna sin avisarte. Necesitas un contrato formal. Escribi un post entero sobre esto (ver links abajo).</p>
-<p><strong>Documentacion como codigo.</strong> Si la documentacion esta en un Confluence que nadie actualiza, no sirve. La documentacion deberia vivir junto al codigo (como los <code>.yml</code> de dbt o los comentarios en los modelos).</p>
-<p><strong>Linaje compartido.</strong> Todos los equipos deberian poder ver de donde vienen los datos, por donde pasan, y quien los consume. Unity Catalog en Databricks te da esto gratis si lo configuras bien.</p>
-</section>
-</section>
-<section id="niveles-de-madurez-en-dataops" class="level2">
-<h2 class="anchored" data-anchor-id="niveles-de-madurez-en-dataops">Niveles de madurez en DataOps</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Nivel</th>
-<th>Nombre</th>
-<th>Caracteristicas</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>0</td>
-<td>Manual</td>
-<td>Pipelines se corren a mano, no hay tests, no hay CI/CD. “Funciona en mi notebook.”</td>
-</tr>
-<tr class="even">
-<td>1</td>
-<td>CI basico</td>
-<td>El codigo esta en Git, hay algun proceso de deploy, pero los tests son manuales o no existen.</td>
-</tr>
-<tr class="odd">
-<td>2</td>
-<td>Testing automatizado</td>
-<td>Tests de calidad de datos en el pipeline, validacion de schema, CI/CD completo. Los errores se detectan antes de produccion.</td>
-</tr>
-<tr class="even">
-<td>3</td>
-<td>Observabilidad completa</td>
-<td>Monitoreo de freshness, SLAs, costos, data contracts entre equipos, alertas automaticas, linaje end-to-end.</td>
-</tr>
-</tbody>
-</table>
-<p>La mayoria de los equipos que conozco estan entre el nivel 0 y el 1. Llegar al nivel 2 ya es un salto enorme. El nivel 3 es donde queres estar, pero requiere no solo herramientas sino un cambio cultural.</p>
-</section>
-<section id="errores-comunes" class="level2">
-<h2 class="anchored" data-anchor-id="errores-comunes">Errores comunes</h2>
-<p><strong>“Hacemos DataOps porque usamos Airflow.”</strong> No.&nbsp;Airflow es un orquestador, no una practica. Podes tener Airflow y seguir deployando a mano, sin tests, sin monitoreo. La herramienta no es la practica.</p>
-<p><strong>Confundir CI/CD con DataOps.</strong> CI/CD es una parte de DataOps (automatizacion), pero si no tenes monitoreo ni colaboracion, tenes un tercio del puzzle.</p>
-<p><strong>Automatizar sin testear.</strong> El peor escenario: un pipeline que se deployea automaticamente a produccion, sin tests de calidad, y rompe datos en silencio. Automatizaste el desastre.</p>
-<p><strong>Ignorar el costo.</strong> DataOps tambien es eficiencia. Si tu pipeline corre un <code>OPTIMIZE</code> completo en una tabla de 10 TB todos los dias sin predicado, estas quemando plata. El monitoreo de costos es parte de la observabilidad.</p>
-</section>
-<section id="links" class="level2">
-<h2 class="anchored" data-anchor-id="links">Links</h2>
-<ul>
-<li><i class="fa-solid fa-podcast" aria-label="podcast"></i> <a href="https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w">Episodio en Spotify</a></li>
-<li><i class="fa-solid fa-book" aria-label="book"></i> <a href="https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/">Fundamentals of Data Engineering (Reis &amp; Housley)</a> — cubre DataOps como disciplina</li>
-<li><i class="fa-solid fa-book" aria-label="book"></i> <a href="https://www.oreilly.com/library/view/data-pipelines-pocket/9781492087823/">Data Pipelines Pocket Reference (Densmore)</a> — patrones practicos de CI/CD para datos</li>
-<li><i class="fa-solid fa-link" aria-label="link"></i> <a href="https://dataopsmanifesto.org/">DataOps Manifesto</a> — los 18 principios originales</li>
-<li><i class="fa-solid fa-code-branch" aria-label="code-branch"></i> <a href="https://docs.databricks.com/en/dev-tools/bundles/index.html">Databricks Asset Bundles docs</a> — CI/CD nativo para Databricks</li>
-</ul>
-<hr>
-<p><em>Proximo episodio: Data Contracts — como disenar un framework desde cero.</em></p>
-
-
-</section>
-
- ]]></description>
-  <category>Podcast</category>
-  <category>Data Engineering</category>
-  <category>DataOps</category>
-  <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/dataops-pipelines/</guid>
-  <pubDate>Mon, 01 Sep 2025 03:00:00 GMT</pubDate>
-  <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/dataops-pipelines/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>
