@@ -10,8 +10,1287 @@
 <atom:link href="https://mauroloprete.github.io/mauroloprete/blog/index.xml" rel="self" type="application/rss+xml"/>
 <description>Tips de Databricks, Data Engineering, MLOps y procesamiento de encuestas.</description>
 <language>es</language>
-<generator>quarto-1.6.39</generator>
-<lastBuildDate>Fri, 19 Jun 2026 03:00:00 GMT</lastBuildDate>
+<generator>quarto-1.9.38</generator>
+<lastBuildDate>Sun, 21 Jun 2026 03:00:00 GMT</lastBuildDate>
+<item>
+  <title>El mapa de GitHub de Databricks: repos que tenés que conocer</title>
+  <dc:creator>Mauro Loprete</dc:creator>
+  <link>https://mauroloprete.github.io/mauroloprete/blog/posts/repos-github-databricks/</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>El ecosistema de Databricks se mueve rápido. Cada Data + AI Summit trae una avalancha de anuncios, y entre summit y summit aparecen repos nuevos que a veces resuelven problemas que venías peleando hace meses. El tema es que si no estás mirando activamente, te los perdés — y terminás reinventando la rueda o usando herramientas deprecadas.</p>
+<p><strong>¿Cómo se afronta esto sin volverse loco?</strong> No necesitás seguir todo. Lo que sí necesitás es saber <em>dónde</em> mirar y <em>qué vale la pena</em>. La buena noticia es que Databricks construye en abierto — sus repos de GitHub son la ventana más directa a lo que viene. Spark Declarative Pipelines, Lakebase, Omnigent — todo apareció primero en GitHub, antes que en cualquier blog corporativo o keynote. Seguir los repos correctos, seguir a los referentes que aportan a la comunidad, y probar las herramientas en tu propio entorno es la forma más práctica de estar actualizado sin depender de que alguien te lo cuente.</p>
+<p>Databricks tiene más de 500 repos públicos, dispersos en cuatro organizaciones propias más varios proyectos open-source que viven en fundaciones independientes. Cada org tiene un propósito distinto, un nivel de soporte distinto, y si no sabés cuál es cuál, podés terminar usando en producción algo que es un experimento de un hackathon interno. Si alguna vez buscaste algo y terminaste en un repo deprecado de 2019, este post es para vos.</p>
+<p>Armé esta guía curada organizando todo por tema y nivel de madurez. <strong>Podés leerla de corrido como un blog post</strong> — tiene contexto, reseñas y demos para cada herramienta — <strong>o usarla como fuente de consulta</strong> cuando necesites encontrar un repo para un problema puntual. No es un listado exhaustivo: es lo que yo considero más útil si laburás con Databricks día a día.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Databricks tiene <strong>cuatro orgs propias en GitHub</strong> — todas mantenidas por empleados, pero con distinto rol: <code>databricks</code> (producto), <code>databrickslabs</code> (experimental), <code>databricks-solutions</code> (toolkits de campo), <code>databricks-industry-solutions</code> (soluciones finales por industria). Más proyectos OSS en fundaciones independientes.</li>
+<li>Para <strong>desarrollo con coding agents</strong> (Claude Code, Cursor, Copilot): el <a href="https://github.com/databricks-solutions/ai-dev-kit">AI Dev Kit</a> es el repo más completo con 75+ herramientas.</li>
+<li>Para <strong>Databricks Apps</strong>: <a href="https://github.com/databricks/appkit">AppKit</a> es el SDK nuevo de React/Node.js con plugins para Genie, Lakebase, SQL y Files.</li>
+<li>Para <strong>Data Engineering</strong>: <code>dbt-databricks</code>, <code>terraform-provider-databricks</code>, <code>mlops-stacks</code> y los bundles examples siguen siendo esenciales.</li>
+<li>Los <strong>MVPs de la comunidad</strong> (MrPowers, Jacek Laskowski) mantienen herramientas que muchos equipos usan en producción sin saber que son community-driven.</li>
+</ul>
+</div>
+</div>
+<section id="guía-de-colores" class="level3">
+<h3 class="anchored" data-anchor-id="guía-de-colores">Guía de colores</h3>
+<p>A lo largo del post, cada card tiene un borde de color que indica de qué organización viene:</p>
+<div class="org-legend">
+<div class="org-legend-item">
+<p><span class="org-dot navy"></span> <strong>databricks</strong> — Producto oficial</p>
+</div>
+<div class="org-legend-item">
+<p><span class="org-dot orange"></span> <strong>databrickslabs</strong> — Experimental</p>
+</div>
+<div class="org-legend-item">
+<p><span class="org-dot purple"></span> <strong>databricks-solutions</strong> — Field Engineering</p>
+</div>
+<div class="org-legend-item">
+<p><span class="org-dot pink"></span> <strong>databricks-industry-solutions</strong> — Soluciones por industria</p>
+</div>
+<div class="org-legend-item">
+<p><span class="org-dot blue"></span> <strong>OSS foundations</strong> — Linux Foundation / Apache</p>
+</div>
+<div class="org-legend-item">
+<p><span class="org-dot green"></span> <strong>Comunidad</strong> — MVPs y terceros</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="las-organizaciones-de-databricks-en-github" class="level2">
+<h2 class="anchored" data-anchor-id="las-organizaciones-de-databricks-en-github">Las organizaciones de Databricks en GitHub</h2>
+<p>Todas son de Databricks, pero no son lo mismo. Las cuatro organizaciones son propiedad de Databricks y están mantenidas por empleados — ninguna es comunidad externa. La diferencia está en <strong>quién</strong> dentro de Databricks las mantiene y con <strong>qué nivel de compromiso</strong>:</p>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-oficial" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-oficial"><a href="https://github.com/databricks"><i class="fa-brands fa-github" aria-label="github"></i> databricks</a> <span class="section-badge badge-official">Oficial</span></h3>
+<p>Equipo de <strong>producto</strong>. SDKs oficiales, CLI, drivers, conectores, material educativo. Soporte oficial con issues atendidos, versionado y SLAs.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databrickslabs-labs" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databrickslabs-labs"><a href="https://github.com/databrickslabs"><i class="fa-brands fa-github" aria-label="github"></i> databrickslabs</a> <span class="section-badge badge-labs">Labs</span></h3>
+<p>Empleados, proyectos <strong>experimentales</strong>. Prototipos, herramientas incubadas, side projects internos. Best-effort, sin garantía. Algunos migran al producto.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-solutions-solutions" class="level3 repo-card org-solutions">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-solutions-solutions"><a href="https://github.com/databricks-solutions"><i class="fa-brands fa-github" aria-label="github"></i> databricks-solutions</a> <span class="section-badge badge-solutions">Solutions</span></h3>
+<p>Equipo de <strong>Field Engineering</strong>. Toolkits horizontales, templates de apps, integraciones con herramientas (AI Dev Kit, AppKit cookbook, Lakebase dev kit). Código de referencia para developers y platform engineers.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-industry-solutions-industry" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-industry-solutions-industry"><a href="https://github.com/databricks-industry-solutions"><i class="fa-brands fa-github" aria-label="github"></i> databricks-industry-solutions</a> <span class="section-badge badge-industry">Industry</span></h3>
+<p><strong>213 repos</strong> de soluciones finales por industria. Notebooks completos, pipelines end-to-end, datos de ejemplo. Más “soft” que las otras orgs — acá no hay SDKs ni CLIs, hay <strong>soluciones de negocio listas para clonar y adaptar</strong>: fraud detection para banca, demand forecasting para retail, imágenes médicas para salud. Es lo que Databricks llama <a href="https://www.databricks.com/solutions/accelerators">Solution Accelerators</a>.</p>
+</section>
+<p><strong>¿Cuál es la diferencia entre las cuatro?</strong> <code>databricks</code> es el producto. <code>databrickslabs</code> son experimentos que pueden desaparecer. <code>databricks-solutions</code> son herramientas horizontales para developers. <code>databricks-industry-solutions</code> son <strong>soluciones verticales de negocio</strong> — el nivel más alto de abstracción, listas para presentarle a un stakeholder.</p>
+<p>Además, hay una quinta categoría: proyectos que Databricks creó o impulsó pero que viven en <strong>organizaciones independientes</strong> bajo la Linux Foundation o Apache (<code>delta-io</code>, <code>mlflow</code>, <code>unitycatalog</code>, <code>apache/spark</code>). Estos tienen gobernanza comunitaria y son los más estables de todos.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Cuidado con repos deprecados
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Varios repos históricos en <code>databricks</code> están archivados o deprecados: <code>koalas</code> (ahora es <code>pyspark.pandas</code>), <code>spark-csv</code> (integrado en Spark core), <code>databricks-cli</code> en Python (reemplazado por el <a href="https://github.com/databricks/cli">CLI en Go</a>). Si un README dice “deprecated”, creelo.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="developer-experience-oficial-solutions" class="level2">
+<h2 class="anchored" data-anchor-id="developer-experience-oficial-solutions">Developer Experience <span class="section-badge badge-official">Oficial</span> <span class="section-badge badge-solutions">Solutions</span></h2>
+<p>Esta es la categoría que más creció en el último año. Databricks apostó fuerte a que puedas desarrollar desde tu editor favorito, con coding agents, y con un portal centralizado.</p>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-ai-dev-kit" class="level3 repo-featured">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-ai-dev-kit"><a href="https://github.com/databricks-solutions/ai-dev-kit"><i class="fa-brands fa-github" aria-label="github"></i> AI Dev Kit</a></h3>
+<div class="github-card">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://opengraph.githubassets.com/1/databricks-solutions/ai-dev-kit.png" class="img-fluid figure-img"></p>
+<figcaption>AI Dev Kit — GitHub</figcaption>
+</figure>
+</div>
+</div>
+<p><img src="https://img.shields.io/github/stars/databricks-solutions/ai-dev-kit?style=flat-square&amp;logo=github&amp;label=Stars.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-solutions/ai-dev-kit?style=flat-square&amp;logo=git&amp;label=Last%20commit.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/databricks-solutions/ai-dev-kit?style=flat-square&amp;logo=github&amp;label=Contributors.png" class="img-fluid" alt="Contributors"> <img src="https://img.shields.io/github/languages/top/databricks-solutions/ai-dev-kit?style=flat-square&amp;logo=python&amp;label=Language.png" class="img-fluid" alt="Python"></p>
+<p>El repo estrella de <code>databricks-solutions</code>. Certificado como <strong>Gold Project</strong> por Databricks.</p>
+<p>No es una librería — es un kit de contexto que le enseña a tu coding agent cómo funciona Databricks. 75+ herramientas ejecutables + patrones curados por los field engineers de Databricks. Tu agente “sabe” cómo construir Spark Pipelines, Jobs, Unity Catalog, dashboards, Model Serving, MLflow y Apps sin que le expliques las convenciones.</p>
+<p>Soporta Claude Code, Cursor, Codex, Copilot, Gemini CLI y Windsurf.</p>
+<p><strong>vs.&nbsp;copiar prompts manualmente</strong>: AI Dev Kit son skills ejecutables, no solo texto de documentación. El agente puede <em>hacer cosas</em> en tu workspace, no solo sugerirte código.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Instalación en un proyecto existente (Mac/Linux)</span></span>
+<span id="cb1-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">bash</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;(</span><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-sL</span> https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">)</span></span>
+<span id="cb1-3"></span>
+<span id="cb1-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># O directamente como MCP server para Claude Code</span></span>
+<span id="cb1-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">claude</span> mcp add databricks-ai-dev-kit <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb1-6">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--</span> uvx databricks-ai-dev-kit@latest</span></code></pre></div></div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Requiere <code>uv</code> y Databricks CLI instalados. La instalación es a nivel de proyecto — tenés que correr el agente desde el directorio donde lo instalaste.</p>
+</div>
+</div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-agent-skills" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-agent-skills"><a href="https://github.com/databricks/databricks-agent-skills"><i class="fa-brands fa-github" aria-label="github"></i> databricks-agent-skills</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/databricks-agent-skills?style=flat-square&amp;logo=github&amp;label=Stars.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/databricks-agent-skills?style=flat-square&amp;logo=git&amp;label=Last%20commit.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/databricks/databricks-agent-skills?style=flat-square&amp;logo=github&amp;label=Contributors.png" class="img-fluid" alt="Contributors"></p>
+<p>El approach más liviano: skills que se instalan como archivos Markdown en tu agente de código. Auto-detecta qué agente tenés instalado y escribe los <code>SKILL.md</code> en la ubicación correcta. Incluye <code>databricks-setup</code> y <code>databricks-doctor</code> para diagnóstico.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> aitools install</span></code></pre></div></div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-cli" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-cli"><a href="https://github.com/databricks/cli"><i class="fa-brands fa-github" aria-label="github"></i> cli</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/cli?style=flat-square&amp;logo=github&amp;label=Stars.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/cli?style=flat-square&amp;logo=git&amp;label=Last%20commit.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/languages/top/databricks/cli?style=flat-square&amp;logo=go&amp;label=Language.png" class="img-fluid" alt="Go"></p>
+<p>El CLI moderno en Go que reemplazó al viejo CLI en Python. Es el core de <strong>Databricks Asset Bundles (DABs)</strong> — si usás DABs, ya lo tenés instalado.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-sdk-py" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-sdk-py"><a href="https://github.com/databricks/databricks-sdk-py"><i class="fa-brands fa-github" aria-label="github"></i> databricks-sdk-py</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/databricks-sdk-py?style=flat-square&amp;logo=github&amp;label=Stars.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/databricks-sdk-py?style=flat-square&amp;logo=git&amp;label=Last%20commit.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/databricks/databricks-sdk-py?style=flat-square&amp;logo=github&amp;label=Contributors.png" class="img-fluid" alt="Contributors"></p>
+<p>El SDK oficial. Reemplaza al viejo patrón de <code>requests</code> + token manual. Tipado, con retry logic, y compatible con toda la API REST.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-vscode" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-vscode"><a href="https://github.com/databricks/databricks-vscode"><i class="fa-brands fa-github" aria-label="github"></i> databricks-vscode</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/databricks-vscode?style=flat-square&amp;logo=github&amp;label=Stars.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/databricks-vscode?style=flat-square&amp;logo=git&amp;label=Last%20commit.png" class="img-fluid" alt="Last Commit"></p>
+<p>Para desarrollo local con conexión a clusters remotos. Incluye ejecución de notebooks, debugging, y autocompletado de catálogo.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c20666120676c6f6265203e7d7d-devhub" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c20666120676c6f6265203e7d7d-devhub"><a href="https://developers.databricks.com/docs/start-here"><i class="fa-solid fa-globe" aria-label="globe"></i> DevHub</a></h3>
+<p>No es un repo, pero es el portal que nuclea todo. Templates, documentación de AppKit, setup guides. Si vas a construir algo sobre Databricks, empezá acá.</p>
+</section>
+<hr>
+</section>
+<section id="databricks-apps-oficial-solutions" class="level2">
+<h2 class="anchored" data-anchor-id="databricks-apps-oficial-solutions">Databricks Apps <span class="section-badge badge-official">Oficial</span> <span class="section-badge badge-solutions">Solutions</span></h2>
+<p>Databricks Apps es la plataforma para deployar aplicaciones web dentro del workspace, con autenticación, governance y networking resueltos.</p>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-appkit" class="level3 repo-featured">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-appkit"><a href="https://github.com/databricks/appkit"><i class="fa-brands fa-github" aria-label="github"></i> AppKit</a></h3>
+<div class="github-card">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://opengraph.githubassets.com/1/databricks/appkit.png" class="img-fluid figure-img"></p>
+<figcaption>AppKit — GitHub</figcaption>
+</figure>
+</div>
+</div>
+<p><img src="https://img.shields.io/github/stars/databricks/appkit?style=flat-square&amp;logo=github&amp;label=Stars.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/appkit?style=flat-square&amp;logo=git&amp;label=Last%20commit.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/databricks/appkit?style=flat-square&amp;logo=github&amp;label=Contributors.png" class="img-fluid" alt="Contributors"> <img src="https://img.shields.io/github/languages/top/databricks/appkit?style=flat-square&amp;logo=typescript&amp;label=Language.png" class="img-fluid" alt="TypeScript"></p>
+<p>El único SDK TypeScript diseñado para Databricks Apps. Te da un servidor con plugins listos para producción: <strong>Analytics</strong> (queries SQL con caching), <strong>Genie</strong> (conversacional AI/BI), <strong>Files</strong> (Unity Catalog Volumes) y <strong>Lakebase</strong> (devuelve un <code>pg.Pool</code> estándar compatible con Prisma, Drizzle, TypeORM).</p>
+<p><strong>vs.&nbsp;llamar a la API REST directo</strong>: AppKit resuelve autenticación OAuth (on-behalf-of user), retry logic, caching, telemetría OpenTelemetry y hot reload remoto. Sin AppKit, tenés que implementar todo eso a mano.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode typescript code-with-copy"><code class="sourceCode typescript"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> { createApp<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> analytics<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> lakebase<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span> genie }</span>
+<span id="cb3-2">  <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'@databricks/appkit'</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb3-3"></span>
+<span id="cb3-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">createApp</span>({</span>
+<span id="cb3-5">  plugins<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span> [</span>
+<span id="cb3-6">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">analytics</span>()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span>   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// SQL con caché y type-gen automático</span></span>
+<span id="cb3-7">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">lakebase</span>()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span>    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Postgres OLTP nativo (pg.Pool estándar)</span></span>
+<span id="cb3-8">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">genie</span>()<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span>       <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">// Preguntas en lenguaje natural</span></span>
+<span id="cb3-9">  ]<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb3-10">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">onPluginsReady</span>(appkit) {</span>
+<span id="cb3-11">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">setupRoutes</span>(appkit)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span>
+<span id="cb3-12">  }<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">,</span></span>
+<span id="cb3-13">})<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">catch</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">console</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">error</span>)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">;</span></span></code></pre></div></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Scaffolding de una app nueva</span></span>
+<span id="cb4-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">npx</span> create-databricks-app my-app</span></code></pre></div></div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Solo TypeScript/Node.js — no hay versión Python. Actualmente en v0, API en evolución.</p>
+</div>
+</div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-apps-cookbook" class="level3 repo-card org-solutions">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-apps-cookbook"><a href="https://github.com/databricks-solutions/databricks-apps-cookbook"><i class="fa-brands fa-github" aria-label="github"></i> databricks-apps-cookbook</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks-solutions/databricks-apps-cookbook?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-solutions/databricks-apps-cookbook?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Snippets listos para copiar y pegar en tu Databricks App.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-apx" class="level3 repo-card org-solutions">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-apx"><a href="https://github.com/databricks-solutions/apx"><i class="fa-brands fa-github" aria-label="github"></i> apx</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks-solutions/apx?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-solutions/apx?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Toolkit para construir apps sobre Databricks.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-app-templates" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-app-templates"><a href="https://github.com/databricks/app-templates"><i class="fa-brands fa-github" aria-label="github"></i> app-templates</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/app-templates?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/app-templates?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Templates oficiales de Databricks para arrancar rápido.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-claude-databricks-app-template" class="level3 repo-card org-solutions">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-claude-databricks-app-template"><a href="https://github.com/databricks-solutions/claude-databricks-app-template"><i class="fa-brands fa-github" aria-label="github"></i> claude-databricks-app-template</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks-solutions/claude-databricks-app-template?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-solutions/claude-databricks-app-template?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Template de Databricks App nativa con Claude AI.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-caspers" class="level3 repo-card org-solutions">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-caspers"><a href="https://github.com/databricks-solutions/caspers"><i class="fa-brands fa-github" aria-label="github"></i> caspers</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks-solutions/caspers?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-solutions/caspers?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Demo simulada de negocio completa: streaming, agentes AI, apps — todo deployable.</p>
+</section>
+<hr>
+</section>
+<section id="databricks-lakebase-solutions" class="level2">
+<h2 class="anchored" data-anchor-id="databricks-lakebase-solutions">Databricks Lakebase <span class="section-badge badge-solutions">Solutions</span></h2>
+<p>Lakebase es el Postgres serverless de Databricks que escribe directamente en Delta/Iceberg (la promesa de <a href="../../../blog/posts/ltap-databricks/">LTAP</a>). El ecosistema de repos alrededor está creciendo rápido.</p>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-lakebase-app-dev-kit" class="level3 repo-featured">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-lakebase-app-dev-kit"><a href="https://github.com/databricks-solutions/lakebase-app-dev-kit"><i class="fa-brands fa-github" aria-label="github"></i> Lakebase App Dev Kit</a></h3>
+<div class="github-card">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://opengraph.githubassets.com/1/databricks-solutions/lakebase-app-dev-kit.png" class="img-fluid figure-img"></p>
+<figcaption>Lakebase App Dev Kit — GitHub</figcaption>
+</figure>
+</div>
+</div>
+<p><img src="https://img.shields.io/github/stars/databricks-solutions/lakebase-app-dev-kit?style=flat-square&amp;logo=github&amp;label=Stars.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-solutions/lakebase-app-dev-kit?style=flat-square&amp;logo=git&amp;label=Last%20commit.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/databricks-solutions/lakebase-app-dev-kit?style=flat-square&amp;logo=github&amp;label=Contributors.png" class="img-fluid" alt="Contributors"></p>
+<p>Workflows opinados de <strong>git + Lakebase</strong>: branch pairing, schema diff, PR flow. Incluye un MCP server y una metodología de desarrollo (Spec-First Test-Driven Development). Soporta Claude Code, Cursor y Databricks Genie Code.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">bash</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;(</span><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-sL</span> https://raw.githubusercontent.com/databricks-solutions/lakebase-app-dev-kit/main/install.sh<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">)</span></span></code></pre></div></div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-lakebase-fastapi-app" class="level3 repo-card org-solutions">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-lakebase-fastapi-app"><a href="https://github.com/databricks-solutions/lakebase-fastapi-app"><i class="fa-brands fa-github" aria-label="github"></i> lakebase-fastapi-app</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks-solutions/lakebase-fastapi-app?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-solutions/lakebase-fastapi-app?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>App FastAPI con Lakebase como backend.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-brickhouse-brands-demo" class="level3 repo-card org-solutions">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-brickhouse-brands-demo"><a href="https://github.com/databricks-solutions/brickhouse-brands-demo"><i class="fa-brands fa-github" aria-label="github"></i> brickhouse-brands-demo</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks-solutions/brickhouse-brands-demo?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-solutions/brickhouse-brands-demo?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Demo full-stack: React + FastAPI + Lakebase. Gestión de inventario deployable.</p>
+</section>
+<hr>
+</section>
+<section id="agents-ai-oficial" class="level2">
+<h2 class="anchored" data-anchor-id="agents-ai-oficial">Agents &amp; AI <span class="section-badge badge-official">Oficial</span></h2>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true" href="">Herramientas</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false" href="">Omnigent</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" aria-controls="tabset-1-3" aria-selected="false" href="">MosaicML</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-lilac" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-lilac"><a href="https://github.com/databricks/lilac"><i class="fa-brands fa-github" aria-label="github"></i> lilac</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/lilac?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/lilac?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Curar y limpiar datasets para fine-tuning de LLMs.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-judges" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-judges"><a href="https://github.com/databricks/judges"><i class="fa-brands fa-github" aria-label="github"></i> judges</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/judges?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/judges?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Biblioteca de LLM judges para evaluación de modelos.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-genai-cookbook" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-genai-cookbook"><a href="https://github.com/databricks/genai-cookbook"><i class="fa-brands fa-github" aria-label="github"></i> genai-cookbook</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/genai-cookbook?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/genai-cookbook?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Recetario de GenAI en Databricks: patrones, ejemplos, best practices.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-ai-bridge" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-ai-bridge"><a href="https://github.com/databricks/databricks-ai-bridge"><i class="fa-brands fa-github" aria-label="github"></i> databricks-ai-bridge</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/databricks-ai-bridge?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/databricks-ai-bridge?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Puente entre Databricks y frameworks de AI: LangChain, LlamaIndex.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-megablocks" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-megablocks"><a href="https://github.com/databricks/megablocks"><i class="fa-brands fa-github" aria-label="github"></i> megablocks</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/megablocks?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/megablocks?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Mixture-of-Experts para entrenamiento eficiente de LLMs.</p>
+</section>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-omnigent" class="level3 repo-featured">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-omnigent"><a href="https://github.com/omnigent-ai/omnigent"><i class="fa-brands fa-github" aria-label="github"></i> omnigent</a></h3>
+<p><img src="https://img.shields.io/github/stars/omnigent-ai/omnigent?style=flat-square&amp;logo=github&amp;label=Stars.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/omnigent-ai/omnigent?style=flat-square&amp;logo=git&amp;label=Last%20commit.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/omnigent-ai/omnigent?style=flat-square&amp;logo=github&amp;label=Contributors.png" class="img-fluid" alt="Contributors"></p>
+<p>Meta-harness open-source para orquestar agentes AI. Se pone <em>por encima</em> de Claude Code, Codex, Cursor, Pi — y los convierte en piezas intercambiables. Construido por el equipo de AI de Databricks junto con Neon.</p>
+<p><strong>vs.&nbsp;usar un solo agente directo</strong>: Omnigent te deja componer agentes sin reescribir código, con policies de spending/rate limiting, sandboxing, y colaboración en tiempo real por URL. Un agente es un archivo YAML con prompt, harness, tools y sub-agentes.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># omnigent.yaml — definir un agente compuesto</span></span>
+<span id="cb6-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">agents</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">:</span></span>
+<span id="cb6-3"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">  </span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">-</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;"> </span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">name</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">:</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;"> data-engineer</span></span>
+<span id="cb6-4"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">harness</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">:</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;"> claude-code</span></span>
+<span id="cb6-5"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">prompt</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">:</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;"> </span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Sos un DE experto en Databricks..."</span></span>
+<span id="cb6-6"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">tools</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">:</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;"> </span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">[</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">databricks-cli</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">,</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;"> dbt</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">]</span></span>
+<span id="cb6-7"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">    </span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">policies</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">:</span></span>
+<span id="cb6-8"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">      </span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">spend_cap</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">:</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;"> </span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10.00</span></span>
+<span id="cb6-9"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">      </span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">require_approval</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">:</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;"> </span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">[</span><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">shell</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">]</span></span></code></pre></div></div>
+<p>Escribí un <a href="../../../blog/posts/omnigent-meta-harness/">post completo sobre Omnigent</a> con instalación, configuración y prueba real.</p>
+</section>
+</div>
+<div id="tabset-1-3" class="tab-pane" aria-labelledby="tabset-1-3-tab">
+<p>Databricks compró MosaicML en 2023. Sus repos siguen activos y son los que se usan internamente para entrenar los foundation models de Databricks (DBRX, MPT).</p>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-llm-foundry" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-llm-foundry"><a href="https://github.com/mosaicml/llm-foundry"><i class="fa-brands fa-github" aria-label="github"></i> llm-foundry</a></h3>
+<p><img src="https://img.shields.io/github/stars/mosaicml/llm-foundry?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/mosaicml/llm-foundry?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/mosaicml/llm-foundry?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Contributors"></p>
+<p>Código de entrenamiento de foundation models. Acá está el código real que se usa para entrenar DBRX y los modelos que corren detrás de AI/BI Genie. Uno de los repos de entrenamiento de LLMs más completos en open source.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-composer" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-composer"><a href="https://github.com/mosaicml/composer"><i class="fa-brands fa-github" aria-label="github"></i> composer</a></h3>
+<p><img src="https://img.shields.io/github/stars/mosaicml/composer?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/mosaicml/composer?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Framework de entrenamiento eficiente de modelos.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-streaming" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-streaming"><a href="https://github.com/mosaicml/streaming"><i class="fa-brands fa-github" aria-label="github"></i> streaming</a></h3>
+<p><img src="https://img.shields.io/github/stars/mosaicml/streaming?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/mosaicml/streaming?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Data loading optimizado para training de modelos.</p>
+</section>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="data-engineering-platform-oficial" class="level2">
+<h2 class="anchored" data-anchor-id="data-engineering-platform-oficial">Data Engineering &amp; Platform <span class="section-badge badge-official">Oficial</span></h2>
+<p>Estos son los repos que probablemente ya conocés si laburás con Databricks, pero vale la pena tenerlos juntos.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" aria-controls="tabset-2-1" aria-selected="true" href="">IaC &amp; DevOps</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" aria-controls="tabset-2-2" aria-selected="false" href="">Pipelines &amp; SQL</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-3" aria-controls="tabset-2-3" aria-selected="false" href="">Best Practices</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" aria-labelledby="tabset-2-1-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-terraform-provider-databricks" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-terraform-provider-databricks"><a href="https://github.com/databricks/terraform-provider-databricks"><i class="fa-brands fa-github" aria-label="github"></i> terraform-provider-databricks</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/terraform-provider-databricks?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/terraform-provider-databricks?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/databricks/terraform-provider-databricks?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Contributors"></p>
+<p>IaC para workspaces, clusters, jobs, Unity Catalog. Esencial para cualquier setup serio.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-terraform-databricks-examples" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-terraform-databricks-examples"><a href="https://github.com/databricks/terraform-databricks-examples"><i class="fa-brands fa-github" aria-label="github"></i> terraform-databricks-examples</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/terraform-databricks-examples?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/terraform-databricks-examples?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Templates Terraform multi-cloud (AWS, Azure, GCP).</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-terraform-databricks-sra" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-terraform-databricks-sra"><a href="https://github.com/databricks/terraform-databricks-sra"><i class="fa-brands fa-github" aria-label="github"></i> terraform-databricks-sra</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/terraform-databricks-sra?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/terraform-databricks-sra?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Security Reference Architecture. Best practices de seguridad con Terraform.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-mlops-stacks" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-mlops-stacks"><a href="https://github.com/databricks/mlops-stacks"><i class="fa-brands fa-github" aria-label="github"></i> mlops-stacks</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/mlops-stacks?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/mlops-stacks?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Template de producción MLOps con DABs y CI/CD. El mejor punto de partida si arrancás un proyecto de cero.</p>
+</section>
+</div>
+<div id="tabset-2-2" class="tab-pane" aria-labelledby="tabset-2-2-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dbt-databricks" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dbt-databricks"><a href="https://github.com/databricks/dbt-databricks"><i class="fa-brands fa-github" aria-label="github"></i> dbt-databricks</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/dbt-databricks?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/dbt-databricks?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Adaptador dbt oficial para Databricks.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-bundle-examples" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-bundle-examples"><a href="https://github.com/databricks/bundle-examples"><i class="fa-brands fa-github" aria-label="github"></i> bundle-examples</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/bundle-examples?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/bundle-examples?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Ejemplos de Databricks Asset Bundles. Templates para jobs, pipelines, MLOps.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-live-tables-notebooks" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-live-tables-notebooks"><a href="https://github.com/databricks/delta-live-tables-notebooks"><i class="fa-brands fa-github" aria-label="github"></i> delta-live-tables-notebooks</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/delta-live-tables-notebooks?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/delta-live-tables-notebooks?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Notebooks de referencia para Delta Live Tables.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-sql-python" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-databricks-sql-python"><a href="https://github.com/databricks/databricks-sql-python"><i class="fa-brands fa-github" aria-label="github"></i> databricks-sql-python</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/databricks-sql-python?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/databricks-sql-python?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Conector SQL oficial para Python.</p>
+</section>
+</div>
+<div id="tabset-2-3" class="tab-pane" aria-labelledby="tabset-2-3-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-notebook-best-practices" class="level3 repo-card org-databricks">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-notebook-best-practices"><a href="https://github.com/databricks/notebook-best-practices"><i class="fa-brands fa-github" aria-label="github"></i> notebook-best-practices</a></h3>
+<p><img src="https://img.shields.io/github/stars/databricks/notebook-best-practices?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks/notebook-best-practices?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Patrones de ingeniería de software para notebooks Databricks.</p>
+</section>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="solution-accelerators-por-industria-industry" class="level2">
+<h2 class="anchored" data-anchor-id="solution-accelerators-por-industria-industry">Solution Accelerators por industria <span class="section-badge badge-industry">Industry</span></h2>
+<p>Esta es la org más “soft” de Databricks — y probablemente la menos conocida entre developers. Acá no vas a encontrar SDKs ni CLIs. Lo que hay son <strong>soluciones de negocio completas</strong>: notebooks con pipelines end-to-end, datos de ejemplo, y documentación orientada al caso de uso. Si tu jefe te dice “necesito esto para ayer”, estos repos son tu mejor amigo.</p>
+<p>La org <a href="https://github.com/databricks-industry-solutions">databricks-industry-solutions</a> tiene <strong>213 repos</strong> organizados por vertical. Los Solution Accelerators están pensados para clonarlos, adaptarlos a tus datos, y tener algo funcionando rápido. Databricks los lista en su <a href="https://www.databricks.com/solutions/accelerators">catálogo oficial</a>.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" aria-controls="tabset-3-1" aria-selected="true" href="">Salud &amp; Ciencias de la Vida</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" aria-controls="tabset-3-2" aria-selected="false" href="">Finanzas &amp; Seguros</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-3" aria-controls="tabset-3-3" aria-selected="false" href="">Retail &amp; CPG</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-4-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-4" aria-controls="tabset-3-4" aria-selected="false" href="">Cross-industry</a></li></ul>
+<div class="tab-content">
+<div id="tabset-3-1" class="tab-pane active" aria-labelledby="tabset-3-1-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-pixels-imágenes-médicas-a-escala" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-pixels-imágenes-médicas-a-escala"><a href="https://github.com/databricks-industry-solutions/pixels"><i class="fa-brands fa-github" aria-label="github"></i> pixels</a> — Imágenes médicas a escala</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/pixels?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/pixels?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>El repo más popular de la org (418 stars). Procesamiento masivo de imágenes DICOM, documentos y ZIPs. Incluye integración con OHIF Viewer y modelos de segmentación. Si laburás con datos de salud, este es imprescindible.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-smolder-hl7-como-datasource-de-spark" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-smolder-hl7-como-datasource-de-spark"><a href="https://github.com/databricks-industry-solutions/smolder"><i class="fa-brands fa-github" aria-label="github"></i> smolder</a> — HL7 como DataSource de Spark</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/smolder?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/smolder?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Datasource nativo de Spark para mensajes HL7 (el estándar de interoperabilidad en salud). Leés archivos HL7 como si fueran Parquet.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-hls-llm-doc-qa-qa-sobre-documentos-médicos" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-hls-llm-doc-qa-qa-sobre-documentos-médicos"><a href="https://github.com/databricks-industry-solutions/hls-llm-doc-qa"><i class="fa-brands fa-github" aria-label="github"></i> hls-llm-doc-qa</a> — QA sobre documentos médicos</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/hls-llm-doc-qa?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/hls-llm-doc-qa?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>RAG sobre documentación clínica con LLMs open-source. Un buen punto de partida si querés armar un asistente para profesionales de salud.</p>
+</section>
+</div>
+<div id="tabset-3-2" class="tab-pane" aria-labelledby="tabset-3-2-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-esg-scoring-scoring-esg-con-nlp" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-esg-scoring-scoring-esg-con-nlp"><a href="https://github.com/databricks-industry-solutions/esg-scoring"><i class="fa-brands fa-github" aria-label="github"></i> esg-scoring</a> — Scoring ESG con NLP</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/esg-scoring?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/esg-scoring?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Finanzas sostenibles: analiza noticias con NLP para generar scores ESG automáticos. Pipeline completo de ingesta, procesamiento y scoring.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-smart-claims-gestión-inteligente-de-reclamos" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-smart-claims-gestión-inteligente-de-reclamos"><a href="https://github.com/databricks-industry-solutions/smart-claims"><i class="fa-brands fa-github" aria-label="github"></i> smart-claims</a> — Gestión inteligente de reclamos</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/smart-claims?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/smart-claims?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Pipeline DLT para gestión de reclamos de seguros con detección de fraude. Incluye modelos ML y dashboards.</p>
+</section>
+</div>
+<div id="tabset-3-3" class="tab-pane" aria-labelledby="tabset-3-3-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-fine-grained-demand-forecasting-demand-forecasting-distribuido" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-fine-grained-demand-forecasting-demand-forecasting-distribuido"><a href="https://github.com/databricks-industry-solutions/fine-grained-demand-forecasting"><i class="fa-brands fa-github" aria-label="github"></i> fine-grained-demand-forecasting</a> — Demand forecasting distribuido</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/fine-grained-demand-forecasting?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/fine-grained-demand-forecasting?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Forecasting a nivel tienda-ítem con modelos distribuidos en Spark. El acelerador clásico para retail — uno de los más clonados.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-product-search-búsqueda-semántica-de-productos" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-product-search-búsqueda-semántica-de-productos"><a href="https://github.com/databricks-industry-solutions/product-search"><i class="fa-brands fa-github" aria-label="github"></i> product-search</a> — Búsqueda semántica de productos</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/product-search?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/product-search?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Embeddings + vector store para búsqueda semántica en catálogos de productos. Ideal para e-commerce.</p>
+</section>
+</div>
+<div id="tabset-3-4" class="tab-pane" aria-labelledby="tabset-3-4-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-security-analysis-tool-auditoría-de-seguridad" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-security-analysis-tool-auditoría-de-seguridad"><a href="https://github.com/databricks-industry-solutions/security-analysis-tool"><i class="fa-brands fa-github" aria-label="github"></i> security-analysis-tool</a> — Auditoría de seguridad</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/security-analysis-tool?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/security-analysis-tool?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>SAT analiza las configuraciones de seguridad de tu workspace Databricks y te da recomendaciones de best practices. Útil para cualquier empresa, independientemente de la industria.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-many-model-forecasting-forecasting-a-gran-escala" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-many-model-forecasting-forecasting-a-gran-escala"><a href="https://github.com/databricks-industry-solutions/many-model-forecasting"><i class="fa-brands fa-github" aria-label="github"></i> many-model-forecasting</a> — Forecasting a gran escala</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/many-model-forecasting?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/many-model-forecasting?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Framework para entrenar miles de modelos de forecasting en paralelo (MMF). Aplica a retail, finanzas, logística — cualquier dominio con series temporales masivas.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-auto-data-linkage-entity-resolution-automatizada" class="level3 repo-card org-industry">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-auto-data-linkage-entity-resolution-automatizada"><a href="https://github.com/databricks-industry-solutions/auto-data-linkage"><i class="fa-brands fa-github" aria-label="github"></i> auto-data-linkage</a> — Entity resolution automatizada</h3>
+<p><img src="https://img.shields.io/github/stars/databricks-industry-solutions/auto-data-linkage?style=flat-square&amp;logo=github&amp;color=e11d48.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databricks-industry-solutions/auto-data-linkage?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Linkeo y deduplicación de registros con Databricks ARC. Resuelve el clásico problema de “¿es el mismo cliente?” a escala.</p>
+</section>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>¿Cómo usar un Solution Accelerator?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Cloná el repo, importá los notebooks en tu workspace, y adaptá las queries a tus datos. Los aceleradores vienen con datos de ejemplo para que puedas probarlos sin conectar nada. El <a href="https://www.databricks.com/solutions/accelerators">catálogo oficial</a> te deja filtrar por industria y caso de uso.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="databricks-labs-labs" class="level2">
+<h2 class="anchored" data-anchor-id="databricks-labs-labs">Databricks Labs <span class="section-badge badge-labs">Labs</span></h2>
+<p>Labs es donde pasan las cosas interesantes. Proyectos construidos por empleados de Databricks que no tienen soporte oficial pero que muchas veces terminan siendo herramientas indispensables.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" aria-controls="tabset-4-1" aria-selected="true" href="">Populares</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" aria-controls="tabset-4-2" aria-selected="false" href="">Joyas ocultas</a></li></ul>
+<div class="tab-content">
+<div id="tabset-4-1" class="tab-pane active" aria-labelledby="tabset-4-1-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dolly" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dolly"><a href="https://github.com/databrickslabs/dolly"><i class="fa-brands fa-github" aria-label="github"></i> dolly</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/dolly?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/dolly?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Primer LLM open-source instruction-tuned de Databricks. Histórico — marcó un antes y después en la democratización de LLMs.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dbldatagen" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dbldatagen"><a href="https://github.com/databrickslabs/dbldatagen"><i class="fa-brands fa-github" aria-label="github"></i> dbldatagen</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/dbldatagen?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/dbldatagen?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Generador de datos sintéticos a escala de billones de filas usando Spark nativo. Lo uso en mis pipelines para generar datos de prueba antes de tocar datos reales. Soporta claves primarias/foráneas consistentes entre tablas, distribuciones estadísticas, pesos en valores discretos y integración con Faker.</p>
+<p><strong>vs.&nbsp;Faker en Python</strong>: Faker es single-thread y no escala. dbldatagen genera datos distribuidos en Spark manteniendo consistencia referencial entre tablas.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> dbldatagen <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> dg</span>
+<span id="cb7-2"></span>
+<span id="cb7-3">df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (dg.DataGenerator(spark, name<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"test_data"</span>,</span>
+<span id="cb7-4">                       rows<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1_000_000</span>, partitions<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span>
+<span id="cb7-5">    .withIdOutput()</span>
+<span id="cb7-6">    .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"status"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"string"</span>,</span>
+<span id="cb7-7">                values<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'active'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'inactive'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'pending'</span>],</span>
+<span id="cb7-8">                random<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, weights<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">9</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>])</span>
+<span id="cb7-9">    .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"score"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"float"</span>,</span>
+<span id="cb7-10">                expr<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"floor(rand() * 100)"</span>)</span>
+<span id="cb7-11">).build()</span></code></pre></div></div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dqx" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dqx"><a href="https://github.com/databrickslabs/dqx"><i class="fa-brands fa-github" aria-label="github"></i> dqx</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/dqx?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/dqx?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Framework de Data Quality para PySpark DataFrames. Lo uso en producción para validar datos entre capas del medallion — si algo viene mal desde bronze, te enterás antes de que llegue a gold.</p>
+<p><strong>vs.&nbsp;Great Expectations / Soda Core</strong>: dqx es nativo de PySpark sin dependencias externas, con un profiler integrado que genera reglas de calidad automáticamente desde perfiles estadísticos de tus datos. GE requiere mucha config manual; Soda necesita su cloud propio. dqx además genera expectations para DLT/Lakeflow Pipelines.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> databricks.labs.dqx.profiler.profiler <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DQProfiler</span>
+<span id="cb8-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> databricks.labs.dqx.engine <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DQEngine</span>
+<span id="cb8-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> databricks.sdk <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> WorkspaceClient</span>
+<span id="cb8-4"></span>
+<span id="cb8-5">ws <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> WorkspaceClient()</span>
+<span id="cb8-6">profiler <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DQProfiler(ws)</span>
+<span id="cb8-7">_, profiles <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> profiler.profile(input_df)</span>
+<span id="cb8-8"></span>
+<span id="cb8-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Genera checks automáticamente — revisalos antes de aplicar</span></span>
+<span id="cb8-10">checks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DQGenerator(ws).generate_dq_rules(profiles)</span>
+<span id="cb8-11"></span>
+<span id="cb8-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Separar válidos de cuarentena</span></span>
+<span id="cb8-13">valid_df, quarantine_df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DQEngine(ws) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb8-14">    .apply_checks_by_metadata_and_split(input_df, checks)</span></code></pre></div></div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-ucx" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-ucx"><a href="https://github.com/databrickslabs/ucx"><i class="fa-brands fa-github" aria-label="github"></i> ucx</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/ucx?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/ucx?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/databrickslabs/ucx?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Contributors"></p>
+<p>La única herramienta para migrar workspaces completos de Hive Metastore a Unity Catalog de forma automatizada. Maneja grupos, tablas, vistas, dashboards, jobs, notebooks, DLT pipelines y permisos en bloque.</p>
+<p><strong>vs.&nbsp;migración manual</strong>: sin UCX necesitás semanas de scripting manual con <code>CREATE TABLE ... AS SELECT</code>. UCX genera un assessment previo que identifica incompatibilidades y luego migra en batch con reconciliación de datos post-migración.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 1. Instalar</span></span>
+<span id="cb9-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> labs install ucx</span>
+<span id="cb9-3"></span>
+<span id="cb9-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 2. Assessment del workspace actual</span></span>
+<span id="cb9-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> labs ucx assessment</span>
+<span id="cb9-6"></span>
+<span id="cb9-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 3. Mapeo de tablas Hive → Unity Catalog</span></span>
+<span id="cb9-8"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> labs ucx create-table-mapping</span>
+<span id="cb9-9"></span>
+<span id="cb9-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 4. Migrar tablas y código</span></span>
+<span id="cb9-11"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> labs ucx migrate-tables</span>
+<span id="cb9-12"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> labs ucx migrate-local-code</span></code></pre></div></div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Requiere Workspace Administrator, metastore UC ya creado, y un PRO/Serverless SQL Warehouse para el reporte de assessment.</p>
+</div>
+</div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-tempo" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-tempo"><a href="https://github.com/databrickslabs/tempo"><i class="fa-brands fa-github" aria-label="github"></i> tempo</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/tempo?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/tempo?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>API de series temporales sobre Spark: lagged values, rolling stats, AS OF joins, downsampling.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-mosaic" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-mosaic"><a href="https://github.com/databrickslabs/mosaic"><i class="fa-brands fa-github" aria-label="github"></i> mosaic</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/mosaic?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/mosaic?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Procesamiento geoespacial a gran escala sobre Spark.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dlt-meta" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dlt-meta"><a href="https://github.com/databrickslabs/dlt-meta"><i class="fa-brands fa-github" aria-label="github"></i> dlt-meta</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/dlt-meta?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/dlt-meta?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>ETL metadata-driven con DLT. Definís bronze/silver en config, no en código.</p>
+</section>
+</div>
+<div id="tabset-4-2" class="tab-pane" aria-labelledby="tabset-4-2-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-ontos" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-ontos"><a href="https://github.com/databrickslabs/ontos"><i class="fa-brands fa-github" aria-label="github"></i> ontos</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/ontos?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/ontos?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Business Catalog: capa de contexto de negocio sobre Unity Catalog.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-lakebridge" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-lakebridge"><a href="https://github.com/databrickslabs/lakebridge"><i class="fa-brands fa-github" aria-label="github"></i> lakebridge</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/lakebridge?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/lakebridge?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Acelerador de migraciones desde otros data warehouses a Databricks.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-discoverx" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-discoverx"><a href="https://github.com/databrickslabs/discoverx"><i class="fa-brands fa-github" aria-label="github"></i> discoverx</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/discoverx?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/discoverx?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Swiss-army-knife para explorar y administrar Unity Catalog.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-mcp" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-mcp"><a href="https://github.com/databrickslabs/mcp"><i class="fa-brands fa-github" aria-label="github"></i> mcp</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/mcp?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/mcp?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Model Context Protocol para Databricks.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-pylint-plugin" class="level3 repo-card org-labs">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-pylint-plugin"><a href="https://github.com/databrickslabs/pylint-plugin"><i class="fa-brands fa-github" aria-label="github"></i> pylint-plugin</a></h3>
+<p><img src="https://img.shields.io/github/stars/databrickslabs/pylint-plugin?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/databrickslabs/pylint-plugin?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Plugin PyLint con reglas específicas para código Databricks.</p>
+</section>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Labs ≠ producto oficial
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Ningún repo de Labs tiene soporte oficial de Databricks. Antes de usar uno en producción, revisá la actividad reciente del repo (commits, issues respondidos) y tené un plan B. Algunos repos populares como <code>dbx</code> y <code>overwatch</code> ya están deprecados.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="ecosistema-open-source-oss" class="level2">
+<h2 class="anchored" data-anchor-id="ecosistema-open-source-oss">Ecosistema Open-Source <span class="section-badge badge-oss">OSS</span></h2>
+<p>Acá hay un punto que vale la pena aclarar: no todos estos proyectos “los creó Databricks”. La relación es más matizada que eso, y entenderla ayuda a dimensionar qué tan independiente es cada uno.</p>
+<p><strong>Apache Spark</strong> nació en 2009 en el AMPLab de UC Berkeley como proyecto de investigación académica. Los fundadores de ese proyecto (Matei Zaharia y otros) después fundaron Databricks en 2013 para comercializarlo, pero Spark ya existía antes que la empresa. Hoy es un proyecto de la Apache Software Foundation, gobernado por la comunidad, con contribuidores de decenas de empresas. Databricks construyó toda su plataforma <em>alrededor</em> de Spark, no al revés.</p>
+<p><strong>Delta Lake</strong> sí fue creado por Databricks y open-sourced en 2019. Pero vive como proyecto independiente en la Linux Foundation bajo la org <code>delta-io</code>. Tiene su propia governance y contribuidores externos. Databricks lo usa como formato de tabla core de su plataforma, pero Delta Lake funciona perfectamente fuera de Databricks — con Spark standalone, con Flink, o directamente desde Python vía <code>delta-rs</code>.</p>
+<p><strong>MLflow</strong> fue creado por Databricks (liderado por Matei Zaharia) y open-sourced en 2018. También vive en la Linux Foundation con gobernanza independiente. Databricks lo integró profundamente en su plataforma (Model Registry, Experiment Tracking, Model Serving), pero MLflow corre en cualquier lado — es agnóstico de plataforma.</p>
+<p><strong>Unity Catalog</strong> es el más reciente. Fue producto propietario de Databricks hasta 2024, cuando open-sourced la versión OSS. Todavía es el proyecto con mayor dependencia del ecosistema Databricks, pero la intención es que funcione como catálogo abierto multi-motor.</p>
+<p>El punto clave: <strong>son proyectos independientes que Databricks fue encajando en su plataforma</strong>, no al revés. Spark existía antes que Databricks, y Delta Lake, MLflow y Unity Catalog funcionan fuera de Databricks. Si mañana migrás a otro vendor, estos proyectos siguen siendo tuyos.</p>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="github-card quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://opengraph.githubassets.com/1/apache/spark.png" class="img-fluid figure-img"></p>
+<figcaption>Apache Spark</figcaption>
+</figure>
+</div>
+</div>
+<div class="github-card quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://opengraph.githubassets.com/1/mlflow/mlflow.png" class="img-fluid figure-img"></p>
+<figcaption>MLflow</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="github-card quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://opengraph.githubassets.com/1/delta-io/delta.png" class="img-fluid figure-img"></p>
+<figcaption>Delta Lake</figcaption>
+</figure>
+</div>
+</div>
+<div class="github-card quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://opengraph.githubassets.com/1/unitycatalog/unitycatalog.png" class="img-fluid figure-img"></p>
+<figcaption>Unity Catalog</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-rs" class="level3 repo-card org-oss">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-rs"><a href="https://github.com/delta-io/delta-rs"><i class="fa-brands fa-github" aria-label="github"></i> delta-rs</a></h3>
+<p><img src="https://img.shields.io/github/stars/delta-io/delta-rs?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/delta-io/delta-rs?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"> <img src="https://img.shields.io/github/contributors/delta-io/delta-rs?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Contributors"></p>
+<p>Delta Lake nativo en Rust, con bindings Python. La prueba viviente de que Delta Lake es un proyecto independiente: esta implementación no tiene una sola línea de código de Databricks ni de Spark.</p>
+<p><strong>vs.&nbsp;delta-spark</strong>: delta-spark requiere JVM + Spark. delta-rs corre en Python puro — perfecto para CI/CD, Lambda functions, scripts de validación, o integraciones con Polars y pandas. Es la única opción para acceso a Delta Lake en entornos sin JVM.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> deltalake <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DeltaTable, write_deltalake</span>
+<span id="cb10-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pandas <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> pd</span>
+<span id="cb10-3"></span>
+<span id="cb10-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Escribir Delta sin Spark (también acepta s3://, abfss://)</span></span>
+<span id="cb10-5">df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> pd.DataFrame({<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"id"</span>: [<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>], <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"value"</span>: [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"a"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"b"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"c"</span>]})</span>
+<span id="cb10-6">write_deltalake(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"./data/mi_tabla"</span>, df)</span>
+<span id="cb10-7"></span>
+<span id="cb10-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Leer con filtros y time travel</span></span>
+<span id="cb10-9">dt <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DeltaTable(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"./data/mi_tabla"</span>)</span>
+<span id="cb10-10">df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> dt.to_pandas(filters<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"id"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"&gt;"</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)])</span>
+<span id="cb10-11"></span>
+<span id="cb10-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># DML nativo: merge, delete, update</span></span>
+<span id="cb10-13">dt.merge(source<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>new_df, predicate<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"s.id = t.id"</span>,</span>
+<span id="cb10-14">         source_alias<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"s"</span>, target_alias<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"t"</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-15">  .when_matched_update_all() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-16">  .when_not_matched_insert_all() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-17">  .execute()</span></code></pre></div></div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-sharing" class="level3 repo-card org-oss">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-sharing"><a href="https://github.com/delta-io/delta-sharing"><i class="fa-brands fa-github" aria-label="github"></i> delta-sharing</a></h3>
+<p><img src="https://img.shields.io/github/stars/delta-io/delta-sharing?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/delta-io/delta-sharing?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Protocolo abierto para compartir datos de forma segura entre organizaciones. Funciona cross-platform — no necesitás que ambas partes usen Databricks.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-kernel-rs" class="level3 repo-card org-oss">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-kernel-rs"><a href="https://github.com/delta-io/delta-kernel-rs"><i class="fa-brands fa-github" aria-label="github"></i> delta-kernel-rs</a></h3>
+<p><img src="https://img.shields.io/github/stars/delta-io/delta-kernel-rs?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/delta-io/delta-kernel-rs?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Implementación Rust de bajo nivel para leer/escribir Delta desde cualquier motor. Es el kernel que permite que cualquier query engine (no solo Spark) pueda trabajar con Delta Lake de forma nativa.</p>
+</section>
+<hr>
+</section>
+<section id="comunidad-y-developer-advocates-comunidad" class="level2">
+<h2 class="anchored" data-anchor-id="comunidad-y-developer-advocates-comunidad">Comunidad y Developer Advocates <span class="section-badge badge-community">Comunidad</span></h2>
+<p>No todos los repos útiles del ecosistema Databricks vienen de las orgs oficiales. Algunos vienen de Developer Advocates de Databricks (empleados que construyen herramientas open-source para la comunidad) y otros de MVPs externos reconocidos por el <a href="https://www.databricks.com/discover/mvps">programa de MVPs</a>.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" aria-controls="tabset-5-1" aria-selected="true" href="">MrPowers</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" aria-controls="tabset-5-2" aria-selected="false" href="">Jacek Laskowski</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-3" aria-controls="tabset-5-3" aria-selected="false" href="">Otros</a></li></ul>
+<div class="tab-content">
+<div id="tabset-5-1" class="tab-pane active" aria-labelledby="tabset-5-1-tab">
+<p><a href="https://www.linkedin.com/in/matthew-powers-cfa/">Matthew Powers</a> es <strong>Staff Developer Advocate en Databricks</strong> (no MVP — es empleado). Pero sus repos son open-source, viven fuera de las orgs de Databricks, y los mantiene como proyectos personales. Muchos equipos los usan en producción sin saber que vienen de alguien de Databricks. Fun fact: la mayoría de sus repos llevan nombres de personajes de <em>Daria</em> — la serie animada de MTV. <code>spark-daria</code>, <code>quinn</code> (la hermana de Daria), <code>mack</code>, <code>jodie</code>… Si ves un repo de PySpark con nombre de personaje noventero, probablemente sea de MrPowers.</p>
+<div class="github-card">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://opengraph.githubassets.com/1/MrPowers/chispa.png" class="img-fluid figure-img"></p>
+<figcaption>chispa — GitHub</figcaption>
+</figure>
+</div>
+</div>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-chispa" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-chispa"><a href="https://github.com/MrPowers/chispa"><i class="fa-brands fa-github" aria-label="github"></i> chispa</a></h3>
+<p><img src="https://img.shields.io/github/stars/MrPowers/chispa?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/MrPowers/chispa?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>La única librería de testing PySpark que te muestra mensajes de error con colores y diffs legibles — filas que difieren en rojo, iguales en azul. Sin chispa, un test que falla te tira un dump ilegible de objetos <code>Row</code>. Con chispa, ves exactamente qué fila falló y por qué.</p>
+<p><strong>vs.&nbsp;la alternativa</strong> (asserts manuales con <code>.collect()</code>): incomparable. <code>chispa</code> ahorra horas de debugging.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> chispa <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> assert_column_equality</span>
+<span id="cb11-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pyspark.sql.functions <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> F</span>
+<span id="cb11-3"></span>
+<span id="cb11-4">data <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"jo&amp;&amp;se"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"jose"</span>), (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"**li**"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"li"</span>), (<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>, <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>)]</span>
+<span id="cb11-5">df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (spark.createDataFrame(data, [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"nombre"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"esperado"</span>])</span>
+<span id="cb11-6">      .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"limpio"</span>,</span>
+<span id="cb11-7">          F.regexp_replace(F.col(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"nombre"</span>), <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"[^</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\\</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">w</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\\</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s]+"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>)))</span>
+<span id="cb11-8"></span>
+<span id="cb11-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Si falla, te muestra exactamente qué fila difiere</span></span>
+<span id="cb11-10">assert_column_equality(df, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"limpio"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"esperado"</span>)</span></code></pre></div></div>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-spark-daria" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-spark-daria"><a href="https://github.com/mrpowers-io/spark-daria"><i class="fa-brands fa-github" aria-label="github"></i> spark-daria</a></h3>
+<p><img src="https://img.shields.io/github/stars/mrpowers-io/spark-daria?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/mrpowers-io/spark-daria?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Extensiones esenciales de Spark en Scala. La que le dio nombre a la saga.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-quinn" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-quinn"><a href="https://github.com/mrpowers-io/quinn"><i class="fa-brands fa-github" aria-label="github"></i> quinn</a></h3>
+<p><img src="https://img.shields.io/github/stars/mrpowers-io/quinn?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/mrpowers-io/quinn?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Utilidades PySpark para productividad. Column helpers, DataFrame validations, transformations.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-mack" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-mack"><a href="https://github.com/MrPowers/mack"><i class="fa-brands fa-github" aria-label="github"></i> mack</a></h3>
+<p><img src="https://img.shields.io/github/stars/MrPowers/mack?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/MrPowers/mack?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Helpers para Delta Lake: SCD Type 2, upserts, deduplicación, kill duplicates.</p>
+</section>
+</div>
+<div id="tabset-5-2" class="tab-pane" aria-labelledby="tabset-5-2-tab">
+<p>Databricks MVP. Mantiene <strong>“The Internals Of”</strong>, una serie de libros open-source que son probablemente el mejor recurso gratuito que existe para entender cómo funcionan Spark, Delta Lake y el ecosistema por dentro. No son tutoriales superficiales — son deep dives reales en el código fuente, los algoritmos y las decisiones de diseño. Si alguna vez quisiste entender <em>por qué</em> Spark hace lo que hace (y no solo <em>cómo</em> usarlo), esta serie es imprescindible. Todos gratuitos en <a href="https://books.japila.pl">books.japila.pl</a>.</p>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-apache-spark-internals" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-apache-spark-internals"><a href="https://github.com/japila-books/apache-spark-internals"><i class="fa-brands fa-github" aria-label="github"></i> apache-spark-internals</a></h3>
+<p><img src="https://img.shields.io/github/stars/japila-books/apache-spark-internals?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/japila-books/apache-spark-internals?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>El libro principal de la serie. Cubre el scheduler, memory management, shuffle, storage — todo lo que la documentación oficial no explica.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-spark-sql-internals" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-spark-sql-internals"><a href="https://github.com/japila-books/spark-sql-internals"><i class="fa-brands fa-github" aria-label="github"></i> spark-sql-internals</a></h3>
+<p><img src="https://img.shields.io/github/stars/japila-books/spark-sql-internals?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/japila-books/spark-sql-internals?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Catalyst optimizer, Tungsten execution, query planning, AQE. Si optimizás queries en Spark, este libro te cambia la perspectiva.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-spark-structured-streaming-internals" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-spark-structured-streaming-internals"><a href="https://github.com/japila-books/spark-structured-streaming-internals"><i class="fa-brands fa-github" aria-label="github"></i> spark-structured-streaming-internals</a></h3>
+<p><img src="https://img.shields.io/github/stars/japila-books/spark-structured-streaming-internals?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/japila-books/spark-structured-streaming-internals?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Micro-batching, watermarks, state management — Structured Streaming de adentro para afuera.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-lake-internals" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-delta-lake-internals"><a href="https://github.com/japila-books/delta-lake-internals"><i class="fa-brands fa-github" aria-label="github"></i> delta-lake-internals</a></h3>
+<p><img src="https://img.shields.io/github/stars/japila-books/delta-lake-internals?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/japila-books/delta-lake-internals?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Transaction log, checkpointing, optimistic concurrency, VACUUM — todo lo que pasa debajo de una tabla Delta.</p>
+</section>
+</div>
+<div id="tabset-5-3" class="tab-pane" aria-labelledby="tabset-5-3-tab">
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-sqlglot" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-sqlglot"><a href="https://github.com/tobymao/sqlglot"><i class="fa-brands fa-github" aria-label="github"></i> sqlglot</a></h3>
+<p><img src="https://img.shields.io/github/stars/tobymao/sqlglot?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/tobymao/sqlglot?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Parser y transpiler SQL en Python. Soporta dialecto Databricks/Spark SQL. Usado internamente por muchas herramientas del ecosistema.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dataflintspark" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-dataflintspark"><a href="https://github.com/dataflint/spark"><i class="fa-brands fa-github" aria-label="github"></i> dataflint/spark</a></h3>
+<p><img src="https://img.shields.io/github/stars/dataflint/spark?style=flat-square&amp;logo=github.png" class="img-fluid" alt="Stars"> <img src="https://img.shields.io/github/last-commit/dataflint/spark?style=flat-square&amp;logo=git.png" class="img-fluid" alt="Last Commit"></p>
+<p>Drop-in replacement para la Spark UI. Mucho mejor para debugging y profiling de jobs.</p>
+</section>
+<section id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-spark-style-guide" class="level3 repo-card org-community">
+<h3 class="anchored" data-anchor-id="b58fc729-690b-4000-b19f-365a4093b2ff7b7b3c206661206272616e647320676974687562203e7d7d-spark-style-guide"><a href="https://github.com/mrpowers-io/spark-style-guide"><i class="fa-brands fa-github" aria-label="github"></i> spark-style-guide</a></h3>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="https://img.shields.io/github/stars/mrpowers-io/spark-style-guide?style=flat-square&amp;logo=github.png" class="lightbox" data-gallery="quarto-lightbox-gallery-9" title="Stars"><img src="https://img.shields.io/github/stars/mrpowers-io/spark-style-guide?style=flat-square&amp;logo=github.png" class="img-fluid figure-img" alt="Stars"></a></p>
+<figcaption>Stars</figcaption>
+</figure>
+</div>
+<p>Guía de estilo comunitaria para proyectos Spark. Buena referencia para equipos que quieren estandarizar.</p>
+</section>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="cómo-navegar-todo-esto-mi-recomendación" class="level2">
+<h2 class="anchored" data-anchor-id="cómo-navegar-todo-esto-mi-recomendación">Cómo navegar todo esto: mi recomendación</h2>
+<p>Si te sentís abrumado por la cantidad de repos, acá va mi filtro pragmático:</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Si sos Data Engineer
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Instalá <a href="https://github.com/databricks-solutions/ai-dev-kit">AI Dev Kit</a> o <a href="https://github.com/databricks/databricks-agent-skills">Agent Skills</a> en tu editor</li>
+<li>Mirá <a href="https://github.com/databricks/bundle-examples">bundle-examples</a> para templates de DABs</li>
+<li>Usá <a href="https://github.com/MrPowers/chispa">chispa</a> para testing y <a href="https://github.com/databrickslabs/dqx">dqx</a> para data quality</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Si estás construyendo una Databricks App
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Arrancá con <a href="https://github.com/databricks/appkit">AppKit</a> y el <a href="https://developers.databricks.com">DevHub</a></li>
+<li>Copiá snippets del <a href="https://github.com/databricks-solutions/databricks-apps-cookbook">apps-cookbook</a></li>
+<li>Si usás Lakebase, mirá el <a href="https://github.com/databricks-solutions/lakebase-app-dev-kit">lakebase-app-dev-kit</a></li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Si querés entender cómo funciona todo por dentro
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Los libros de <a href="https://books.japila.pl">Jacek Laskowski</a> son el mejor recurso gratuito que existe</li>
+<li><a href="https://github.com/delta-io/delta-rs">delta-rs</a> para entender Delta Lake sin la complejidad de Spark</li>
+<li><a href="https://github.com/mosaicml/llm-foundry">llm-foundry</a> si te interesa cómo se entrenan los modelos</li>
+</ol>
+</div>
+</div>
+<hr>
+</section>
+<section id="reflexión-final-el-open-source-como-forma-de-estar-al-día" class="level2">
+<h2 class="anchored" data-anchor-id="reflexión-final-el-open-source-como-forma-de-estar-al-día">Reflexión final: el open source como forma de estar al día</h2>
+<p>Si hay algo que me queda claro después de armar este mapa, es que <strong>el ecosistema de Databricks se mueve rápido porque se mueve en abierto</strong>. Los repos que listamos acá no son proyectos estáticos — tienen issues, PRs, discusiones, releases. Cada uno es una ventana a cómo se están resolviendo problemas reales <em>hoy</em>.</p>
+<p>Mantener una buena relación con la comunidad open source no es solo “dar back” — es una de las formas más efectivas de mantenerte actualizado. Cuando seguís un repo, leés los changelogs, probás una nueva versión o reportás un bug, estás aprendiendo cómo evoluciona la plataforma <em>antes</em> de que salga en un blog corporativo o en una keynote.</p>
+<p>No hace falta contribuir a todo. Con seguir los repos que te importan, probar las herramientas en tu entorno y compartir lo que aprendés, ya estás participando. <strong>El open source funciona porque hay gente que elige estar al día — y lo comparte.</strong> Mientras quieras seguir aprendiendo, la comunidad te va a tener al tanto.</p>
+<hr>
+<p><em>Los badges de stars y último commit se actualizan automáticamente — si estás leyendo esto meses después de la publicación, los números que ves son los de hoy.</em></p>
+<p><em>¿Conocés algún repo que me haya faltado? Dejame un comentario acá abajo — siempre estoy buscando herramientas nuevas.</em></p>
+
+
+</section>
+
+ ]]></description>
+  <category>Data Engineering</category>
+  <category>Databricks Tips</category>
+  <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/repos-github-databricks/</guid>
+  <pubDate>Sun, 21 Jun 2026 03:00:00 GMT</pubDate>
+  <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/repos-github-databricks/cover.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>LTAP: Databricks quiere eliminar el ETL entre tu base y tu warehouse</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -30,14 +1309,14 @@
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-TL;DR
+<span class="screen-reader-only">Note</span>TL;DR
 </div>
 </div>
 <div class="callout-body-container callout-body">
 <ul>
 <li><strong>LTAP</strong> = Lake Transactional/Analytical Processing. Unifica OLTP y OLAP sobre una sola copia de datos.</li>
-<li><strong>Lakebase</strong> (Postgres serverless) escribe directamente en Delta e Iceberg. Sin ETL, sin réplicas.</li>
-<li>Elimina tres categorías de infra: <strong>CDC/ETL</strong> de ida, <strong>Reverse ETL</strong> de vuelta, y <strong>serving layers</strong> de cache.</li>
+<li><strong>Lakebase</strong> (Postgres serverless), con LTAP, escribirá directamente en Delta e Iceberg. Sin ETL, sin réplicas.</li>
+<li>Elimina <strong>CDC/ETL</strong> de ida, reduce significativamente la necesidad de <strong>Reverse ETL</strong> de vuelta, y simplifica <strong>serving layers</strong> de cache.</li>
 <li>Los <strong>agentes AI</strong> se benefician directamente: read + reason + write sobre un solo backend, sin cruzar fronteras OLTP/OLAP.</li>
 <li>No es HTAP (que sacrifica performance) ni Zero ETL (que oculta el pipeline). Es unificación en la capa de storage.</li>
 <li>Estado actual: <strong>coming soon</strong> — todavía no está GA.</li>
@@ -48,11 +1327,11 @@ TL;DR
 <section id="qué-es-ltap" class="level2">
 <h2 class="anchored" data-anchor-id="qué-es-ltap">Qué es LTAP</h2>
 <p>LTAP significa <strong>Lake Transactional/Analytical Processing</strong>. Es una arquitectura que combina <a href="https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres">Lakebase</a> (el Postgres serverless de Databricks, que corre sobre object storage abierto) con el Lakehouse, bajo un solo modelo de gobernanza, un solo source of truth y una sola capa de storage.</p>
-<p>La idea central: los datos transaccionales se escriben <strong>directamente en Delta e Iceberg desde el punto de escritura</strong>. No después, no con un CDC de por medio, no con un job batch nocturno. Desde el momento cero.</p>
+<p>La idea central: con LTAP, los datos transaccionales se escribirán <strong>directamente en Delta e Iceberg desde el punto de escritura</strong>. No después, no con un CDC de por medio, no con un job batch nocturno. Desde el momento cero.</p>
 <p>Ali Ghodsi lo dijo en el keynote:</p>
 <blockquote class="blockquote">
 <p><em>“For forty years we’ve lived with a separation between OLTP and OLAP… For the first time, we think we’ve cracked the unification code.”</em></p>
-<p>— Ali Ghodsi, CEO de Databricks — DAIS 2026 Keynote</p>
+<p>— Ali Ghodsi, CEO de Databricks (DAIS 2026)</p>
 </blockquote>
 <p>Cuarenta años. Desde que se inventaron los data warehouses, la industria asumió que los datos operacionales y los analíticos viven en mundos separados y que necesitás un pipeline para conectarlos. LTAP dice que no.</p>
 <hr>
@@ -76,7 +1355,7 @@ TL;DR
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;"><strong>Lakebase</strong></td>
+<td style="text-align: left;"><strong>Lakebase (GA)</strong></td>
 <td style="text-align: left;">Motor transaccional</td>
 <td style="text-align: left;">Postgres serverless sobre object storage abierto. 12M launches/día.</td>
 </tr>
@@ -91,9 +1370,9 @@ TL;DR
 <td style="text-align: left;">Un modelo de identidad, permisos y auditoría para ambos mundos.</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>Lakehouse//RT</strong></td>
+<td style="text-align: left;"><strong>Lakehouse//RT (Beta)</strong></td>
 <td style="text-align: left;">Serving real-time</td>
-<td style="text-align: left;">Queries sub-milisegundo sobre datos gobernados en Delta/Iceberg.</td>
+<td style="text-align: left;">Queries sub-100ms sobre datos gobernados en Delta/Iceberg.</td>
 </tr>
 </tbody>
 </table>
@@ -177,7 +1456,7 @@ Important
 </tr>
 </tbody>
 </table>
-<p>La diferencia clave: HTAP intentó meter todo en un motor y nadie lo usó en producción seria porque un query analítico pesado te mataba las transacciones. Zero ETL (como el de AWS entre Aurora y Redshift) automatiza la copia, pero seguís teniendo dos copias con latencia entre ellas.</p>
+<p>La diferencia clave: HTAP intentó meter todo en un motor, pero tuvo adopción limitada en producción por los trade-offs de aislamiento y performance. Zero ETL (como el de AWS entre Aurora y Redshift) automatiza la copia, pero seguís teniendo dos copias con latencia entre ellas.</p>
 <p>LTAP toma otro camino: mantiene motores separados (Postgres para OLTP, Lakehouse para OLAP) pero los sienta sobre la misma capa de storage. El dato es uno solo. No hay copia, no hay sincronización, no hay pipeline que se pueda romper.</p>
 <hr>
 </section>
@@ -202,7 +1481,7 @@ flowchart TD
     BRONZE("&lt;b&gt;Delta Lake&lt;/b&gt;&lt;br&gt;&lt;small&gt;Bronze&lt;/small&gt;")
     DBT("&lt;b&gt;dbt&lt;/b&gt;&lt;br&gt;&lt;small&gt;Silver → Gold&lt;/small&gt;")
     DASH("&lt;b&gt;Dashboards / ML&lt;/b&gt;")
-    RETL("&lt;b&gt;Reverse ETL&lt;/b&gt;&lt;br&gt;&lt;small&gt;Census, Hightouch...&lt;/small&gt;")
+    RETL("&lt;b&gt;Reverse ETL&lt;/b&gt;&lt;br&gt;&lt;small&gt;Census, Hightouch…&lt;/small&gt;")
     SERVE("&lt;b&gt;CRM, Redis, Serving&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving / API cache&lt;/small&gt;")
 
     PG --&gt; CDC --&gt; KAFKA --&gt; SS --&gt; BRONZE --&gt; DBT
@@ -261,12 +1540,12 @@ flowchart TD
     LB("&lt;b&gt;Lakebase&lt;/b&gt;&lt;br&gt;&lt;small&gt;Postgres serverless&lt;/small&gt;")
     UC("&lt;b&gt;Unity Catalog&lt;/b&gt;&lt;br&gt;&lt;small&gt;Gobernanza unificada&lt;/small&gt;")
     DBT2("&lt;b&gt;dbt&lt;/b&gt;&lt;br&gt;&lt;small&gt;Silver → Gold&lt;/small&gt;")
-    RT("&lt;b&gt;Lakehouse//RT&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving sub-ms&lt;/small&gt;")
+    RT("&lt;b&gt;Lakehouse//RT&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving sub-100ms&lt;/small&gt;")
     APPS("&lt;b&gt;Apps / APIs&lt;/b&gt;&lt;br&gt;&lt;small&gt;Leen directo&lt;/small&gt;")
     AGENTS("&lt;b&gt;Agentes AI&lt;/b&gt;&lt;br&gt;&lt;small&gt;Read + reason + write&lt;/small&gt;")
     DASH2("&lt;b&gt;Dashboards / ML&lt;/b&gt;")
 
-    LB -- "escribe directo en Delta / Iceberg" --&gt; UC
+    LB -- "escribirá directo en Delta / Iceberg" --&gt; UC
     UC --&gt; DBT2 --&gt; DASH2
     UC --&gt; RT
     UC --&gt; APPS
@@ -287,12 +1566,12 @@ flowchart TD
 </div>
 <p>Lo que cambia:</p>
 <ul>
-<li><strong>No hay Debezium</strong>. No hay CDC. Lakebase escribe nativamente en Delta/Iceberg.</li>
+<li><strong>No hay Debezium</strong>. No hay CDC. Con LTAP, Lakebase escribirá nativamente en Delta/Iceberg.</li>
 <li><strong>No hay Kafka</strong>. No hay sistema de mensajería intermedio.</li>
 <li><strong>No hay Structured Streaming</strong> para ingestar. El dato ya está en el lake.</li>
-<li><strong>No hay Reverse ETL</strong>. La app y el warehouse leen del mismo storage. Si tu modelo Gold calcula un score de churn y querés usarlo en la app, no necesitás empujarlo de vuelta — ya está ahí, accesible desde Lakebase.</li>
-<li><strong>No hay serving layer separada</strong>. Lakehouse//RT resuelve queries sub-milisegundo directamente sobre los datos gobernados. No necesitás Redis ni Pinot como cache intermedio.</li>
-<li><strong>Latencia cero</strong> entre la escritura operacional y la disponibilidad analítica. Es el mismo dato.</li>
+<li><strong>Menos Reverse ETL</strong>. La app y el warehouse leen del mismo storage. Si tu modelo Gold calcula un score de churn y querés usarlo en la app, en muchos casos no necesitás empujarlo de vuelta — ya está ahí, accesible desde Lakebase. Para SaaS externos, puede seguir haciendo falta.</li>
+<li><strong>No hay serving layer separada</strong>. Lakehouse//RT (Beta) resuelve queries sub-100ms directamente sobre los datos gobernados. No necesitás Redis ni Pinot como cache intermedio.</li>
+<li><strong>Sin pipeline de sincronización</strong> entre la escritura operacional y la disponibilidad analítica. Es el mismo dato.</li>
 <li><strong>Un solo sistema de gobernanza</strong>. Unity Catalog para permisos, lineage, auditoría.</li>
 <li><strong>dbt sigue existiendo</strong> — pero transforma datos que ya están en Delta, no datos que tuvieron que viajar por tres sistemas para llegar.</li>
 </ul>
@@ -317,7 +1596,7 @@ Tip
 <p>Reynold Xin lo dijo en el keynote:</p>
 <blockquote class="blockquote">
 <p><em>“The agents really prefer a much simpler stack, because they can move way faster.”</em></p>
-<p>— Reynold Xin, Co-founder de Databricks — DAIS 2026 Keynote</p>
+<p>— Reynold Xin, Co-founder de Databricks (DAIS 2026 Keynote)</p>
 </blockquote>
 <p>Y no es una frase de marketing — hay una razón técnica concreta.</p>
 <p>Un agente AI típico necesita hacer tres cosas:</p>
@@ -332,7 +1611,7 @@ Tip
 <li>Lee datos históricos y analíticos → Lakehouse (misma copia de datos)</li>
 <li>Escribe resultados operacionales → Lakebase (misma copia de datos)</li>
 <li>El resultado es inmediatamente consultable para analítica, sin esperar a ningún pipeline</li>
-<li>Con Lakebase Search, el retrieval (vector + full-text) también corre en el mismo backend</li>
+<li>Con Lakebase Search (Beta), el retrieval (vector + full-text) también corre en el mismo backend</li>
 </ul>
 <p>El loop completo — <strong>retrieve → reason → act → remember</strong> — pasa sobre una sola capa de storage. No hay latencia de sincronización entre lo que el agente hizo y lo que el sistema de monitoreo puede ver.</p>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -345,14 +1624,14 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Esto explica por qué Databricks está empujando LTAP tan fuerte en el contexto de su plataforma agentic. Si tenés Genie, Agent Bricks, o agentes custom corriendo en producción, cada milisegundo de latencia y cada pipeline intermedio es fricción. LTAP elimina esa fricción de raíz.</p>
+<p>Esto explica por qué Databricks está empujando LTAP tan fuerte en el contexto de su plataforma agentic. Si tenés Genie, Agent Bricks, o agentes custom corriendo en producción, cada milisegundo de latencia y cada pipeline intermedio es fricción. LTAP reduce esa fricción de raíz.</p>
 </div>
 </div>
 <hr>
 </section>
 <section id="lo-que-viene-con-lakebase" class="level2">
 <h2 class="anchored" data-anchor-id="lo-que-viene-con-lakebase">Lo que viene con Lakebase</h2>
-<p>Además de LTAP, Lakebase trajo features propios que vale la pena conocer:</p>
+<p>Además de LTAP (Coming soon), Lakebase (GA) trajo funcionalidades propias que vale la pena conocer:</p>
 <section id="disaster-recovery-cross-cloud" class="level3">
 <h3 class="anchored" data-anchor-id="disaster-recovery-cross-cloud">Disaster Recovery cross-cloud</h3>
 <p>Replicación entre nubes y regiones. Si tu Lakebase en AWS US-East se cae, tenés failover a otra región o incluso a Azure. Para quienes están construyendo arquitecturas multi-cloud, esto es significativo.</p>
@@ -365,20 +1644,21 @@ Note
 <h3 class="anchored" data-anchor-id="operaciones-autónomas">Operaciones autónomas</h3>
 <p>Agentes que monitorean la salud de la base, detectan slowdowns, proponen índices y asisten en recovery. La idea de Databricks es que la administración de la base de datos se automatice progresivamente. Lo mismo que Genie ZeroOps hace para pipelines, pero para la base transaccional.</p>
 </section>
-<section id="lakebase-search" class="level3">
-<h3 class="anchored" data-anchor-id="lakebase-search">Lakebase Search</h3>
+<section id="lakebase-search-beta" class="level3">
+<h3 class="anchored" data-anchor-id="lakebase-search-beta">Lakebase Search (Beta)</h3>
 <p>Retrieval híbrido — vector y full-text — nativo dentro de Postgres. Dos extensiones:</p>
 <ul>
 <li><code>lakebase_vector</code>: pgvector con indexing avanzado para embeddings</li>
 <li><code>lakebase_text</code>: BM25 para búsqueda full-text clásica</li>
 </ul>
-<p>El loop completo de un agente (retrieve → reason → act → remember) puede correr sobre un solo backend. Te ahorrás montar un Pinecone o Weaviate al lado.</p>
+<p>Es el mismo loop de agente sobre un solo backend, ahora con retrieval nativo. Te ahorrás montar un Pinecone o Weaviate al lado.</p>
+<p>Para serving de baja latencia sobre datos gobernados, Lakehouse//RT (Beta) completa la historia del lado operacional.</p>
 <hr>
 </section>
 </section>
 <section id="quién-ya-lo-usa" class="level2">
 <h2 class="anchored" data-anchor-id="quién-ya-lo-usa">Quién ya lo usa</h2>
-<p>Lakebase (la base de LTAP) ya está en producción con clientes grandes:</p>
+<p>Lakebase (la base de LTAP) ya está en producción con clientes grandes. Esto refiere a Lakebase (GA), no a LTAP, que Databricks anunció como coming soon.</p>
 <ul>
 <li><strong>Block</strong> (Square, Cash App)</li>
 <li><strong>Superhuman</strong> (email)</li>
@@ -421,7 +1701,7 @@ Important
 <h2 class="anchored" data-anchor-id="mi-lectura">Mi lectura</h2>
 <p>LTAP me parece el anuncio más relevante del DAIS 2026 a nivel arquitectónico. No por lo que hace hoy (que todavía no está GA), sino por lo que implica si funciona como prometen.</p>
 <p>Reynold Xin lo dijo bien: <em>“The agents really prefer a much simpler stack.”</em> Y tiene razón — no solo los agentes. Cualquiera que haya mantenido un pipeline de sincronización OLTP → OLAP sabe que la complejidad está en la logística, no en la lógica de negocio.</p>
-<p>Si LTAP cumple, hay una cantidad significativa de infraestructura que va a dejar de tener razón de ser. Debezium, Kafka Connect para CDC, Structured Streaming como paso de ingesta, las tablas Bronze que son copias crudas de la fuente, las herramientas de Reverse ETL, las serving layers de cache — todo eso se simplifica drásticamente.</p>
+<p>Si LTAP cumple, hay una cantidad significativa de infraestructura que va a dejar de tener razón de ser o a simplificarse drásticamente. Debezium, Kafka Connect para CDC, Structured Streaming como paso de ingesta, las tablas Bronze que son copias crudas de la fuente, parte de las herramientas de Reverse ETL, las serving layers de cache — todo eso cambia de peso en la arquitectura.</p>
 <p>¿Significa que los data engineers nos quedamos sin trabajo? No.&nbsp;Significa que dejamos de gastar tiempo en plomería y podemos enfocarnos en lo que realmente importa: modelado, calidad de datos, y construir productos de datos que generen valor.</p>
 <p>Voy a estar siguiendo de cerca cómo avanza. Cuando salga en GA, planeo hacer un benchmark real comparando el stack clásico contra LTAP. Stay tuned.</p>
 <hr>
@@ -20741,544 +22021,6 @@ font-style: inherit;"> clean_sales</span></span></code></pre></div>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/si-arrancara-de-cero/</guid>
   <pubDate>Tue, 17 Feb 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/si-arrancara-de-cero/cover.png" medium="image" type="image/png" height="81" width="144"/>
-</item>
-<item>
-  <title>Data Engineering Design Patterns: 8 patrones de ingesta que tenés que conocer</title>
-  <dc:creator>Mauro Loprete</dc:creator>
-  <link>https://mauroloprete.github.io/mauroloprete/blog/posts/data-engineering-design-patterns/</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>En este episodio repaso los capítulos 1 y 2 del libro <em>Data Engineering Design Patterns</em> de <strong>Bartosz Konieczny</strong>, cubriendo los fundamentos de patrones de diseño aplicados a data engineering y los 8 patrones de ingesta de datos que el autor presenta.</p>
-<p>El libro es una lectura que recomiendo mucho si ya tenés experiencia construyendo pipelines y querés poner nombre a las cosas que venís haciendo (o que deberías estar haciendo). No es un libro introductorio: asume que sabés qué es un pipeline y que ya te peleaste con problemas reales.</p>
-<section id="por-qué-importan-los-patrones" class="level2">
-<h2 class="anchored" data-anchor-id="por-qué-importan-los-patrones"><i class="fa-solid fa-lightbulb" aria-label="lightbulb"></i> Por qué importan los patrones</h2>
-<p>Cuando trabajás en un equipo de datos, uno de los problemas más frecuentes no es técnico sino comunicativo. Alguien dice “cargamos todo de nuevo” y otro entiende algo distinto. Los patrones de diseño resuelven eso: te dan un <strong>vocabulario compartido</strong> para discutir soluciones.</p>
-<p>No se trata de memorizar nombres. Se trata de que cuando alguien diga “usemos CDC para esta fuente” o “necesitamos un Compactor después del streaming”, todos en la mesa entiendan exactamente lo mismo. Es la misma lógica que los patrones de diseño en software (Factory, Observer, etc.), pero aplicada a flujos de datos.</p>
-<p>Konieczny organiza los patrones en categorías. En este post me enfoco en los <strong>8 patrones de ingesta</strong>, que son los que más impacto tienen en el día a día.</p>
-</section>
-<section id="los-8-patrones-de-ingesta" class="level2">
-<h2 class="anchored" data-anchor-id="los-8-patrones-de-ingesta"><i class="fa-solid fa-database" aria-label="database"></i> Los 8 patrones de ingesta</h2>
-<section id="full-loader" class="level3">
-<h3 class="anchored" data-anchor-id="full-loader">1. Full Loader</h3>
-<p>Carga completa de la fuente en cada ejecución. Borrás (o sobreescribís) todo lo que había y traés el dataset entero de nuevo. Es el patrón más simple y el que menos puede fallar, pero el más costoso en tiempo y recursos cuando la tabla crece.</p>
-<p><strong>Cuándo usarlo</strong>: tablas de referencia chicas (países, monedas, configuraciones), fuentes que no tienen columna de fecha de modificación, o cuando necesitás garantizar consistencia total sin complicarte.</p>
-<div id="lst-full-loader" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-full-loader-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Full Loader: sobreescritura completa de tabla de dimensiones
-</figcaption>
-<div aria-describedby="lst-full-loader-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-full-loader" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-full-loader-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Full Loader en PySpark — sobreescribir tabla de dimensiones</span></span>
-<span id="lst-full-loader-2">df_source <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (spark.read.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"jdbc"</span>)</span>
-<span id="lst-full-loader-3">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"url"</span>, jdbc_url)</span>
-<span id="lst-full-loader-4">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"dbtable"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"erp.dim_currency"</span>)</span>
-<span id="lst-full-loader-5">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"user"</span>, user)</span>
-<span id="lst-full-loader-6">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"password"</span>, password)</span>
-<span id="lst-full-loader-7">    .load())</span>
-<span id="lst-full-loader-8"></span>
-<span id="lst-full-loader-9">(df_source.write</span>
-<span id="lst-full-loader-10">    .<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"delta"</span>)</span>
-<span id="lst-full-loader-11">    .mode(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"overwrite"</span>)</span>
-<span id="lst-full-loader-12">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"overwriteSchema"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"true"</span>)</span>
-<span id="lst-full-loader-13">    .saveAsTable(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"bronze.dim_currency"</span>))</span></code></pre></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="incremental-loader" class="level3">
-<h3 class="anchored" data-anchor-id="incremental-loader">2. Incremental Loader</h3>
-<p>Solo trae los registros nuevos o modificados desde la última ejecución. Requiere una <strong>columna de control</strong> confiable: un timestamp de modificación, un ID autoincremental, o algo equivalente. Es el patrón más común en producción porque equilibra eficiencia con simplicidad.</p>
-<p><strong>Cuándo usarlo</strong>: tablas transaccionales que crecen constantemente y tienen una columna <code>updated_at</code> o similar. Es el caballo de batalla de la mayoría de los pipelines batch.</p>
-<div id="lst-incremental-loader" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-incremental-loader-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Incremental Loader: ingesta por high watermark con PySpark
-</figcaption>
-<div aria-describedby="lst-incremental-loader-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-incremental-loader" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-incremental-loader-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Incremental Loader — traer solo registros nuevos</span></span>
-<span id="lst-incremental-loader-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> pyspark.sql <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> functions <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> F</span>
-<span id="lst-incremental-loader-3"></span>
-<span id="lst-incremental-loader-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Obtener la última marca de agua (high watermark)</span></span>
-<span id="lst-incremental-loader-5">max_timestamp <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (spark.table(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"bronze.orders"</span>)</span>
-<span id="lst-incremental-loader-6">    .agg(F.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">max</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"updated_at"</span>))</span>
-<span id="lst-incremental-loader-7">    .collect()[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>][<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>])</span>
-<span id="lst-incremental-loader-8"></span>
-<span id="lst-incremental-loader-9"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Leer solo lo nuevo desde la fuente</span></span>
-<span id="lst-incremental-loader-10">df_incremental <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (spark.read.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"jdbc"</span>)</span>
-<span id="lst-incremental-loader-11">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"url"</span>, jdbc_url)</span>
-<span id="lst-incremental-loader-12">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"dbtable"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"erp.orders"</span>)</span>
-<span id="lst-incremental-loader-13">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"user"</span>, user)</span>
-<span id="lst-incremental-loader-14">    .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"password"</span>, password)</span>
-<span id="lst-incremental-loader-15">    .load()</span>
-<span id="lst-incremental-loader-16">    .<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">filter</span>(F.col(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"updated_at"</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span> max_timestamp))</span>
-<span id="lst-incremental-loader-17"></span>
-<span id="lst-incremental-loader-18"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Append o merge en destino</span></span>
-<span id="lst-incremental-loader-19">(df_incremental.write</span>
-<span id="lst-incremental-loader-20">    .<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"delta"</span>)</span>
-<span id="lst-incremental-loader-21">    .mode(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"append"</span>)</span>
-<span id="lst-incremental-loader-22">    .saveAsTable(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"bronze.orders"</span>))</span></code></pre></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="cdc-change-data-capture" class="level3">
-<h3 class="anchored" data-anchor-id="cdc-change-data-capture">3. CDC (Change Data Capture)</h3>
-<p>Captura cambios directamente desde el <strong>log de transacciones</strong> de la base de datos origen. Es el patrón más eficiente para fuentes transaccionales porque no necesitás escanear la tabla origen: leés los cambios del WAL (Write-Ahead Log) o el equivalente del motor. Herramientas como Debezium, Fivetran o el conector CDC de Databricks hacen el trabajo pesado.</p>
-<p><strong>Cuándo usarlo</strong>: cuando la fuente es una base de datos relacional con alto volumen de cambios, cuando necesitás capturar deletes (que el Incremental Loader no ve), o cuando querés latencia baja sin impactar la fuente.</p>
-<div id="lst-cdc-merge" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cdc-merge-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: CDC con MERGE en Delta Lake: inserts, updates y deletes
-</figcaption>
-<div aria-describedby="lst-cdc-merge-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cdc-merge" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-cdc-merge-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- CDC con MERGE en Delta Lake</span></span>
-<span id="lst-cdc-merge-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Los eventos CDC llegan con una columna _operation: INSERT, UPDATE, DELETE</span></span>
-<span id="lst-cdc-merge-3"></span>
-<span id="lst-cdc-merge-4"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">MERGE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">INTO</span> silver.customers <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">AS</span> target</span>
-<span id="lst-cdc-merge-5"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> (</span>
-<span id="lst-cdc-merge-6">    <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">FROM</span> bronze.customers_cdc</span>
-<span id="lst-cdc-merge-7">    QUALIFY <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ROW_NUMBER</span>() <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">OVER</span> (</span>
-<span id="lst-cdc-merge-8">        <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">PARTITION</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">BY</span> customer_id <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ORDER</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">BY</span> _event_timestamp <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">DESC</span></span>
-<span id="lst-cdc-merge-9">    ) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span></span>
-<span id="lst-cdc-merge-10">) <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">AS</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">source</span></span>
-<span id="lst-cdc-merge-11"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ON</span> target.customer_id <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">source</span>.customer_id</span>
-<span id="lst-cdc-merge-12"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WHEN</span> MATCHED <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">AND</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">source</span>._operation <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'DELETE'</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">THEN</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">DELETE</span></span>
-<span id="lst-cdc-merge-13"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WHEN</span> MATCHED <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">AND</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">source</span>._operation <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'UPDATE'</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">THEN</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">UPDATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SET</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span></span>
-<span id="lst-cdc-merge-14"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WHEN</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">NOT</span> MATCHED <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">AND</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">source</span>._operation <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">!=</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'DELETE'</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">THEN</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">INSERT</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>;</span></code></pre></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="passthrough-replicator" class="level3">
-<h3 class="anchored" data-anchor-id="passthrough-replicator">4. Passthrough Replicator</h3>
-<p>Replica datos tal cual vienen de la fuente, sin ninguna transformación. Es como un espejo: lo que hay en origen, lo tenés igual en destino. Suena trivial, pero es un patrón deliberado: separar la extracción de la transformación te da un punto de recuperación limpio.</p>
-<p><strong>Cuándo usarlo</strong>: capas de staging o Bronze donde querés mantener una copia fiel de la fuente. Si algo sale mal en la transformación posterior, siempre podés volver a los datos originales sin pegar de nuevo al sistema origen.</p>
-</section>
-<section id="transformation-replicator" class="level3">
-<h3 class="anchored" data-anchor-id="transformation-replicator">5. Transformation Replicator</h3>
-<p>Replica y transforma en el mismo paso. A diferencia del Passthrough, acá aplicás lógica de negocio, limpieza o reestructuración durante la ingesta misma. Reduce la cantidad de jobs pero acopla extracción y transformación.</p>
-<p><strong>Cuándo usarlo</strong>: cuando el volumen es bajo y no justificás una capa intermedia, o cuando la transformación es muy simple (renombrar columnas, castear tipos). En la práctica, lo uso poco porque prefiero separar responsabilidades.</p>
-</section>
-<section id="compactor" class="level3">
-<h3 class="anchored" data-anchor-id="compactor">6. Compactor</h3>
-<p>Consolida archivos pequeños en archivos más grandes. Si tenés un pipeline de streaming o micro-batches que genera miles de archivos chicos por hora, el rendimiento de lectura se degrada porque el motor tiene que abrir miles de archivos. El Compactor los junta periódicamente.</p>
-<p><strong>Cuándo usarlo</strong>: siempre que tengas pipelines de streaming o micro-batches que escriban a Delta, Parquet o Iceberg. Es casi obligatorio en producción.</p>
-<div id="lst-compactor" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-compactor-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Compactor: OPTIMIZE para consolidar archivos pequeños en Delta
-</figcaption>
-<div aria-describedby="lst-compactor-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-compactor" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-compactor-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Compactor en Databricks — OPTIMIZE es la implementación nativa</span></span>
-<span id="lst-compactor-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Compactar toda la tabla</span></span>
-<span id="lst-compactor-3">OPTIMIZE bronze.<span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">events</span>;</span>
-<span id="lst-compactor-4"></span>
-<span id="lst-compactor-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Compactar solo la partición de ayer (mucho más eficiente)</span></span>
-<span id="lst-compactor-6">OPTIMIZE bronze.<span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">events</span></span>
-<span id="lst-compactor-7"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WHERE</span> event_date <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">current_date</span>() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">INTERVAL</span> <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1</span> <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DAY</span>;</span>
-<span id="lst-compactor-8"></span>
-<span id="lst-compactor-9"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Si usás Liquid Clustering, OPTIMIZE es incremental</span></span>
-<span id="lst-compactor-10"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- y además reordena los datos para queries más rápidas</span></span></code></pre></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="readiness-marker" class="level3">
-<h3 class="anchored" data-anchor-id="readiness-marker">7. Readiness Marker</h3>
-<p>Señaliza cuándo un dataset está listo para consumo downstream. Parece un detalle menor, pero en pipelines complejos con muchas dependencias es fundamental. Sin un marcador de readiness, tus jobs downstream no saben si los datos ya están completos o si la ingesta sigue corriendo.</p>
-<p><strong>Cuándo usarlo</strong>: orquestación de pipelines con dependencias complejas. Se puede implementar con archivos <code>_SUCCESS</code>, registros en una tabla de metadatos, o señales en el orquestador (Airflow sensors, Databricks task dependencies).</p>
-</section>
-<section id="external-trigger" class="level3">
-<h3 class="anchored" data-anchor-id="external-trigger">8. External Trigger</h3>
-<p>La ingesta no corre en un schedule fijo: se dispara por un <strong>evento externo</strong>. Un archivo llega a S3, un webhook se activa, un mensaje aparece en una cola. Es el patrón para arquitecturas event-driven.</p>
-<p><strong>Cuándo usarlo</strong>: cuando la fuente no tiene un schedule predecible o cuando necesitás reaccionar en tiempo real. Ejemplos: archivos que un proveedor sube a un bucket, webhooks de APIs, mensajes en Kafka/EventHub.</p>
-</section>
-</section>
-<section id="mapeo-a-la-arquitectura-medallion" class="level2">
-<h2 class="anchored" data-anchor-id="mapeo-a-la-arquitectura-medallion"><i class="fa-solid fa-layer-group" aria-label="layer-group"></i> Mapeo a la arquitectura Medallion</h2>
-<p>Uno de los ejercicios más útiles que podés hacer es mapear estos patrones a las capas de una arquitectura <strong>Medallion</strong> (Bronze / Silver / Gold). No es una relación uno a uno, pero hay afinidades claras:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Capa</th>
-<th>Patrones típicos</th>
-<th>Rol</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><strong>Bronze</strong></td>
-<td>Full Loader, Incremental Loader, CDC, Passthrough Replicator, External Trigger</td>
-<td>Ingesta cruda. El objetivo es tener una copia fiel de las fuentes con mínima transformación.</td>
-</tr>
-<tr class="even">
-<td><strong>Silver</strong></td>
-<td>Transformation Replicator, CDC (MERGE), Compactor, Readiness Marker</td>
-<td>Limpieza y conformado. Acá aplicás deduplicación, tipado, joins y lógica de negocio liviana.</td>
-</tr>
-<tr class="odd">
-<td><strong>Gold</strong></td>
-<td>Compactor, Readiness Marker</td>
-<td>Agregaciones y modelos de consumo. Tablas optimizadas para dashboards y ML.</td>
-</tr>
-</tbody>
-</table>
-<p>El <strong>Compactor</strong> y el <strong>Readiness Marker</strong> son transversales: los necesitás en cualquier capa donde haya escritura frecuente o dependencias downstream.</p>
-</section>
-<section id="comparación-rápida" class="level2">
-<h2 class="anchored" data-anchor-id="comparación-rápida"><i class="fa-solid fa-table" aria-label="table"></i> Comparación rápida</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Patrón</th>
-<th>Complejidad</th>
-<th>Latencia</th>
-<th>Cuándo usarlo</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Full Loader</td>
-<td>Baja</td>
-<td>Alta</td>
-<td>Tablas chicas, sin columna de control</td>
-</tr>
-<tr class="even">
-<td>Incremental Loader</td>
-<td>Media</td>
-<td>Media</td>
-<td>Tablas con <code>updated_at</code>, batch diario/horario</td>
-</tr>
-<tr class="odd">
-<td>CDC</td>
-<td>Alta</td>
-<td>Baja</td>
-<td>Fuentes transaccionales, captura de deletes</td>
-</tr>
-<tr class="even">
-<td>Passthrough Replicator</td>
-<td>Baja</td>
-<td>Variable</td>
-<td>Capas de staging, Bronze raw</td>
-</tr>
-<tr class="odd">
-<td>Transformation Replicator</td>
-<td>Media</td>
-<td>Variable</td>
-<td>Transformaciones simples en ingesta</td>
-</tr>
-<tr class="even">
-<td>Compactor</td>
-<td>Baja</td>
-<td>N/A (mantenimiento)</td>
-<td>Post-streaming, micro-batches</td>
-</tr>
-<tr class="odd">
-<td>Readiness Marker</td>
-<td>Baja</td>
-<td>N/A (señalización)</td>
-<td>Orquestación con dependencias</td>
-</tr>
-<tr class="even">
-<td>External Trigger</td>
-<td>Media-Alta</td>
-<td>Baja</td>
-<td>Arquitecturas event-driven</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="opinión-personal-lo-que-más-uso-en-producción" class="level2">
-<h2 class="anchored" data-anchor-id="opinión-personal-lo-que-más-uso-en-producción"><i class="fa-solid fa-user" aria-label="user"></i> Opinión personal: lo que más uso en producción</h2>
-<p>De estos 8 patrones, los que uso en el <strong>90% de mis proyectos en Databricks</strong> son:</p>
-<ul>
-<li><strong>Incremental Loader</strong> para todo lo batch. Es el patrón por defecto. Si la fuente tiene <code>updated_at</code>, no hay razón para hacer Full Load.</li>
-<li><strong>CDC con MERGE</strong> para fuentes transaccionales donde necesito capturar updates y deletes. En Databricks, el <code>MERGE INTO</code> de Delta Lake hace que implementar esto sea casi trivial.</li>
-<li><strong>Compactor</strong> (vía <code>OPTIMIZE</code>) después de cualquier pipeline de streaming o micro-batches. Sin esto, el rendimiento de lectura se degrada rápido.</li>
-<li><strong>Readiness Marker</strong> implementado como task dependencies en Databricks Workflows. Simple pero efectivo.</li>
-</ul>
-<p>El <strong>Full Loader</strong> lo reservo para tablas de dimensiones chicas donde no vale la pena complicarse. El <strong>External Trigger</strong> lo uso cuando trabajo con archivos que llegan a S3/ADLS en horarios impredecibles (Auto Loader de Databricks es ideal para esto).</p>
-<p>Los patrones que menos uso son <strong>Passthrough Replicator</strong> y <strong>Transformation Replicator</strong> como patrones separados, porque en la práctica mi capa Bronze ya cumple el rol del Passthrough y Silver el del Transformation Replicator. Pero tener el nombre del patrón me ayuda a explicar qué hace cada capa cuando hablo con el equipo.</p>
-</section>
-<section id="links" class="level2">
-<h2 class="anchored" data-anchor-id="links"><i class="fa-solid fa-link" aria-label="link"></i> Links</h2>
-<ul>
-<li><i class="fa-solid fa-podcast" aria-label="podcast"></i> <a href="https://open.spotify.com/episode/6GM0HWX7vdE6SmURAWTcCG">Escuchar el episodio en Spotify</a></li>
-<li><i class="fa-solid fa-book" aria-label="book"></i> <em>Data Engineering Design Patterns</em> — Bartosz Konieczny</li>
-<li><i class="fa-solid fa-file-alt" aria-label="file-alt"></i> <a href="https://docs.delta.io/latest/delta-update.html">Documentación de MERGE en Delta Lake</a></li>
-<li><i class="fa-solid fa-file-alt" aria-label="file-alt"></i> <a href="https://docs.databricks.com/ingestion/auto-loader/index.html">Auto Loader en Databricks</a></li>
-</ul>
-
-
-</section>
-
- ]]></description>
-  <category>Podcast</category>
-  <category>Data Engineering</category>
-  <category>Book Review</category>
-  <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/data-engineering-design-patterns/</guid>
-  <pubDate>Mon, 15 Sep 2025 03:00:00 GMT</pubDate>
-  <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/data-engineering-design-patterns/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>

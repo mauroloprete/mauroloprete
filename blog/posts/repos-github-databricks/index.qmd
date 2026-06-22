@@ -1,0 +1,1102 @@
+---
+title: "El mapa de GitHub de Databricks: repos que tenés que conocer"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-06-21"
+draft: false
+categories: [Data Engineering, Databricks Tips]
+description: "Guía curada de los repositorios más útiles del ecosistema Databricks en GitHub: desde las cuatro orgs oficiales hasta herramientas de la comunidad y MVPs. Con contexto de qué es cada cosa y cuándo te sirve."
+image: cover.png
+css: styles.css
+---
+
+El ecosistema de Databricks se mueve rápido. Cada Data + AI Summit trae una avalancha de anuncios, y entre summit y summit aparecen repos nuevos que a veces resuelven problemas que venías peleando hace meses. El tema es que si no estás mirando activamente, te los perdés — y terminás reinventando la rueda o usando herramientas deprecadas.
+
+**¿Cómo se afronta esto sin volverse loco?** No necesitás seguir todo. Lo que sí necesitás es saber *dónde* mirar y *qué vale la pena*. La buena noticia es que Databricks construye en abierto — sus repos de GitHub son la ventana más directa a lo que viene. Spark Declarative Pipelines, Lakebase, Omnigent — todo apareció primero en GitHub, antes que en cualquier blog corporativo o keynote. Seguir los repos correctos, seguir a los referentes que aportan a la comunidad, y probar las herramientas en tu propio entorno es la forma más práctica de estar actualizado sin depender de que alguien te lo cuente.
+
+Databricks tiene más de 500 repos públicos, dispersos en cuatro organizaciones propias más varios proyectos open-source que viven en fundaciones independientes. Cada org tiene un propósito distinto, un nivel de soporte distinto, y si no sabés cuál es cuál, podés terminar usando en producción algo que es un experimento de un hackathon interno. Si alguna vez buscaste algo y terminaste en un repo deprecado de 2019, este post es para vos.
+
+Armé esta guía curada organizando todo por tema y nivel de madurez. **Podés leerla de corrido como un blog post** — tiene contexto, reseñas y demos para cada herramienta — **o usarla como fuente de consulta** cuando necesites encontrar un repo para un problema puntual. No es un listado exhaustivo: es lo que yo considero más útil si laburás con Databricks día a día.
+
+::: callout-note
+## TL;DR
+
+-   Databricks tiene **cuatro orgs propias en GitHub** — todas mantenidas por empleados, pero con distinto rol: `databricks` (producto), `databrickslabs` (experimental), `databricks-solutions` (toolkits de campo), `databricks-industry-solutions` (soluciones finales por industria). Más proyectos OSS en fundaciones independientes.
+-   Para **desarrollo con coding agents** (Claude Code, Cursor, Copilot): el [AI Dev Kit](https://github.com/databricks-solutions/ai-dev-kit) es el repo más completo con 75+ herramientas.
+-   Para **Databricks Apps**: [AppKit](https://github.com/databricks/appkit) es el SDK nuevo de React/Node.js con plugins para Genie, Lakebase, SQL y Files.
+-   Para **Data Engineering**: `dbt-databricks`, `terraform-provider-databricks`, `mlops-stacks` y los bundles examples siguen siendo esenciales.
+-   Los **MVPs de la comunidad** (MrPowers, Jacek Laskowski) mantienen herramientas que muchos equipos usan en producción sin saber que son community-driven.
+:::
+
+### Guía de colores
+
+A lo largo del post, cada card tiene un borde de color que indica de qué organización viene:
+
+:::{.org-legend}
+:::{.org-legend-item}
+[]{.org-dot .navy} **databricks** — Producto oficial
+:::
+:::{.org-legend-item}
+[]{.org-dot .orange} **databrickslabs** — Experimental
+:::
+:::{.org-legend-item}
+[]{.org-dot .purple} **databricks-solutions** — Field Engineering
+:::
+:::{.org-legend-item}
+[]{.org-dot .pink} **databricks-industry-solutions** — Soluciones por industria
+:::
+:::{.org-legend-item}
+[]{.org-dot .blue} **OSS foundations** — Linux Foundation / Apache
+:::
+:::{.org-legend-item}
+[]{.org-dot .green} **Comunidad** — MVPs y terceros
+:::
+:::
+
+------------------------------------------------------------------------
+
+## Las organizaciones de Databricks en GitHub
+
+Todas son de Databricks, pero no son lo mismo. Las cuatro organizaciones son propiedad de Databricks y están mantenidas por empleados — ninguna es comunidad externa. La diferencia está en **quién** dentro de Databricks las mantiene y con **qué nivel de compromiso**:
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} databricks](https://github.com/databricks) [Oficial]{.section-badge .badge-official}
+
+Equipo de **producto**. SDKs oficiales, CLI, drivers, conectores, material educativo. Soporte oficial con issues atendidos, versionado y SLAs.
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} databrickslabs](https://github.com/databrickslabs) [Labs]{.section-badge .badge-labs}
+
+Empleados, proyectos **experimentales**. Prototipos, herramientas incubadas, side projects internos. Best-effort, sin garantía. Algunos migran al producto.
+:::
+
+:::{.repo-card .org-solutions}
+### [{{< fa brands github >}} databricks-solutions](https://github.com/databricks-solutions) [Solutions]{.section-badge .badge-solutions}
+
+Equipo de **Field Engineering**. Toolkits horizontales, templates de apps, integraciones con herramientas (AI Dev Kit, AppKit cookbook, Lakebase dev kit). Código de referencia para developers y platform engineers.
+:::
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} databricks-industry-solutions](https://github.com/databricks-industry-solutions) [Industry]{.section-badge .badge-industry}
+
+**213 repos** de soluciones finales por industria. Notebooks completos, pipelines end-to-end, datos de ejemplo. Más "soft" que las otras orgs — acá no hay SDKs ni CLIs, hay **soluciones de negocio listas para clonar y adaptar**: fraud detection para banca, demand forecasting para retail, imágenes médicas para salud. Es lo que Databricks llama [Solution Accelerators](https://www.databricks.com/solutions/accelerators).
+:::
+
+**¿Cuál es la diferencia entre las cuatro?** `databricks` es el producto. `databrickslabs` son experimentos que pueden desaparecer. `databricks-solutions` son herramientas horizontales para developers. `databricks-industry-solutions` son **soluciones verticales de negocio** — el nivel más alto de abstracción, listas para presentarle a un stakeholder.
+
+Además, hay una quinta categoría: proyectos que Databricks creó o impulsó pero que viven en **organizaciones independientes** bajo la Linux Foundation o Apache (`delta-io`, `mlflow`, `unitycatalog`, `apache/spark`). Estos tienen gobernanza comunitaria y son los más estables de todos.
+
+::: callout-important
+## Cuidado con repos deprecados
+
+Varios repos históricos en `databricks` están archivados o deprecados: `koalas` (ahora es `pyspark.pandas`), `spark-csv` (integrado en Spark core), `databricks-cli` en Python (reemplazado por el [CLI en Go](https://github.com/databricks/cli)). Si un README dice "deprecated", creelo.
+:::
+
+------------------------------------------------------------------------
+
+## Developer Experience [Oficial]{.section-badge .badge-official} [Solutions]{.section-badge .badge-solutions}
+
+Esta es la categoría que más creció en el último año. Databricks apostó fuerte a que puedas desarrollar desde tu editor favorito, con coding agents, y con un portal centralizado.
+
+:::{.repo-featured}
+### [{{< fa brands github >}} AI Dev Kit](https://github.com/databricks-solutions/ai-dev-kit)
+
+:::{.github-card}
+[![AI Dev Kit — GitHub](https://opengraph.githubassets.com/1/databricks-solutions/ai-dev-kit)](https://github.com/databricks-solutions/ai-dev-kit)
+:::
+
+![Stars](https://img.shields.io/github/stars/databricks-solutions/ai-dev-kit?style=flat-square&logo=github&label=Stars)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-solutions/ai-dev-kit?style=flat-square&logo=git&label=Last%20commit)
+![Contributors](https://img.shields.io/github/contributors/databricks-solutions/ai-dev-kit?style=flat-square&logo=github&label=Contributors)
+![Python](https://img.shields.io/github/languages/top/databricks-solutions/ai-dev-kit?style=flat-square&logo=python&label=Language)
+
+El repo estrella de `databricks-solutions`. Certificado como **Gold Project** por Databricks.
+
+No es una librería — es un kit de contexto que le enseña a tu coding agent cómo funciona Databricks. 75+ herramientas ejecutables + patrones curados por los field engineers de Databricks. Tu agente "sabe" cómo construir Spark Pipelines, Jobs, Unity Catalog, dashboards, Model Serving, MLflow y Apps sin que le expliques las convenciones.
+
+Soporta Claude Code, Cursor, Codex, Copilot, Gemini CLI y Windsurf.
+
+**vs. copiar prompts manualmente**: AI Dev Kit son skills ejecutables, no solo texto de documentación. El agente puede *hacer cosas* en tu workspace, no solo sugerirte código.
+
+```bash
+# Instalación en un proyecto existente (Mac/Linux)
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/ai-dev-kit/main/install.sh)
+
+# O directamente como MCP server para Claude Code
+claude mcp add databricks-ai-dev-kit \
+  -- uvx databricks-ai-dev-kit@latest
+```
+
+::: callout-warning
+Requiere `uv` y Databricks CLI instalados. La instalación es a nivel de proyecto — tenés que correr el agente desde el directorio donde lo instalaste.
+:::
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} databricks-agent-skills](https://github.com/databricks/databricks-agent-skills)
+
+![Stars](https://img.shields.io/github/stars/databricks/databricks-agent-skills?style=flat-square&logo=github&label=Stars)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/databricks-agent-skills?style=flat-square&logo=git&label=Last%20commit)
+![Contributors](https://img.shields.io/github/contributors/databricks/databricks-agent-skills?style=flat-square&logo=github&label=Contributors)
+
+El approach más liviano: skills que se instalan como archivos Markdown en tu agente de código. Auto-detecta qué agente tenés instalado y escribe los `SKILL.md` en la ubicación correcta. Incluye `databricks-setup` y `databricks-doctor` para diagnóstico.
+
+```bash
+databricks aitools install
+```
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} cli](https://github.com/databricks/cli)
+
+![Stars](https://img.shields.io/github/stars/databricks/cli?style=flat-square&logo=github&label=Stars)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/cli?style=flat-square&logo=git&label=Last%20commit)
+![Go](https://img.shields.io/github/languages/top/databricks/cli?style=flat-square&logo=go&label=Language)
+
+El CLI moderno en Go que reemplazó al viejo CLI en Python. Es el core de **Databricks Asset Bundles (DABs)** — si usás DABs, ya lo tenés instalado.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} databricks-sdk-py](https://github.com/databricks/databricks-sdk-py)
+
+![Stars](https://img.shields.io/github/stars/databricks/databricks-sdk-py?style=flat-square&logo=github&label=Stars)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/databricks-sdk-py?style=flat-square&logo=git&label=Last%20commit)
+![Contributors](https://img.shields.io/github/contributors/databricks/databricks-sdk-py?style=flat-square&logo=github&label=Contributors)
+
+El SDK oficial. Reemplaza al viejo patrón de `requests` + token manual. Tipado, con retry logic, y compatible con toda la API REST.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} databricks-vscode](https://github.com/databricks/databricks-vscode)
+
+![Stars](https://img.shields.io/github/stars/databricks/databricks-vscode?style=flat-square&logo=github&label=Stars)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/databricks-vscode?style=flat-square&logo=git&label=Last%20commit)
+
+Para desarrollo local con conexión a clusters remotos. Incluye ejecución de notebooks, debugging, y autocompletado de catálogo.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa globe >}} DevHub](https://developers.databricks.com/docs/start-here)
+
+No es un repo, pero es el portal que nuclea todo. Templates, documentación de AppKit, setup guides. Si vas a construir algo sobre Databricks, empezá acá.
+:::
+
+------------------------------------------------------------------------
+
+## Databricks Apps [Oficial]{.section-badge .badge-official} [Solutions]{.section-badge .badge-solutions}
+
+Databricks Apps es la plataforma para deployar aplicaciones web dentro del workspace, con autenticación, governance y networking resueltos.
+
+:::{.repo-featured}
+### [{{< fa brands github >}} AppKit](https://github.com/databricks/appkit)
+
+:::{.github-card}
+[![AppKit — GitHub](https://opengraph.githubassets.com/1/databricks/appkit)](https://github.com/databricks/appkit)
+:::
+
+![Stars](https://img.shields.io/github/stars/databricks/appkit?style=flat-square&logo=github&label=Stars)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/appkit?style=flat-square&logo=git&label=Last%20commit)
+![Contributors](https://img.shields.io/github/contributors/databricks/appkit?style=flat-square&logo=github&label=Contributors)
+![TypeScript](https://img.shields.io/github/languages/top/databricks/appkit?style=flat-square&logo=typescript&label=Language)
+
+El único SDK TypeScript diseñado para Databricks Apps. Te da un servidor con plugins listos para producción: **Analytics** (queries SQL con caching), **Genie** (conversacional AI/BI), **Files** (Unity Catalog Volumes) y **Lakebase** (devuelve un `pg.Pool` estándar compatible con Prisma, Drizzle, TypeORM).
+
+**vs. llamar a la API REST directo**: AppKit resuelve autenticación OAuth (on-behalf-of user), retry logic, caching, telemetría OpenTelemetry y hot reload remoto. Sin AppKit, tenés que implementar todo eso a mano.
+
+```typescript
+import { createApp, analytics, lakebase, genie }
+  from '@databricks/appkit';
+
+createApp({
+  plugins: [
+    analytics(),   // SQL con caché y type-gen automático
+    lakebase(),    // Postgres OLTP nativo (pg.Pool estándar)
+    genie(),       // Preguntas en lenguaje natural
+  ],
+  async onPluginsReady(appkit) {
+    await setupRoutes(appkit);
+  },
+}).catch(console.error);
+```
+
+```bash
+# Scaffolding de una app nueva
+npx create-databricks-app my-app
+```
+
+::: callout-important
+Solo TypeScript/Node.js — no hay versión Python. Actualmente en v0, API en evolución.
+:::
+:::
+
+:::{.repo-card .org-solutions}
+### [{{< fa brands github >}} databricks-apps-cookbook](https://github.com/databricks-solutions/databricks-apps-cookbook)
+
+![Stars](https://img.shields.io/github/stars/databricks-solutions/databricks-apps-cookbook?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-solutions/databricks-apps-cookbook?style=flat-square&logo=git)
+
+Snippets listos para copiar y pegar en tu Databricks App.
+:::
+
+:::{.repo-card .org-solutions}
+### [{{< fa brands github >}} apx](https://github.com/databricks-solutions/apx)
+
+![Stars](https://img.shields.io/github/stars/databricks-solutions/apx?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-solutions/apx?style=flat-square&logo=git)
+
+Toolkit para construir apps sobre Databricks.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} app-templates](https://github.com/databricks/app-templates)
+
+![Stars](https://img.shields.io/github/stars/databricks/app-templates?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/app-templates?style=flat-square&logo=git)
+
+Templates oficiales de Databricks para arrancar rápido.
+:::
+
+:::{.repo-card .org-solutions}
+### [{{< fa brands github >}} claude-databricks-app-template](https://github.com/databricks-solutions/claude-databricks-app-template)
+
+![Stars](https://img.shields.io/github/stars/databricks-solutions/claude-databricks-app-template?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-solutions/claude-databricks-app-template?style=flat-square&logo=git)
+
+Template de Databricks App nativa con Claude AI.
+:::
+
+:::{.repo-card .org-solutions}
+### [{{< fa brands github >}} caspers](https://github.com/databricks-solutions/caspers)
+
+![Stars](https://img.shields.io/github/stars/databricks-solutions/caspers?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-solutions/caspers?style=flat-square&logo=git)
+
+Demo simulada de negocio completa: streaming, agentes AI, apps — todo deployable.
+:::
+
+------------------------------------------------------------------------
+
+## Databricks Lakebase [Solutions]{.section-badge .badge-solutions}
+
+Lakebase es el Postgres serverless de Databricks que escribe directamente en Delta/Iceberg (la promesa de [LTAP](/blog/posts/ltap-databricks/)). El ecosistema de repos alrededor está creciendo rápido.
+
+:::{.repo-featured}
+### [{{< fa brands github >}} Lakebase App Dev Kit](https://github.com/databricks-solutions/lakebase-app-dev-kit)
+
+:::{.github-card}
+[![Lakebase App Dev Kit — GitHub](https://opengraph.githubassets.com/1/databricks-solutions/lakebase-app-dev-kit)](https://github.com/databricks-solutions/lakebase-app-dev-kit)
+:::
+
+![Stars](https://img.shields.io/github/stars/databricks-solutions/lakebase-app-dev-kit?style=flat-square&logo=github&label=Stars)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-solutions/lakebase-app-dev-kit?style=flat-square&logo=git&label=Last%20commit)
+![Contributors](https://img.shields.io/github/contributors/databricks-solutions/lakebase-app-dev-kit?style=flat-square&logo=github&label=Contributors)
+
+Workflows opinados de **git + Lakebase**: branch pairing, schema diff, PR flow. Incluye un MCP server y una metodología de desarrollo (Spec-First Test-Driven Development). Soporta Claude Code, Cursor y Databricks Genie Code.
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/databricks-solutions/lakebase-app-dev-kit/main/install.sh)
+```
+:::
+
+:::{.repo-card .org-solutions}
+### [{{< fa brands github >}} lakebase-fastapi-app](https://github.com/databricks-solutions/lakebase-fastapi-app)
+
+![Stars](https://img.shields.io/github/stars/databricks-solutions/lakebase-fastapi-app?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-solutions/lakebase-fastapi-app?style=flat-square&logo=git)
+
+App FastAPI con Lakebase como backend.
+:::
+
+:::{.repo-card .org-solutions}
+### [{{< fa brands github >}} brickhouse-brands-demo](https://github.com/databricks-solutions/brickhouse-brands-demo)
+
+![Stars](https://img.shields.io/github/stars/databricks-solutions/brickhouse-brands-demo?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-solutions/brickhouse-brands-demo?style=flat-square&logo=git)
+
+Demo full-stack: React + FastAPI + Lakebase. Gestión de inventario deployable.
+:::
+
+------------------------------------------------------------------------
+
+## Agents & AI [Oficial]{.section-badge .badge-official}
+
+::: {.panel-tabset}
+
+### Herramientas
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} lilac](https://github.com/databricks/lilac)
+
+![Stars](https://img.shields.io/github/stars/databricks/lilac?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/lilac?style=flat-square&logo=git)
+
+Curar y limpiar datasets para fine-tuning de LLMs.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} judges](https://github.com/databricks/judges)
+
+![Stars](https://img.shields.io/github/stars/databricks/judges?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/judges?style=flat-square&logo=git)
+
+Biblioteca de LLM judges para evaluación de modelos.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} genai-cookbook](https://github.com/databricks/genai-cookbook)
+
+![Stars](https://img.shields.io/github/stars/databricks/genai-cookbook?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/genai-cookbook?style=flat-square&logo=git)
+
+Recetario de GenAI en Databricks: patrones, ejemplos, best practices.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} databricks-ai-bridge](https://github.com/databricks/databricks-ai-bridge)
+
+![Stars](https://img.shields.io/github/stars/databricks/databricks-ai-bridge?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/databricks-ai-bridge?style=flat-square&logo=git)
+
+Puente entre Databricks y frameworks de AI: LangChain, LlamaIndex.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} megablocks](https://github.com/databricks/megablocks)
+
+![Stars](https://img.shields.io/github/stars/databricks/megablocks?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/megablocks?style=flat-square&logo=git)
+
+Mixture-of-Experts para entrenamiento eficiente de LLMs.
+:::
+
+### Omnigent
+
+:::{.repo-featured}
+### [{{< fa brands github >}} omnigent](https://github.com/omnigent-ai/omnigent)
+
+![Stars](https://img.shields.io/github/stars/omnigent-ai/omnigent?style=flat-square&logo=github&label=Stars)
+![Last Commit](https://img.shields.io/github/last-commit/omnigent-ai/omnigent?style=flat-square&logo=git&label=Last%20commit)
+![Contributors](https://img.shields.io/github/contributors/omnigent-ai/omnigent?style=flat-square&logo=github&label=Contributors)
+
+Meta-harness open-source para orquestar agentes AI. Se pone *por encima* de Claude Code, Codex, Cursor, Pi — y los convierte en piezas intercambiables. Construido por el equipo de AI de Databricks junto con Neon.
+
+**vs. usar un solo agente directo**: Omnigent te deja componer agentes sin reescribir código, con policies de spending/rate limiting, sandboxing, y colaboración en tiempo real por URL. Un agente es un archivo YAML con prompt, harness, tools y sub-agentes.
+
+```yaml
+# omnigent.yaml — definir un agente compuesto
+agents:
+  - name: data-engineer
+    harness: claude-code
+    prompt: "Sos un DE experto en Databricks..."
+    tools: [databricks-cli, dbt]
+    policies:
+      spend_cap: 10.00
+      require_approval: [shell]
+```
+
+Escribí un [post completo sobre Omnigent](/blog/posts/omnigent-meta-harness/) con instalación, configuración y prueba real.
+:::
+
+### MosaicML
+
+Databricks compró MosaicML en 2023. Sus repos siguen activos y son los que se usan internamente para entrenar los foundation models de Databricks (DBRX, MPT).
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} llm-foundry](https://github.com/mosaicml/llm-foundry)
+
+![Stars](https://img.shields.io/github/stars/mosaicml/llm-foundry?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/mosaicml/llm-foundry?style=flat-square&logo=git)
+![Contributors](https://img.shields.io/github/contributors/mosaicml/llm-foundry?style=flat-square&logo=github)
+
+Código de entrenamiento de foundation models. Acá está el código real que se usa para entrenar DBRX y los modelos que corren detrás de AI/BI Genie. Uno de los repos de entrenamiento de LLMs más completos en open source.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} composer](https://github.com/mosaicml/composer)
+
+![Stars](https://img.shields.io/github/stars/mosaicml/composer?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/mosaicml/composer?style=flat-square&logo=git)
+
+Framework de entrenamiento eficiente de modelos.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} streaming](https://github.com/mosaicml/streaming)
+
+![Stars](https://img.shields.io/github/stars/mosaicml/streaming?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/mosaicml/streaming?style=flat-square&logo=git)
+
+Data loading optimizado para training de modelos.
+:::
+
+:::
+
+------------------------------------------------------------------------
+
+## Data Engineering & Platform [Oficial]{.section-badge .badge-official}
+
+Estos son los repos que probablemente ya conocés si laburás con Databricks, pero vale la pena tenerlos juntos.
+
+::: {.panel-tabset}
+
+### IaC & DevOps
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} terraform-provider-databricks](https://github.com/databricks/terraform-provider-databricks)
+
+![Stars](https://img.shields.io/github/stars/databricks/terraform-provider-databricks?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/terraform-provider-databricks?style=flat-square&logo=git)
+![Contributors](https://img.shields.io/github/contributors/databricks/terraform-provider-databricks?style=flat-square&logo=github)
+
+IaC para workspaces, clusters, jobs, Unity Catalog. Esencial para cualquier setup serio.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} terraform-databricks-examples](https://github.com/databricks/terraform-databricks-examples)
+
+![Stars](https://img.shields.io/github/stars/databricks/terraform-databricks-examples?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/terraform-databricks-examples?style=flat-square&logo=git)
+
+Templates Terraform multi-cloud (AWS, Azure, GCP).
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} terraform-databricks-sra](https://github.com/databricks/terraform-databricks-sra)
+
+![Stars](https://img.shields.io/github/stars/databricks/terraform-databricks-sra?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/terraform-databricks-sra?style=flat-square&logo=git)
+
+Security Reference Architecture. Best practices de seguridad con Terraform.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} mlops-stacks](https://github.com/databricks/mlops-stacks)
+
+![Stars](https://img.shields.io/github/stars/databricks/mlops-stacks?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/mlops-stacks?style=flat-square&logo=git)
+
+Template de producción MLOps con DABs y CI/CD. El mejor punto de partida si arrancás un proyecto de cero.
+:::
+
+### Pipelines & SQL
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} dbt-databricks](https://github.com/databricks/dbt-databricks)
+
+![Stars](https://img.shields.io/github/stars/databricks/dbt-databricks?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/dbt-databricks?style=flat-square&logo=git)
+
+Adaptador dbt oficial para Databricks.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} bundle-examples](https://github.com/databricks/bundle-examples)
+
+![Stars](https://img.shields.io/github/stars/databricks/bundle-examples?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/bundle-examples?style=flat-square&logo=git)
+
+Ejemplos de Databricks Asset Bundles. Templates para jobs, pipelines, MLOps.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} delta-live-tables-notebooks](https://github.com/databricks/delta-live-tables-notebooks)
+
+![Stars](https://img.shields.io/github/stars/databricks/delta-live-tables-notebooks?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/delta-live-tables-notebooks?style=flat-square&logo=git)
+
+Notebooks de referencia para Delta Live Tables.
+:::
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} databricks-sql-python](https://github.com/databricks/databricks-sql-python)
+
+![Stars](https://img.shields.io/github/stars/databricks/databricks-sql-python?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/databricks-sql-python?style=flat-square&logo=git)
+
+Conector SQL oficial para Python.
+:::
+
+### Best Practices
+
+:::{.repo-card .org-databricks}
+### [{{< fa brands github >}} notebook-best-practices](https://github.com/databricks/notebook-best-practices)
+
+![Stars](https://img.shields.io/github/stars/databricks/notebook-best-practices?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databricks/notebook-best-practices?style=flat-square&logo=git)
+
+Patrones de ingeniería de software para notebooks Databricks.
+:::
+
+:::
+
+------------------------------------------------------------------------
+
+## Solution Accelerators por industria [Industry]{.section-badge .badge-industry}
+
+Esta es la org más "soft" de Databricks — y probablemente la menos conocida entre developers. Acá no vas a encontrar SDKs ni CLIs. Lo que hay son **soluciones de negocio completas**: notebooks con pipelines end-to-end, datos de ejemplo, y documentación orientada al caso de uso. Si tu jefe te dice "necesito esto para ayer", estos repos son tu mejor amigo.
+
+La org [databricks-industry-solutions](https://github.com/databricks-industry-solutions) tiene **213 repos** organizados por vertical. Los Solution Accelerators están pensados para clonarlos, adaptarlos a tus datos, y tener algo funcionando rápido. Databricks los lista en su [catálogo oficial](https://www.databricks.com/solutions/accelerators).
+
+::: {.panel-tabset}
+
+### Salud & Ciencias de la Vida
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} pixels](https://github.com/databricks-industry-solutions/pixels) — Imágenes médicas a escala
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/pixels?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/pixels?style=flat-square&logo=git)
+
+El repo más popular de la org (418 stars). Procesamiento masivo de imágenes DICOM, documentos y ZIPs. Incluye integración con OHIF Viewer y modelos de segmentación. Si laburás con datos de salud, este es imprescindible.
+:::
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} smolder](https://github.com/databricks-industry-solutions/smolder) — HL7 como DataSource de Spark
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/smolder?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/smolder?style=flat-square&logo=git)
+
+Datasource nativo de Spark para mensajes HL7 (el estándar de interoperabilidad en salud). Leés archivos HL7 como si fueran Parquet.
+:::
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} hls-llm-doc-qa](https://github.com/databricks-industry-solutions/hls-llm-doc-qa) — QA sobre documentos médicos
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/hls-llm-doc-qa?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/hls-llm-doc-qa?style=flat-square&logo=git)
+
+RAG sobre documentación clínica con LLMs open-source. Un buen punto de partida si querés armar un asistente para profesionales de salud.
+:::
+
+### Finanzas & Seguros
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} esg-scoring](https://github.com/databricks-industry-solutions/esg-scoring) — Scoring ESG con NLP
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/esg-scoring?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/esg-scoring?style=flat-square&logo=git)
+
+Finanzas sostenibles: analiza noticias con NLP para generar scores ESG automáticos. Pipeline completo de ingesta, procesamiento y scoring.
+:::
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} smart-claims](https://github.com/databricks-industry-solutions/smart-claims) — Gestión inteligente de reclamos
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/smart-claims?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/smart-claims?style=flat-square&logo=git)
+
+Pipeline DLT para gestión de reclamos de seguros con detección de fraude. Incluye modelos ML y dashboards.
+:::
+
+### Retail & CPG
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} fine-grained-demand-forecasting](https://github.com/databricks-industry-solutions/fine-grained-demand-forecasting) — Demand forecasting distribuido
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/fine-grained-demand-forecasting?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/fine-grained-demand-forecasting?style=flat-square&logo=git)
+
+Forecasting a nivel tienda-ítem con modelos distribuidos en Spark. El acelerador clásico para retail — uno de los más clonados.
+:::
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} product-search](https://github.com/databricks-industry-solutions/product-search) — Búsqueda semántica de productos
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/product-search?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/product-search?style=flat-square&logo=git)
+
+Embeddings + vector store para búsqueda semántica en catálogos de productos. Ideal para e-commerce.
+:::
+
+### Cross-industry
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} security-analysis-tool](https://github.com/databricks-industry-solutions/security-analysis-tool) — Auditoría de seguridad
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/security-analysis-tool?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/security-analysis-tool?style=flat-square&logo=git)
+
+SAT analiza las configuraciones de seguridad de tu workspace Databricks y te da recomendaciones de best practices. Útil para cualquier empresa, independientemente de la industria.
+:::
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} many-model-forecasting](https://github.com/databricks-industry-solutions/many-model-forecasting) — Forecasting a gran escala
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/many-model-forecasting?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/many-model-forecasting?style=flat-square&logo=git)
+
+Framework para entrenar miles de modelos de forecasting en paralelo (MMF). Aplica a retail, finanzas, logística — cualquier dominio con series temporales masivas.
+:::
+
+:::{.repo-card .org-industry}
+### [{{< fa brands github >}} auto-data-linkage](https://github.com/databricks-industry-solutions/auto-data-linkage) — Entity resolution automatizada
+
+![Stars](https://img.shields.io/github/stars/databricks-industry-solutions/auto-data-linkage?style=flat-square&logo=github&color=e11d48)
+![Last Commit](https://img.shields.io/github/last-commit/databricks-industry-solutions/auto-data-linkage?style=flat-square&logo=git)
+
+Linkeo y deduplicación de registros con Databricks ARC. Resuelve el clásico problema de "¿es el mismo cliente?" a escala.
+:::
+
+:::
+
+::: callout-tip
+## ¿Cómo usar un Solution Accelerator?
+
+Cloná el repo, importá los notebooks en tu workspace, y adaptá las queries a tus datos. Los aceleradores vienen con datos de ejemplo para que puedas probarlos sin conectar nada. El [catálogo oficial](https://www.databricks.com/solutions/accelerators) te deja filtrar por industria y caso de uso.
+:::
+
+------------------------------------------------------------------------
+
+## Databricks Labs [Labs]{.section-badge .badge-labs}
+
+Labs es donde pasan las cosas interesantes. Proyectos construidos por empleados de Databricks que no tienen soporte oficial pero que muchas veces terminan siendo herramientas indispensables.
+
+::: {.panel-tabset}
+
+### Populares
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} dolly](https://github.com/databrickslabs/dolly)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/dolly?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/dolly?style=flat-square&logo=git)
+
+Primer LLM open-source instruction-tuned de Databricks. Histórico — marcó un antes y después en la democratización de LLMs.
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} dbldatagen](https://github.com/databrickslabs/dbldatagen)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/dbldatagen?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/dbldatagen?style=flat-square&logo=git)
+
+Generador de datos sintéticos a escala de billones de filas usando Spark nativo. Lo uso en mis pipelines para generar datos de prueba antes de tocar datos reales. Soporta claves primarias/foráneas consistentes entre tablas, distribuciones estadísticas, pesos en valores discretos y integración con Faker.
+
+**vs. Faker en Python**: Faker es single-thread y no escala. dbldatagen genera datos distribuidos en Spark manteniendo consistencia referencial entre tablas.
+
+```python
+import dbldatagen as dg
+
+df = (dg.DataGenerator(spark, name="test_data",
+                       rows=1_000_000, partitions=4)
+    .withIdOutput()
+    .withColumn("status", "string",
+                values=['active', 'inactive', 'pending'],
+                random=True, weights=[9, 1, 1])
+    .withColumn("score", "float",
+                expr="floor(rand() * 100)")
+).build()
+```
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} dqx](https://github.com/databrickslabs/dqx)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/dqx?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/dqx?style=flat-square&logo=git)
+
+Framework de Data Quality para PySpark DataFrames. Lo uso en producción para validar datos entre capas del medallion — si algo viene mal desde bronze, te enterás antes de que llegue a gold.
+
+**vs. Great Expectations / Soda Core**: dqx es nativo de PySpark sin dependencias externas, con un profiler integrado que genera reglas de calidad automáticamente desde perfiles estadísticos de tus datos. GE requiere mucha config manual; Soda necesita su cloud propio. dqx además genera expectations para DLT/Lakeflow Pipelines.
+
+```python
+from databricks.labs.dqx.profiler.profiler import DQProfiler
+from databricks.labs.dqx.engine import DQEngine
+from databricks.sdk import WorkspaceClient
+
+ws = WorkspaceClient()
+profiler = DQProfiler(ws)
+_, profiles = profiler.profile(input_df)
+
+# Genera checks automáticamente — revisalos antes de aplicar
+checks = DQGenerator(ws).generate_dq_rules(profiles)
+
+# Separar válidos de cuarentena
+valid_df, quarantine_df = DQEngine(ws) \
+    .apply_checks_by_metadata_and_split(input_df, checks)
+```
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} ucx](https://github.com/databrickslabs/ucx)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/ucx?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/ucx?style=flat-square&logo=git)
+![Contributors](https://img.shields.io/github/contributors/databrickslabs/ucx?style=flat-square&logo=github)
+
+La única herramienta para migrar workspaces completos de Hive Metastore a Unity Catalog de forma automatizada. Maneja grupos, tablas, vistas, dashboards, jobs, notebooks, DLT pipelines y permisos en bloque.
+
+**vs. migración manual**: sin UCX necesitás semanas de scripting manual con `CREATE TABLE ... AS SELECT`. UCX genera un assessment previo que identifica incompatibilidades y luego migra en batch con reconciliación de datos post-migración.
+
+```bash
+# 1. Instalar
+databricks labs install ucx
+
+# 2. Assessment del workspace actual
+databricks labs ucx assessment
+
+# 3. Mapeo de tablas Hive → Unity Catalog
+databricks labs ucx create-table-mapping
+
+# 4. Migrar tablas y código
+databricks labs ucx migrate-tables
+databricks labs ucx migrate-local-code
+```
+
+::: callout-important
+Requiere Workspace Administrator, metastore UC ya creado, y un PRO/Serverless SQL Warehouse para el reporte de assessment.
+:::
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} tempo](https://github.com/databrickslabs/tempo)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/tempo?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/tempo?style=flat-square&logo=git)
+
+API de series temporales sobre Spark: lagged values, rolling stats, AS OF joins, downsampling.
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} mosaic](https://github.com/databrickslabs/mosaic)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/mosaic?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/mosaic?style=flat-square&logo=git)
+
+Procesamiento geoespacial a gran escala sobre Spark.
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} dlt-meta](https://github.com/databrickslabs/dlt-meta)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/dlt-meta?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/dlt-meta?style=flat-square&logo=git)
+
+ETL metadata-driven con DLT. Definís bronze/silver en config, no en código.
+:::
+
+### Joyas ocultas
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} ontos](https://github.com/databrickslabs/ontos)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/ontos?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/ontos?style=flat-square&logo=git)
+
+Business Catalog: capa de contexto de negocio sobre Unity Catalog.
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} lakebridge](https://github.com/databrickslabs/lakebridge)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/lakebridge?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/lakebridge?style=flat-square&logo=git)
+
+Acelerador de migraciones desde otros data warehouses a Databricks.
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} discoverx](https://github.com/databrickslabs/discoverx)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/discoverx?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/discoverx?style=flat-square&logo=git)
+
+Swiss-army-knife para explorar y administrar Unity Catalog.
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} mcp](https://github.com/databrickslabs/mcp)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/mcp?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/mcp?style=flat-square&logo=git)
+
+Model Context Protocol para Databricks.
+:::
+
+:::{.repo-card .org-labs}
+### [{{< fa brands github >}} pylint-plugin](https://github.com/databrickslabs/pylint-plugin)
+
+![Stars](https://img.shields.io/github/stars/databrickslabs/pylint-plugin?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/databrickslabs/pylint-plugin?style=flat-square&logo=git)
+
+Plugin PyLint con reglas específicas para código Databricks.
+:::
+
+:::
+
+::: callout-warning
+## Labs ≠ producto oficial
+
+Ningún repo de Labs tiene soporte oficial de Databricks. Antes de usar uno en producción, revisá la actividad reciente del repo (commits, issues respondidos) y tené un plan B. Algunos repos populares como `dbx` y `overwatch` ya están deprecados.
+:::
+
+------------------------------------------------------------------------
+
+## Ecosistema Open-Source [OSS]{.section-badge .badge-oss}
+
+Acá hay un punto que vale la pena aclarar: no todos estos proyectos "los creó Databricks". La relación es más matizada que eso, y entenderla ayuda a dimensionar qué tan independiente es cada uno.
+
+**Apache Spark** nació en 2009 en el AMPLab de UC Berkeley como proyecto de investigación académica. Los fundadores de ese proyecto (Matei Zaharia y otros) después fundaron Databricks en 2013 para comercializarlo, pero Spark ya existía antes que la empresa. Hoy es un proyecto de la Apache Software Foundation, gobernado por la comunidad, con contribuidores de decenas de empresas. Databricks construyó toda su plataforma *alrededor* de Spark, no al revés.
+
+**Delta Lake** sí fue creado por Databricks y open-sourced en 2019. Pero vive como proyecto independiente en la Linux Foundation bajo la org `delta-io`. Tiene su propia governance y contribuidores externos. Databricks lo usa como formato de tabla core de su plataforma, pero Delta Lake funciona perfectamente fuera de Databricks — con Spark standalone, con Flink, o directamente desde Python vía `delta-rs`.
+
+**MLflow** fue creado por Databricks (liderado por Matei Zaharia) y open-sourced en 2018. También vive en la Linux Foundation con gobernanza independiente. Databricks lo integró profundamente en su plataforma (Model Registry, Experiment Tracking, Model Serving), pero MLflow corre en cualquier lado — es agnóstico de plataforma.
+
+**Unity Catalog** es el más reciente. Fue producto propietario de Databricks hasta 2024, cuando open-sourced la versión OSS. Todavía es el proyecto con mayor dependencia del ecosistema Databricks, pero la intención es que funcione como catálogo abierto multi-motor.
+
+El punto clave: **son proyectos independientes que Databricks fue encajando en su plataforma**, no al revés. Spark existía antes que Databricks, y Delta Lake, MLflow y Unity Catalog funcionan fuera de Databricks. Si mañana migrás a otro vendor, estos proyectos siguen siendo tuyos.
+
+::: {layout-ncol=2}
+
+:::{.github-card}
+[![Apache Spark](https://opengraph.githubassets.com/1/apache/spark)](https://github.com/apache/spark)
+:::
+
+:::{.github-card}
+[![MLflow](https://opengraph.githubassets.com/1/mlflow/mlflow)](https://github.com/mlflow/mlflow)
+:::
+
+:::{.github-card}
+[![Delta Lake](https://opengraph.githubassets.com/1/delta-io/delta)](https://github.com/delta-io/delta)
+:::
+
+:::{.github-card}
+[![Unity Catalog](https://opengraph.githubassets.com/1/unitycatalog/unitycatalog)](https://github.com/unitycatalog/unitycatalog)
+:::
+
+:::
+
+:::{.repo-card .org-oss}
+### [{{< fa brands github >}} delta-rs](https://github.com/delta-io/delta-rs)
+
+![Stars](https://img.shields.io/github/stars/delta-io/delta-rs?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/delta-io/delta-rs?style=flat-square&logo=git)
+![Contributors](https://img.shields.io/github/contributors/delta-io/delta-rs?style=flat-square&logo=github)
+
+Delta Lake nativo en Rust, con bindings Python. La prueba viviente de que Delta Lake es un proyecto independiente: esta implementación no tiene una sola línea de código de Databricks ni de Spark.
+
+**vs. delta-spark**: delta-spark requiere JVM + Spark. delta-rs corre en Python puro — perfecto para CI/CD, Lambda functions, scripts de validación, o integraciones con Polars y pandas. Es la única opción para acceso a Delta Lake en entornos sin JVM.
+
+```python
+from deltalake import DeltaTable, write_deltalake
+import pandas as pd
+
+# Escribir Delta sin Spark (también acepta s3://, abfss://)
+df = pd.DataFrame({"id": [1, 2, 3], "value": ["a", "b", "c"]})
+write_deltalake("./data/mi_tabla", df)
+
+# Leer con filtros y time travel
+dt = DeltaTable("./data/mi_tabla")
+df = dt.to_pandas(filters=[("id", ">", 1)])
+
+# DML nativo: merge, delete, update
+dt.merge(source=new_df, predicate="s.id = t.id",
+         source_alias="s", target_alias="t") \
+  .when_matched_update_all() \
+  .when_not_matched_insert_all() \
+  .execute()
+```
+:::
+
+:::{.repo-card .org-oss}
+### [{{< fa brands github >}} delta-sharing](https://github.com/delta-io/delta-sharing)
+
+![Stars](https://img.shields.io/github/stars/delta-io/delta-sharing?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/delta-io/delta-sharing?style=flat-square&logo=git)
+
+Protocolo abierto para compartir datos de forma segura entre organizaciones. Funciona cross-platform — no necesitás que ambas partes usen Databricks.
+:::
+
+:::{.repo-card .org-oss}
+### [{{< fa brands github >}} delta-kernel-rs](https://github.com/delta-io/delta-kernel-rs)
+
+![Stars](https://img.shields.io/github/stars/delta-io/delta-kernel-rs?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/delta-io/delta-kernel-rs?style=flat-square&logo=git)
+
+Implementación Rust de bajo nivel para leer/escribir Delta desde cualquier motor. Es el kernel que permite que cualquier query engine (no solo Spark) pueda trabajar con Delta Lake de forma nativa.
+:::
+
+------------------------------------------------------------------------
+
+## Comunidad y Developer Advocates [Comunidad]{.section-badge .badge-community}
+
+No todos los repos útiles del ecosistema Databricks vienen de las orgs oficiales. Algunos vienen de Developer Advocates de Databricks (empleados que construyen herramientas open-source para la comunidad) y otros de MVPs externos reconocidos por el [programa de MVPs](https://www.databricks.com/discover/mvps).
+
+::: {.panel-tabset}
+
+### MrPowers
+
+[Matthew Powers](https://www.linkedin.com/in/matthew-powers-cfa/) es **Staff Developer Advocate en Databricks** (no MVP — es empleado). Pero sus repos son open-source, viven fuera de las orgs de Databricks, y los mantiene como proyectos personales. Muchos equipos los usan en producción sin saber que vienen de alguien de Databricks. Fun fact: la mayoría de sus repos llevan nombres de personajes de *Daria* — la serie animada de MTV. `spark-daria`, `quinn` (la hermana de Daria), `mack`, `jodie`... Si ves un repo de PySpark con nombre de personaje noventero, probablemente sea de MrPowers.
+
+:::{.github-card}
+[![chispa — GitHub](https://opengraph.githubassets.com/1/MrPowers/chispa)](https://github.com/MrPowers/chispa)
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} chispa](https://github.com/MrPowers/chispa)
+
+![Stars](https://img.shields.io/github/stars/MrPowers/chispa?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/MrPowers/chispa?style=flat-square&logo=git)
+
+La única librería de testing PySpark que te muestra mensajes de error con colores y diffs legibles — filas que difieren en rojo, iguales en azul. Sin chispa, un test que falla te tira un dump ilegible de objetos `Row`. Con chispa, ves exactamente qué fila falló y por qué.
+
+**vs. la alternativa** (asserts manuales con `.collect()`): incomparable. `chispa` ahorra horas de debugging.
+
+```python
+from chispa import assert_column_equality
+import pyspark.sql.functions as F
+
+data = [("jo&&se", "jose"), ("**li**", "li"), (None, None)]
+df = (spark.createDataFrame(data, ["nombre", "esperado"])
+      .withColumn("limpio",
+          F.regexp_replace(F.col("nombre"), "[^\\w\\s]+", "")))
+
+# Si falla, te muestra exactamente qué fila difiere
+assert_column_equality(df, "limpio", "esperado")
+```
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} spark-daria](https://github.com/mrpowers-io/spark-daria)
+
+![Stars](https://img.shields.io/github/stars/mrpowers-io/spark-daria?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/mrpowers-io/spark-daria?style=flat-square&logo=git)
+
+Extensiones esenciales de Spark en Scala. La que le dio nombre a la saga.
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} quinn](https://github.com/mrpowers-io/quinn)
+
+![Stars](https://img.shields.io/github/stars/mrpowers-io/quinn?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/mrpowers-io/quinn?style=flat-square&logo=git)
+
+Utilidades PySpark para productividad. Column helpers, DataFrame validations, transformations.
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} mack](https://github.com/MrPowers/mack)
+
+![Stars](https://img.shields.io/github/stars/MrPowers/mack?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/MrPowers/mack?style=flat-square&logo=git)
+
+Helpers para Delta Lake: SCD Type 2, upserts, deduplicación, kill duplicates.
+:::
+
+### Jacek Laskowski
+
+Databricks MVP. Mantiene **"The Internals Of"**, una serie de libros open-source que son probablemente el mejor recurso gratuito que existe para entender cómo funcionan Spark, Delta Lake y el ecosistema por dentro. No son tutoriales superficiales — son deep dives reales en el código fuente, los algoritmos y las decisiones de diseño. Si alguna vez quisiste entender *por qué* Spark hace lo que hace (y no solo *cómo* usarlo), esta serie es imprescindible. Todos gratuitos en [books.japila.pl](https://books.japila.pl).
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} apache-spark-internals](https://github.com/japila-books/apache-spark-internals)
+
+![Stars](https://img.shields.io/github/stars/japila-books/apache-spark-internals?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/japila-books/apache-spark-internals?style=flat-square&logo=git)
+
+El libro principal de la serie. Cubre el scheduler, memory management, shuffle, storage — todo lo que la documentación oficial no explica.
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} spark-sql-internals](https://github.com/japila-books/spark-sql-internals)
+
+![Stars](https://img.shields.io/github/stars/japila-books/spark-sql-internals?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/japila-books/spark-sql-internals?style=flat-square&logo=git)
+
+Catalyst optimizer, Tungsten execution, query planning, AQE. Si optimizás queries en Spark, este libro te cambia la perspectiva.
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} spark-structured-streaming-internals](https://github.com/japila-books/spark-structured-streaming-internals)
+
+![Stars](https://img.shields.io/github/stars/japila-books/spark-structured-streaming-internals?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/japila-books/spark-structured-streaming-internals?style=flat-square&logo=git)
+
+Micro-batching, watermarks, state management — Structured Streaming de adentro para afuera.
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} delta-lake-internals](https://github.com/japila-books/delta-lake-internals)
+
+![Stars](https://img.shields.io/github/stars/japila-books/delta-lake-internals?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/japila-books/delta-lake-internals?style=flat-square&logo=git)
+
+Transaction log, checkpointing, optimistic concurrency, VACUUM — todo lo que pasa debajo de una tabla Delta.
+:::
+
+### Otros
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} sqlglot](https://github.com/tobymao/sqlglot)
+
+![Stars](https://img.shields.io/github/stars/tobymao/sqlglot?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/tobymao/sqlglot?style=flat-square&logo=git)
+
+Parser y transpiler SQL en Python. Soporta dialecto Databricks/Spark SQL. Usado internamente por muchas herramientas del ecosistema.
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} dataflint/spark](https://github.com/dataflint/spark)
+
+![Stars](https://img.shields.io/github/stars/dataflint/spark?style=flat-square&logo=github)
+![Last Commit](https://img.shields.io/github/last-commit/dataflint/spark?style=flat-square&logo=git)
+
+Drop-in replacement para la Spark UI. Mucho mejor para debugging y profiling de jobs.
+:::
+
+:::{.repo-card .org-community}
+### [{{< fa brands github >}} spark-style-guide](https://github.com/mrpowers-io/spark-style-guide)
+
+![Stars](https://img.shields.io/github/stars/mrpowers-io/spark-style-guide?style=flat-square&logo=github)
+
+Guía de estilo comunitaria para proyectos Spark. Buena referencia para equipos que quieren estandarizar.
+:::
+
+:::
+
+------------------------------------------------------------------------
+
+## Cómo navegar todo esto: mi recomendación
+
+Si te sentís abrumado por la cantidad de repos, acá va mi filtro pragmático:
+
+::: callout-tip
+## Si sos Data Engineer
+
+1.  Instalá [AI Dev Kit](https://github.com/databricks-solutions/ai-dev-kit) o [Agent Skills](https://github.com/databricks/databricks-agent-skills) en tu editor
+2.  Mirá [bundle-examples](https://github.com/databricks/bundle-examples) para templates de DABs
+3.  Usá [chispa](https://github.com/MrPowers/chispa) para testing y [dqx](https://github.com/databrickslabs/dqx) para data quality
+:::
+
+::: callout-tip
+## Si estás construyendo una Databricks App
+
+1.  Arrancá con [AppKit](https://github.com/databricks/appkit) y el [DevHub](https://developers.databricks.com)
+2.  Copiá snippets del [apps-cookbook](https://github.com/databricks-solutions/databricks-apps-cookbook)
+3.  Si usás Lakebase, mirá el [lakebase-app-dev-kit](https://github.com/databricks-solutions/lakebase-app-dev-kit)
+:::
+
+::: callout-tip
+## Si querés entender cómo funciona todo por dentro
+
+1.  Los libros de [Jacek Laskowski](https://books.japila.pl) son el mejor recurso gratuito que existe
+2.  [delta-rs](https://github.com/delta-io/delta-rs) para entender Delta Lake sin la complejidad de Spark
+3.  [llm-foundry](https://github.com/mosaicml/llm-foundry) si te interesa cómo se entrenan los modelos
+:::
+
+------------------------------------------------------------------------
+
+## Reflexión final: el open source como forma de estar al día
+
+Si hay algo que me queda claro después de armar este mapa, es que **el ecosistema de Databricks se mueve rápido porque se mueve en abierto**. Los repos que listamos acá no son proyectos estáticos — tienen issues, PRs, discusiones, releases. Cada uno es una ventana a cómo se están resolviendo problemas reales *hoy*.
+
+Mantener una buena relación con la comunidad open source no es solo "dar back" — es una de las formas más efectivas de mantenerte actualizado. Cuando seguís un repo, leés los changelogs, probás una nueva versión o reportás un bug, estás aprendiendo cómo evoluciona la plataforma *antes* de que salga en un blog corporativo o en una keynote.
+
+No hace falta contribuir a todo. Con seguir los repos que te importan, probar las herramientas en tu entorno y compartir lo que aprendés, ya estás participando. **El open source funciona porque hay gente que elige estar al día — y lo comparte.** Mientras quieras seguir aprendiendo, la comunidad te va a tener al tanto.
+
+------------------------------------------------------------------------
+
+*Los badges de stars y último commit se actualizan automáticamente — si estás leyendo esto meses después de la publicación, los números que ves son los de hoy.*
+
+*¿Conocés algún repo que me haya faltado? Dejame un comentario acá abajo — siempre estoy buscando herramientas nuevas.*
