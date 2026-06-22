@@ -1,57 +1,60 @@
 ---
-title: "De YAML a producción"
-subtitle: "Deploy de AI Agents con Declarative Automation Bundles"
+title: "De YAML a producción — Deploy de AI Agents con DABs"
+subtitle: "Databricks Meetup Uruguay · Junio 2026"
 description: "Quiero hacer una réplica de mí mismo — un bot que responda sobre Databricks basado en mi blog. Para eso necesito orquestar 7+ recursos. En esta charla vemos cómo DABs resuelve eso con un solo YAML: ecosistema agéntico, ejemplo real con Lakebase, CI/CD, y demo en vivo."
 author: "Mauro Loprete"
 date: "2026-06-25"
 draft: true
 image: ../spark-de-ideas-cover.jpg
 categories: [Databricks Tips, Data Engineering, MLOps]
+title-slide-attributes:
+  data-visibility: hidden
 format:
   revealjs:
     output-file: index.html
     smaller: true
     code-overflow: scroll
+    css: custom.css
+    footer: "Mauro Loprete"
 ---
 
 ##  {data-background-color="#1e293b" visibility="uncounted"}
 
-::: {style="color: white; text-align: center; margin-top: 0.5em;"}
-![](../spark-de-ideas-cover.jpg){width="180" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"}
+::: {style="color: white; text-align: center; margin-top: 2em;"}
+[De YAML a producción]{style="font-size: 2.4em; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;"}
 
-[**Spark de Ideas**]{style="font-size: 1.6em; color: #FFA166; display: block; margin-top: 0.3em;"}
+[Deploy de AI Agents con]{style="color: #94a3b8; font-size: 1.1em; display: block; margin-top: 0.6em;"}
+[**Declarative Automation Bundles**]{style="color: #FFA166; font-size: 1.4em;"}
 
-[La chispa de la ingeniería de datos en español]{style="font-size: 0.9em; color: #94a3b8;"}
+::: {style="margin-top: 1.5em; padding-top: 1em; border-top: 1px solid rgba(148,163,184,0.3);"}
+[Databricks Meetup Uruguay · 25 de junio 2026]{style="color: #94a3b8; font-size: 0.8em;"}
+
+[Mauro Loprete]{style="color: #cbd5e1; font-size: 0.9em; display: block; margin-top: 0.3em;"}
+:::
+:::
+
+::: notes
+El objetivo de esta charla: quiero hacer una réplica de mí mismo — un bot que responda preguntas sobre Databricks basado en mi blog y documentación oficial. Para eso necesito 7+ recursos en producción. Vamos a ver cómo DABs resuelve eso con un solo YAML, con CI/CD y demo en vivo.
 :::
 
 ##  {data-background-color="#1e293b"}
 
-::: {style="color: white; text-align: center; margin-top: 1em;"}
+::: {style="color: white; text-align: center; margin-top: 0.5em;"}
 ### Mauro Loprete
 
 [Data Engineer \@ F1rst · Docente \@ UDELAR]{style="font-size: 0.95em;"}
 
 ![](../../badge-professional.png){width="120" style="display: inline-block; margin: 0.3em 0.5em;"}
 
-[DABs en producción desde 2024]{style="color: #94a3b8; font-size: 0.85em;"}
+[{{< fa pen-fancy >}} Blog **Spark de Ideas** — databricks, data engineering, MLOps]{style="color: #FFA166; font-size: 0.85em; display: block; margin-top: 0.4em;"}
+
+[{{< fa podcast >}} Podcast **Spark de Ideas** — data en español, desde Uruguay]{style="color: #FFA166; font-size: 0.85em; display: block; margin-top: 0.2em;"}
+
+[DABs en producción desde 2024]{style="color: #94a3b8; font-size: 0.8em; display: block; margin-top: 0.4em;"}
 :::
 
 ::: notes
-Presentarme brevemente. Data Engineer en F1rst, donde usamos DABs para gestionar todos los deployments en Databricks. Docente en UDELAR. Tengo el blog Spark de Ideas donde publico sobre Databricks y Data Engineering.
-:::
-
-##  {data-background-color="#1e293b"}
-
-::: {style="color: white; text-align: center; margin-top: 1em;"}
-[De YAML a producción]{style="font-size: 1.8em; font-weight: bold;"}
-
-[**Deploy de AI Agents con Declarative Automation Bundles**]{style="color: #FFA166; font-size: 1.2em;"}
-
-[Databricks Meetup Uruguay]{style="color: #94a3b8; font-size: 0.85em;"}
-:::
-
-::: notes
-El objetivo de esta charla: quiero hacer una réplica de mí mismo — un bot que responda preguntas sobre Databricks basado en mi blog y documentación oficial. Para eso necesito 7+ recursos en producción. Vamos a ver cómo DABs resuelve eso con un solo YAML, con CI/CD y demo en vivo.
+Presentarme brevemente. Data Engineer en F1rst, donde usamos DABs para gestionar todos los deployments en Databricks. Docente en UDELAR. Tengo el blog y podcast Spark de Ideas donde publico sobre Databricks, Data Engineering y MLOps.
 :::
 
 ## Agenda
@@ -69,7 +72,7 @@ El objetivo de esta charla: quiero hacer una réplica de mí mismo — un bot qu
 > Todo el código de la charla está disponible en el blog.
 
 ::: notes
-7 bloques en 30 minutos. Arrancamos con el problema, el ecosistema, las novedades de DABs, el plato fuerte con el ejemplo real (Spark de Ideas Bot — una réplica mía), CI/CD, gotchas, y cerramos con demo en vivo. Preguntas al final o me interrumpen.
+7 bloques en 35 minutos. Arrancamos con el problema, el ecosistema, las novedades de DABs, el plato fuerte con el ejemplo real (Spark de Ideas Bot — una réplica mía), CI/CD, gotchas, y cerramos con demo en vivo. Preguntas al final o me interrumpen.
 :::
 
 ##  {data-background-color="#dc2626"}
@@ -106,121 +109,7 @@ Un agente en producción no es solo un endpoint. Es un ecosistema de recursos qu
 
 ## La pesadilla del deploy manual
 
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
-#| fig-width: 9
-#| fig-height: 3.5
-#| fig-align: center
-library(ggplot2)
-
-ggplot() +
-    annotate(
-        "rect",
-        xmin = -0.5,
-        xmax = 10.5,
-        ymin = -0.3,
-        ymax = 3.5,
-        fill = "#f8fafc",
-        color = NA
-    ) +
-
-    # Manual deploy (left side)
-    annotate(
-        "rect",
-        xmin = 0,
-        xmax = 4.5,
-        ymin = 0,
-        ymax = 3.3,
-        fill = "#fef2f2",
-        color = "#fca5a5",
-        linewidth = 0.5
-    ) +
-    annotate(
-        "text",
-        x = 2.25,
-        y = 3.1,
-        label = "Deploy manual",
-        color = "#991b1b",
-        size = 4,
-        fontface = "bold"
-    ) +
-    annotate(
-        "text",
-        x = 2.25,
-        y = 2.3,
-        label = "Click en UI para crear endpoint\nClick en UI para registrar modelo\nClick en UI para crear job\nClick en UI para configurar app\n× 3 ambientes = 12+ clicks",
-        color = "#991b1b",
-        size = 2.5,
-        lineheight = 1.1
-    ) +
-    annotate(
-        "text",
-        x = 2.25,
-        y = 0.4,
-        label = "\"Funciona en dev,\nno en prod\"",
-        color = "#dc2626",
-        size = 3,
-        fontface = "bold.italic",
-        lineheight = 0.9
-    ) +
-
-    # DABs deploy (right side)
-    annotate(
-        "rect",
-        xmin = 5.5,
-        xmax = 10,
-        ymin = 0,
-        ymax = 3.3,
-        fill = "#f0fdf4",
-        color = "#86efac",
-        linewidth = 0.5
-    ) +
-    annotate(
-        "text",
-        x = 7.75,
-        y = 3.1,
-        label = "Deploy con DABs",
-        color = "#166534",
-        size = 4,
-        fontface = "bold"
-    ) +
-    annotate(
-        "text",
-        x = 7.75,
-        y = 2,
-        label = "databricks.yml\n+\nbundle deploy --target prod",
-        color = "#166534",
-        size = 3,
-        lineheight = 1.2
-    ) +
-    annotate(
-        "text",
-        x = 7.75,
-        y = 0.4,
-        label = "Reproducible,\nversionado, auditado",
-        color = "#15803d",
-        size = 3,
-        fontface = "bold.italic",
-        lineheight = 0.9
-    ) +
-
-    # VS
-    annotate(
-        "text",
-        x = 5,
-        y = 1.65,
-        label = "vs",
-        color = "#94a3b8",
-        size = 5.5,
-        fontface = "bold"
-    ) +
-
-    coord_cartesian(xlim = c(-0.3, 10.3), ylim = c(-0.2, 3.5)) +
-    theme_void() +
-    theme(plot.margin = margin(2, 5, 2, 5))
-```
+![](deploy-comparison.png){fig-align="center" width="80%"}
 
 ::: notes
 A la izquierda: la realidad de muchos equipos. Click en la UI, repetir por cada ambiente, y rezar para que quede igual. A la derecha: todo definido en un archivo YAML, versionado en Git, deployado con un comando. La diferencia no es solo de velocidad — es de confiabilidad.
@@ -242,158 +131,7 @@ Antes de meternos en DABs, necesitamos entender el ecosistema de agentes que Dat
 
 ## El ecosistema
 
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
-#| fig-width: 9
-#| fig-height: 3.5
-#| fig-align: center
-library(ggplot2)
-
-ggplot() +
-    # Agent Bricks
-    annotate(
-        "rect",
-        xmin = 0.2,
-        xmax = 3.3,
-        ymin = 0.4,
-        ymax = 3.2,
-        fill = "#593196",
-        color = "#4c1d95",
-        linewidth = 0.5
-    ) +
-    annotate(
-        "text",
-        x = 1.75,
-        y = 2.9,
-        label = "Agent Bricks",
-        color = "white",
-        size = 4,
-        fontface = "bold"
-    ) +
-    annotate(
-        "text",
-        x = 1.75,
-        y = 2.1,
-        label = "Task-first\nSynthetic benchmarks\nAuto-optimización\nSupervisor Agent",
-        color = "#c4b5fd",
-        size = 2.5,
-        lineheight = 1.1
-    ) +
-    annotate(
-        "text",
-        x = 1.75,
-        y = 0.7,
-        label = "CONSTRUIR",
-        color = "#FFA166",
-        size = 2.8,
-        fontface = "bold"
-    ) +
-
-    # Lakebase
-    annotate(
-        "rect",
-        xmin = 3.7,
-        xmax = 6.8,
-        ymin = 0.4,
-        ymax = 3.2,
-        fill = "#1e293b",
-        color = "#0f172a",
-        linewidth = 0.5
-    ) +
-    annotate(
-        "text",
-        x = 5.25,
-        y = 2.9,
-        label = "Lakebase",
-        color = "white",
-        size = 4,
-        fontface = "bold"
-    ) +
-    annotate(
-        "text",
-        x = 5.25,
-        y = 2.1,
-        label = "PostgreSQL serverless\nMemoria short/long-term\npgvector nativo\nBranching + Synced Tables",
-        color = "#94a3b8",
-        size = 2.5,
-        lineheight = 1.1
-    ) +
-    annotate(
-        "text",
-        x = 5.25,
-        y = 0.7,
-        label = "RECORDAR",
-        color = "#FFA166",
-        size = 2.8,
-        fontface = "bold"
-    ) +
-
-    # Databricks Apps
-    annotate(
-        "rect",
-        xmin = 7.2,
-        xmax = 10.3,
-        ymin = 0.4,
-        ymax = 3.2,
-        fill = "#0d9488",
-        color = "#0f766e",
-        linewidth = 0.5
-    ) +
-    annotate(
-        "text",
-        x = 8.75,
-        y = 2.9,
-        label = "Databricks Apps",
-        color = "white",
-        size = 4,
-        fontface = "bold"
-    ) +
-    annotate(
-        "text",
-        x = 8.75,
-        y = 2.1,
-        label = "Streamlit / Gradio / Dash\nResource bindings\nAuth integrada\nDeploy vía DABs",
-        color = "#99f6e4",
-        size = 2.5,
-        lineheight = 1.1
-    ) +
-    annotate(
-        "text",
-        x = 8.75,
-        y = 0.7,
-        label = "SERVIR",
-        color = "#FFA166",
-        size = 2.8,
-        fontface = "bold"
-    ) +
-
-    # Base layer
-    annotate(
-        "rect",
-        xmin = 0.2,
-        xmax = 10.3,
-        ymin = 0,
-        ymax = 0.3,
-        fill = "#FFA166",
-        color = "#e8854a",
-        linewidth = 0.3
-    ) +
-    annotate(
-        "text",
-        x = 5.25,
-        y = 0.15,
-        label = "Mosaic AI Agent Framework  ·  Unity Catalog  ·  MLflow 3.0  ·  AI Gateway",
-        color = "#7c2d12",
-        size = 2.5,
-        fontface = "bold"
-    ) +
-
-    coord_cartesian(xlim = c(-0.1, 10.5), ylim = c(-0.1, 3.4)) +
-    theme_void() +
-    theme(plot.margin = margin(2, 2, 2, 2))
-```
+![](ecosystem.png){fig-align="center" width="80%"}
 
 ::: notes
 El ecosistema tiene tres pilares. Agent Bricks para construir agentes de forma task-first, con auto-optimización y benchmarks sintéticos. Lakebase como la memoria — PostgreSQL serverless con pgvector para que los agentes recuerden entre sesiones. Y Databricks Apps para servir la interfaz de chat con auth integrada y resource bindings. Todo corre sobre Mosaic AI, Unity Catalog, MLflow 3.0 y AI Gateway.
@@ -401,109 +139,55 @@ El ecosistema tiene tres pilares. Agent Bricks para construir agentes de forma t
 
 ## Agent Bricks: construir sin code-first
 
-A diferencia del approach clásico (code → prompt → evaluate), Agent Bricks invierte el flujo:
+Invierte el flujo clásico (code → prompt → evaluate):
 
-1.  **Definís la tarea** en lenguaje natural + conectás datos de UC
-2.  El sistema genera **benchmarks sintéticos** específicos al dominio
-3.  **Auto-optimiza** modelo, prompts, parámetros de retrieval y costos
-4.  Evaluación con **Agent-as-a-Judge** — auditores LLM configurables
-
-. . .
-
-Incluye un **Supervisor Agent** para orquestar sistemas multi-agente: combina agentes LLM y tools MCP.
+1.  **Tarea** en lenguaje natural + datos de UC
+2.  **Benchmarks sintéticos** generados automáticamente
+3.  **Auto-optimización** de modelo, prompts y retrieval
+4.  **Agent-as-a-Judge** para evaluación continua
 
 . . .
 
-> No reemplaza el code-first — lo complementa cuando tenés un caso de uso claro y querés iterar rápido.
+Incluye **Supervisor Agent** para orquestar multi-agente con MCP.
+
+> No reemplaza el code-first — lo complementa para iterar rápido.
 
 ::: notes
-Agent Bricks es el approach "no-code" para construir agentes. Le decís qué querés que haga, le apuntás a los datos en Unity Catalog, y el sistema genera benchmarks, optimiza automáticamente, y te da un agente evaluado. Lo interesante es el Supervisor Agent: podés orquestar múltiples agentes — uno que llama APIs, otro que procesa documentos — todo coordinado. Para producción, estos agentes se deployean como Model Serving endpoints, y ahí es donde DABs entra. Ya hay casos donde armaron un asistente financiero completo en días, con extracción de PDFs, RAG y análisis de mercado. Baja la barrera de entrada, pero todavía sacrifica flexibilidad — no se puede elegir modelo ni fine-tunear embeddings (por ahora, Beta).
+Agent Bricks es el approach "no-code" para construir agentes. Le decís qué querés que haga, le apuntás a los datos en Unity Catalog, y el sistema genera benchmarks, optimiza automáticamente, y te da un agente evaluado. Lo interesante es el Supervisor Agent: podés orquestar múltiples agentes con Model Context Protocol. Para producción, estos agentes se deployean como Model Serving endpoints, y ahí es donde DABs entra. Baja la barrera de entrada, pero todavía sacrifica flexibilidad (por ahora, Beta).
 :::
 
 ## Lakebase: la memoria que les faltaba
 
 **Lakebase** = PostgreSQL 17 serverless + managed por Databricks.
 
-¿Por qué importa para agentes?
+![](agent-memory-official.png){fig-align="center" width="75%"}
 
-| Tipo de memoria     | Mecanismo                           | Backend           |
-|------------------------|------------------------|------------------------|
-| **Short-term**      | Thread ID + checkpoints (LangGraph) | Lakebase Postgres |
-| **Long-term**       | Insights extraídos entre sesiones   | Lakebase Postgres |
-| **Semantic search** | pgvector nativo                     | Lakebase Postgres |
-
-::: notes
-Lakebase es la pieza que faltaba para agentes stateful. Hasta ahora los agentes eran stateless — cada request empezaba de cero. Con Lakebase, el agente tiene memoria: short-term para recordar la conversación actual vía checkpoints de LangGraph, y long-term para acumular insights entre sesiones. Y pgvector nativo para embeddings sin pipeline separado. Ya hay equipos corriendo full-stack completo con React + FastAPI + Lakebase donde la API habla directo con Lakebase y se sincroniza automáticamente con el Lakehouse — una sola fuente de verdad para OLTP, OLAP e IA. El patrón ya está en producción.
+::: {style="font-size: 0.6em; color: #94a3b8; text-align: center;"}
+Fuente: [Azure Databricks — AI Agent Memory](https://learn.microsoft.com/en-us/azure/databricks/generative-ai/agent-framework/stateful-agents)
 :::
 
-## ¿Por qué no Delta? ¿Por qué no otro Postgres?
-
-Los checkpoints de LangGraph son **OLTP**: leer state, agregar mensaje, guardar — en milisegundos, mientras el usuario espera. **Delta es analytics** (batch, scan), no sirve para eso.
-
-. . .
-
-¿Y un Postgres externo (RDS, Cloud SQL)?
-
-- Infra extra que mantener fuera de Databricks
-- No se define en `databricks.yml` → no es parte del bundle
-- Sin Unity Catalog → fuera de la gobernanza
-- Sin scale to zero → pagás 24/7
-
 ::: notes
-Esta pregunta la van a hacer. Delta no sirve para checkpoints porque es OLTP — necesitás transacciones rápidas por fila, no scans de columnas. Un Postgres externo funciona, pero sumás infra fuera del ecosistema. Con Lakebase, la base de datos es parte del bundle, la deployás con el agente, y no pagás cuando nadie la usa. Pensalo así: el 75% del juego de agentes se juega en la fundación de datos — si tu fundación está bien, los agentes funcionan. Lakebase unifica esa fundación.
+Lakebase es la pieza que faltaba para agentes stateful. Este diagrama de la documentación oficial muestra los dos tipos de memoria. A la izquierda: short-term — cada thread ID tiene su conversación completa guardada como checkpoints en Lakebase. Es lo que usamos en el bot con PostgresSaver de LangGraph. A la derecha: long-term — el agente extrae insights clave de múltiples conversaciones y los guarda como key-value pairs. Ambos tipos pueden vivir en la misma instancia de Lakebase o en instancias separadas. El agente accede a ambos tipos de memoria.
 :::
 
-## Lakebase: lo que te da
+## ¿Por qué Lakebase y no otra cosa?
 
--   **Definido en DABs**: un solo `bundle deploy` deploya agente + memoria
--   **Scale to zero**: no pagás cuando nadie chatea
--   **Branching**: fork de prod para testing sin tocar datos reales
--   **Synced Tables**: Delta → Lakebase en segundos
--   **pgvector**: embeddings en la misma base, sin pipeline separado
--   **Unity Catalog**: mismos permisos y auditoría que el resto
-
-. . .
+|   | Delta | Postgres externo | **Lakebase** |
+|---|-------|------------------|----------|
+| **Tipo** | OLAP (batch) | OLTP | **OLTP** |
+| **Latencia** | Segundos | Milisegundos | **Milisegundos** |
+| **En DABs** | N/A para checkpoints | No | **Si** |
+| **Gobernanza** | Unity Catalog | Externa | **Unity Catalog** |
+| **Costo idle** | Storage | 24/7 | **Scale to zero** |
+| **Branching** | No | Manual | **Fork instantáneo** |
 
 > Lakebase no es "mejor Postgres" — es Postgres que **vive dentro del ecosistema**.
 
 ::: notes
-El punto clave: si ya tenés un Postgres externo funcionando, no necesitás migrar. Pero si arrancás de cero, Lakebase te ahorra toda la infra y queda integrado en el bundle. Un deploy, un ecosistema, una gobernanza.
+Esta pregunta la van a hacer. Delta no sirve para checkpoints porque es OLAP — los checkpoints necesitan operaciones OLTP rápidas por fila. Un Postgres externo funciona, pero sumás infra fuera del ecosistema, sin gobernanza ni scale to zero. Con Lakebase, la base de datos es parte del bundle, la deployás con el agente, y no pagás cuando nadie la usa. Además: branching instantáneo para testing sin tocar datos reales, pgvector nativo para embeddings sin pipeline separado. Si ya tenés un Postgres externo funcionando, no necesitás migrar. Pero si arrancás de cero, Lakebase te ahorra toda la infra.
 :::
 
-## Lakebase en DABs
-
-``` yaml
-resources:
-  postgres_projects:
-    agent_memory:
-      project_id: soporte-bot-memory
-      display_name: "Spark de Ideas Bot Memory"
-      pg_version: 17
-
-  postgres_branches:
-    prod_branch:
-      parent: ${resources.postgres_projects.agent_memory.id}
-      branch_id: production
-      no_expiry: true
-
-  postgres_endpoints:
-    prod_endpoint:
-      parent: ${resources.postgres_branches.prod_branch.id}
-      endpoint_id: primary
-      endpoint_type: ENDPOINT_TYPE_READ_WRITE
-      autoscaling_limit_min_cu: 0.5
-      autoscaling_limit_max_cu: 2
-```
-
-. . .
-
-> Proyecto → Branch → Endpoint. Como Git, pero para bases de datos.
-
-::: notes
-Lakebase se define nativamente en DABs desde febrero 2026. La jerarquía es: proyecto (la instancia de Postgres), branches (como branches de Git — podés tener production, dev, staging), y endpoints (el punto de conexión con autoscaling). Fíjense en el scale to zero: min 0.5 compute units, max 2. Si nadie consulta, no pagás. Y el branch dev lo podés crear como fork de production para probar sin afectar datos reales.
-:::
-
-##  {data-background-color="#593196"}
+##  {data-background-color="#0369a1"}
 
 ::: {style="color: white; text-align: center;"}
 [**3**]{style="font-size: 3em; opacity: 0.4;"}
@@ -521,15 +205,13 @@ Ahora que entendemos el ecosistema de agentes, veamos qué cambió en DABs este 
 
 Desde **marzo 2026**, Databricks renombró DABs:
 
-**Databricks** Asset Bundles → **Declarative** Automation Bundles
+[**Databricks** Asset Bundles]{style="font-size: 1.1em; text-decoration: line-through; color: #94a3b8;"} → [**Declarative** Automation Bundles]{style="font-size: 1.1em; color: #FFA166; font-weight: 600;"}
 
 . . .
 
 -   Mismos comandos: `bundle validate`, `bundle deploy`, `bundle run`
 -   Mismo `databricks.yml` — 100% retrocompatible
 -   El nombre refleja lo que realmente son: **automatización declarativa**
-
-. . .
 
 > Ya no es solo "assets" — es toda tu plataforma como código.
 
@@ -570,9 +252,9 @@ databricks bundle plan -t prod
 ``` text
 Plan:
 
-  ~ model_serving_endpoints.agent_endpoint
-    ~ config.served_entities[0].entity_version: "3" → "4"
-    ~ config.served_entities[0].workload_size: "Small" → "Medium"
+  ~ apps.mauro_bot_app
+    ~ config.env[4].value: "dev_bronze.labs.mauro_bot_vs_index"
+      → "pro_bronze.labs.mauro_bot_vs_index"
 
   + jobs.evaluation_job (new)
     name: "[prod] Agent Evaluation"
@@ -631,467 +313,133 @@ Python bundles son GA desde abril 2026. Te permiten generar configuración diná
 El plato fuerte. Quiero hacer una réplica de mí mismo — un bot que responda preguntas sobre Databricks basado en mi blog "Spark de Ideas" y documentación oficial. 20 documentos de buenas prácticas, memoria conversacional con Lakebase, y deployado con un solo databricks.yml. Lo llamé "Spark de Ideas Bot".
 :::
 
-## El escenario: Spark de Ideas Bot
+## El escenario: Mauro Bot
 
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
-#| fig-width: 9
-#| fig-height: 5.5
-#| fig-align: center
-library(ggplot2)
-
-ggplot() +
-    # Background
-    annotate("rect", xmin = -0.3, xmax = 12.3, ymin = -0.5, ymax = 6.2,
-             fill = "#f8fafc", color = NA) +
-
-    # ── TITLE ────────────────────────────────────────────────────────────
-    annotate("label", x = 6, y = 5.9,
-             label = "  Spark de Ideas Bot \u2014 7 recursos, 1 databricks.yml  ",
-             fill = "#1e293b", color = "white", size = 3.8,
-             label.size = 0, label.r = unit(5, "pt"), fontface = "bold") +
-
-    # ── ROW 3: DATA PIPELINE ─────────────────────────────────────────────
-
-    # Confluence
-    annotate("rect", xmin = 0, xmax = 2.2, ymin = 4.25, ymax = 4.95,
-             fill = "#64748b", color = "#475569", linewidth = 0.4) +
-    annotate("text", x = 1.1, y = 4.7, label = "Blog + Docs",
-             color = "white", size = 2.4, fontface = "bold") +
-    annotate("text", x = 1.1, y = 4.45, label = "20 documentos",
-             color = "#cbd5e1", size = 1.9) +
-
-    # Arrow →
-    annotate("segment", x = 2.35, xend = 3.35, y = 4.6, yend = 4.6,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#cbd5e1", linewidth = 0.45) +
-
-    # Refresh Job
-    annotate("rect", xmin = 3.5, xmax = 6, ymin = 4.25, ymax = 4.95,
-             fill = "#593196", color = "#4c1d95", linewidth = 0.4) +
-    annotate("text", x = 4.75, y = 4.72, label = "Refresh Job",
-             color = "white", size = 2.4, fontface = "bold") +
-    annotate("text", x = 4.75, y = 4.45, label = "jobs",
-             color = "#c4b5fd", size = 1.9) +
-    annotate("label", x = 5.8, y = 4.92, label = "1",
-             fill = "#593196", color = "white", size = 1.4,
-             label.size = 0, label.r = unit(3, "pt"), fontface = "bold") +
-
-    # Arrow →
-    annotate("segment", x = 6.15, xend = 7.85, y = 4.6, yend = 4.6,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#cbd5e1", linewidth = 0.45) +
-
-    # Vector Search
-    annotate("rect", xmin = 8, xmax = 11.5, ymin = 4.25, ymax = 4.95,
-             fill = "#0d9488", color = "#0f766e", linewidth = 0.4) +
-    annotate("text", x = 9.75, y = 4.72, label = "Vector Search",
-             color = "white", size = 2.4, fontface = "bold") +
-    annotate("text", x = 9.75, y = 4.45, label = "vector_search_endpoints",
-             color = "#99f6e4", size = 1.9) +
-    annotate("label", x = 11.3, y = 4.92, label = "2",
-             fill = "#0f766e", color = "white", size = 1.4,
-             label.size = 0, label.r = unit(3, "pt"), fontface = "bold") +
-
-    # ── ROW 2: USER FLOW ─────────────────────────────────────────────────
-
-    # Usuario
-    annotate("rect", xmin = 0, xmax = 2.2, ymin = 2.65, ymax = 3.35,
-             fill = "#64748b", color = "#475569", linewidth = 0.4) +
-    annotate("text", x = 1.1, y = 3.05, label = "Usuario",
-             color = "white", size = 2.4, fontface = "bold") +
-    annotate("text", x = 1.1, y = 2.82, label = "Comunidad",
-             color = "#94a3b8", size = 1.9) +
-
-    # Arrow →
-    annotate("segment", x = 2.35, xend = 3.35, y = 3.0, yend = 3.0,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#cbd5e1", linewidth = 0.45) +
-
-    # Databricks App
-    annotate("rect", xmin = 3.5, xmax = 6, ymin = 2.5, ymax = 3.5,
-             fill = "#FFA166", color = "#e8854a", linewidth = 0.6) +
-    annotate("text", x = 4.75, y = 3.18, label = "Databricks App",
-             color = "#7c2d12", size = 2.5, fontface = "bold") +
-    annotate("text", x = 4.75, y = 2.92, label = "Streamlit Chat UI",
-             color = "#9a4e1c", size = 1.9) +
-    annotate("text", x = 4.75, y = 2.68, label = "apps",
-             color = "#9a4e1c", size = 1.9) +
-    annotate("label", x = 5.8, y = 3.47, label = "3",
-             fill = "#e8854a", color = "white", size = 1.4,
-             label.size = 0, label.r = unit(3, "pt"), fontface = "bold") +
-
-    # Arrow →
-    annotate("segment", x = 6.15, xend = 7.85, y = 3.0, yend = 3.0,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#cbd5e1", linewidth = 0.45) +
-
-    # Serving Endpoint
-    annotate("rect", xmin = 8, xmax = 11.5, ymin = 2.4, ymax = 3.6,
-             fill = "#1e293b", color = "#0f172a", linewidth = 0.6) +
-    annotate("text", x = 9.75, y = 3.3, label = "Serving Endpoint",
-             color = "white", size = 2.5, fontface = "bold") +
-    annotate("text", x = 9.75, y = 3.0, label = "AI Gateway + Rate Limits",
-             color = "#FFA166", size = 1.9) +
-    annotate("text", x = 9.75, y = 2.72, label = "model_serving_endpoints",
-             color = "#94a3b8", size = 1.9) +
-    annotate("label", x = 11.3, y = 3.57, label = "4",
-             fill = "#0f172a", color = "white", size = 1.4,
-             label.size = 0, label.r = unit(3, "pt"), fontface = "bold") +
-
-    # Arrow: Serving ↑ Vector Search (retrieval)
-    annotate("segment", x = 9.75, xend = 9.75, y = 3.65, yend = 4.2,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#cbd5e1", linewidth = 0.45) +
-    annotate("text", x = 10.55, y = 3.92, label = "retrieval",
-             color = "#94a3b8", size = 1.9) +
-
-    # ── ROW 1: MODEL LAYER ───────────────────────────────────────────────
-
-    # MLflow Experiment
-    annotate("rect", xmin = 0, xmax = 3.8, ymin = 1.2, ymax = 1.85,
-             fill = "#593196", color = "#4c1d95", linewidth = 0.4) +
-    annotate("text", x = 1.9, y = 1.62, label = "MLflow Experiment",
-             color = "white", size = 2.2, fontface = "bold") +
-    annotate("text", x = 1.9, y = 1.38, label = "experiments",
-             color = "#c4b5fd", size = 1.9) +
-    annotate("label", x = 3.6, y = 1.82, label = "5",
-             fill = "#4c1d95", color = "white", size = 1.4,
-             label.size = 0, label.r = unit(3, "pt"), fontface = "bold") +
-
-    # Registered Model (UC)
-    annotate("rect", xmin = 4.5, xmax = 8.5, ymin = 1.2, ymax = 1.85,
-             fill = "#593196", color = "#4c1d95", linewidth = 0.4) +
-    annotate("text", x = 6.5, y = 1.62, label = "Registered Model (UC)",
-             color = "white", size = 2.2, fontface = "bold") +
-    annotate("text", x = 6.5, y = 1.38, label = "registered_models",
-             color = "#c4b5fd", size = 1.9) +
-    annotate("label", x = 8.3, y = 1.82, label = "6",
-             fill = "#4c1d95", color = "white", size = 1.4,
-             label.size = 0, label.r = unit(3, "pt"), fontface = "bold") +
-
-    # Arrow: Experiment → Model
-    annotate("segment", x = 3.9, xend = 4.4, y = 1.52, yend = 1.52,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#c4b5fd", linewidth = 0.45) +
-
-    # Arrow: Model → Serving Endpoint
-    annotate("segment", x = 8.6, xend = 9.75, y = 1.9, yend = 2.35,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#c4b5fd", linewidth = 0.45) +
-    annotate("text", x = 9.6, y = 2.05, label = "serves",
-             color = "#c4b5fd", size = 1.9) +
-
-    # ── ROW 0: LAKEBASE ──────────────────────────────────────────────────
-
-    annotate("rect", xmin = 0, xmax = 11.5, ymin = -0.15, ymax = 0.75,
-             fill = "#2563eb", color = "#1d4ed8", linewidth = 0.7) +
-    annotate("text", x = 5.75, y = 0.52,
-             label = "Lakebase  (PostgreSQL 17)",
-             color = "white", size = 2.8, fontface = "bold") +
-    annotate("text", x = 3.2, y = 0.15, label = "Checkpoints LangGraph",
-             color = "#93c5fd", size = 1.9) +
-    annotate("text", x = 5.75, y = 0.15, label = "|",
-             color = "#93c5fd", size = 1.9) +
-    annotate("text", x = 8.3, y = 0.15, label = "Memoria conversacional",
-             color = "#93c5fd", size = 1.9) +
-    annotate("text", x = 5.75, y = -0.08, label = "postgres_projects",
-             color = "#93c5fd", size = 1.9) +
-    annotate("label", x = 11.3, y = 0.72, label = "7",
-             fill = "#1d4ed8", color = "white", size = 1.4,
-             label.size = 0, label.r = unit(3, "pt"), fontface = "bold") +
-
-    # Arrow: App ↓ Lakebase (checkpoints)
-    annotate("segment", x = 4.75, xend = 4.75, y = 2.45, yend = 0.8,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#60a5fa", linewidth = 0.45) +
-    annotate("text", x = 3.95, y = 1.6, label = "thread_id",
-             color = "#60a5fa", size = 1.9) +
-
-    # Arrow: Serving ↓ Lakebase (memory)
-    annotate("segment", x = 9.75, xend = 9.75, y = 2.35, yend = 0.8,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#60a5fa", linewidth = 0.45) +
-    annotate("text", x = 10.55, y = 1.6, label = "memory",
-             color = "#60a5fa", size = 1.9) +
-
-    # ── FOOTER ───────────────────────────────────────────────────────────
-    annotate("label", x = 6, y = -0.42,
-             label = "  engine: direct  |  bundle deploy  |  7 recursos declarativos  ",
-             fill = "#1e293b", color = "#FFA166", size = 2,
-             label.size = 0, label.r = unit(3, "pt"), fontface = "bold") +
-
-    coord_cartesian(xlim = c(-0.2, 12.2), ylim = c(-0.5, 6.15)) +
-    theme_void() +
-    theme(plot.margin = margin(2, 2, 2, 2))
-```
+![](mauro-bot-architecture.png){fig-align="center" width="50%"}
 
 ::: notes
-Esta es la arquitectura completa de Spark de Ideas Bot — mi réplica. 7 recursos, todos en un databricks.yml con engine direct. Arriba: el pipeline de conocimiento — un Job scrapea directamente el blog con BeautifulSoup, genera chunks y los escribe a Delta. Vector Search indexa automáticamente. En el medio: la comunidad usa la Databricks App (Streamlit), que llama al Serving Endpoint con AI Gateway. Abajo: Lakebase con PostgreSQL 17 para memoria conversacional — cada usuario tiene su thread_id y la memoria persiste entre sesiones. Todo deployable con un solo comando.
+Esta es la arquitectura de Mauro Bot. Arriba: el pipeline de conocimiento — un Job scrapea el blog con BeautifulSoup, genera chunks y los escribe a Delta. Vector Search indexa automáticamente. En el medio: la Databricks App corre el agente directamente usando el patrón agent-langgraph-advanced — sin Model Serving Endpoint de por medio. Abajo: Lakebase con PostgreSQL 17 para memoria conversacional — cada thread_id persiste entre sesiones. El frontend es un chat.html custom servido por FastAPI con marked.js para renderizar markdown. Todo en un solo databricks.yml.
 :::
 
 ## Estructura del proyecto
 
 ``` text
-soporte-bot/
+mauro-bot/
 ├── databricks.yml              # Todo el deploy
+├── app.yaml                    # Runtime config (command + env)
+├── pyproject.toml              # Deps (uv)
+├── agent_server/
+│   ├── agent.py                # LangGraph + ResponsesAgent
+│   ├── start_server.py         # FastAPI + Lakebase init
+│   ├── utils_memory.py         # CheckpointSaver + Store
+│   └── chat.html               # Chat UI (marked.js)
 ├── src/
-│   ├── agent.py                # Código del agente (MLflow)
 │   ├── load_knowledge_base.py  # Carga de la KB
 │   └── refresh_index.py        # Sync del vector index
-├── app/
-│   ├── app.py                  # Streamlit chat UI
-│   └── requirements.txt
 └── .github/
-    └── workflows/
-        └── deploy.yml          # CI/CD
+    └── workflows/deploy.yml    # CI/CD
 ```
 
 ::: notes
-Estructura simple: el databricks.yml en la raíz define todo. src tiene el agente, el script que carga la base de conocimiento (20 documentos del blog + docs oficiales), y el job que sincroniza el índice. app tiene la UI en Streamlit. Y el workflow de GitHub Actions para CI/CD. Veamos el databricks.yml sección por sección.
+Estructura del template agent-langgraph-advanced. El databricks.yml define todos los recursos. app.yaml define el runtime: comando de inicio y variables de entorno (con valueFrom para Lakebase). agent_server tiene el agente con ResponsesAgent, el servidor FastAPI con Lakebase init, y un chat.html custom que renderiza markdown con marked.js. src tiene los notebooks del pipeline de conocimiento. Y el workflow de GitHub Actions para CI/CD.
 :::
 
-## `databricks.yml` — bundle + variables {auto-animate="true"}
+## Ingesta de la base de conocimiento
+
+![](ingesta-pipeline.png){fig-align="center" width="80%"}
+
+::: notes
+Antes de meternos en el YAML, veamos cómo se ingesta la base de conocimiento. Un Job scrapea el blog con requests y BeautifulSoup — extrae las URLs de todos los posts, descarga cada uno, y genera chunks de ~2000 caracteres con título, categoría y fuente. Se escriben a una tabla Delta en Unity Catalog. Vector Search sincroniza automáticamente y genera el índice con embeddings. Si mañana publico un post nuevo, el job lo levanta solo en el próximo run. Ahora veamos el YAML sección por sección.
+:::
+
+## `databricks.yml` — base {auto-animate="true"}
 
 ``` yaml
 bundle:
-  name: soporte-bot
-  engine: direct
+  name: mauro-bot
 
 variables:
-  catalog:
-    default: dev_bronze
-  schema:
-    default: labs
-```
+  catalog: { default: dev_bronze }  # dev_bronze | pro_bronze por target
+  schema:  { default: labs }
 
-::: notes
-Arrancamos con lo básico: nombre del bundle, engine direct (necesario para Vector Search y Lakebase), y variables. El catalog cambia entre dev_bronze y pro_bronze según el target. El schema es labs en ambos ambientes. Simple.
-:::
-
-## `databricks.yml` — experiment + modelo {auto-animate="true"}
-
-``` yaml
 resources:
   experiments:
     agent_experiment:
-      name: /Users/${workspace.current_user.userName}/soporte-bot
+      name: /Users/${workspace.current_user.userName}/mauro-bot
 
-  registered_models:
-    soporte_bot_model:
-      name: soporte_bot
-      catalog_name: ${var.catalog}
-      schema_name: ${var.schema}
+  vector_search_endpoints:
+    mauro_bot_vs:
+      name: mauro-bot-vs
+      endpoint_type: STANDARD
+
+  postgres_projects:
+    mauro_bot_memory:
+      project_id: maurobot-memory
+      display_name: Mauro Bot Memory Store
 ```
-
-. . .
 
 > `${var.catalog}` se resuelve por target: `dev_bronze` en dev, `pro_bronze` en prod.
 
 ::: notes
-Primero definimos el experiment de MLflow para trackear las versiones del agente, y el modelo registrado en Unity Catalog. Noten cómo usamos variables — el mismo YAML deploya el modelo en dev_bronze o pro_bronze dependiendo del target. El experiment usa el usuario actual para que cada developer tenga su propio espacio en dev.
+Arrancamos con lo básico: nombre del bundle y variables. El catalog cambia entre dev_bronze y pro_bronze según el target. Abajo, el experiment de MLflow para tracing, el Vector Search endpoint para RAG, y Lakebase para memoria conversacional — PostgreSQL 17 serverless. Noten que no hay registered_models ni model_serving_endpoints — el agente corre directamente en la App, no detrás de un serving endpoint. Es el patrón agent-langgraph-advanced de Databricks.
 :::
 
-## `databricks.yml` — serving endpoint {auto-animate="true"}
-
-``` yaml
-  model_serving_endpoints:
-    agent_endpoint:
-      name: soporte-bot-${bundle.target}
-      config:
-        served_entities:
-          - entity_name: dev_bronze.labs.soporte_bot
-            entity_version: "5"
-            workload_size: Small
-            scale_to_zero_enabled: true
-      ai_gateway:
-        rate_limits:
-          - key: user
-            renewal_period: minute
-            calls: 30
-
-  vector_search_endpoints:
-    soporte_bot_vs:
-      name: soporte-bot-vs
-      endpoint_type: STANDARD
-```
-
-::: notes
-El serving endpoint con scale to zero para no pagar cuando no se usa, y AI Gateway con rate limits por usuario. Abajo, el Vector Search endpoint — STANDARD para producción. Ambos requieren engine direct para ser declarados en el bundle. Todo versionado en Git: si alguien quiere saber la configuración del endpoint, revisa el YAML — no tiene que ir a la UI.
-:::
-
-## `databricks.yml` — Lakebase (memoria) {auto-animate="true"}
-
-``` yaml
-  postgres_projects:
-    soporte_bot_memory:
-      project_id: soportebot-memory
-      display_name: SoporteBot Memory Store
-```
-
-. . .
-
-PostgreSQL 17 serverless. El agente usa `PostgresSaver` de LangGraph para guardar checkpoints por `thread_id`.
-
-::: notes
-Lakebase declarado en una línea. Crea una instancia de PostgreSQL 17 serverless con branch production por defecto. El agente usa PostgresSaver de LangGraph para guardar checkpoints — cada conversación tiene su thread_id y la memoria persiste entre sesiones. Branching instantáneo para desarrollo: fork de production sin copiar datos.
-:::
-
-## `databricks.yml` — app + job {auto-animate="true"}
+## `databricks.yml` — app (el agente) {auto-animate="true"}
 
 ``` yaml
   apps:
-    soporte_bot_app:
-      name: soporte-bot
-      source_code_path: ./app    # app.yaml define el comando
+    mauro_bot_app:
+      name: mauro-bot
+      source_code_path: ./
+      config:
+        command: ["uv", "run", "start-app"]
+        env:
+          - name: LAKEBASE_AUTOSCALING_ENDPOINT
+            value_from: postgres
+          - name: MLFLOW_EXPERIMENT_NAME
+            value: ${resources.experiments.agent_experiment.name}
+          - name: VS_INDEX_NAME
+            value: ${var.catalog}.${var.schema}.mauro_bot_vs_index
+          - name: LLM_ENDPOINT
+            value: ${var.llm_endpoint}
       resources:
-        - name: serving-endpoint
-          serving_endpoint:
-            name: soporte-bot-${bundle.target}
-            permission: CAN_QUERY
+        - name: postgres
+          postgres:
+            branch: "projects/${var.lakebase_project_id}/branches/production"
+            database: "projects/.../databases/databricks-postgres"
+            permission: CAN_CONNECT_AND_CREATE
+```
 
+> `value_from` inyecta el endpoint de Lakebase automáticamente — sin connection strings.
+
+::: notes
+La app ES el agente — no hay Model Serving Endpoint de por medio. El código del agente corre directamente dentro de la Databricks App con FastAPI y un chat.html custom que renderiza markdown. Lakebase se bindea como recurso postgres: value_from inyecta el autoscaling endpoint automáticamente via OAuth. El VS index y el LLM endpoint se pasan como env vars que varían por target. Importante: el app.yaml en el source root también define valueFrom (camelCase) — es el runtime config que la plataforma lee al deployar.
+:::
+
+## `databricks.yml` — job {auto-animate="true"}
+
+``` yaml
   jobs:
-    refresh_index:
-      name: "[${bundle.target}] Refresh Vector Index"
+    load_knowledge_base:
+      name: "[${bundle.target}] Load Knowledge Base"
       tasks:
-        - task_key: refresh
+        - task_key: load
           notebook_task:
-            notebook_path: ./src/refresh_index.py
+            notebook_path: ./src/load_knowledge_base.py
             base_parameters:
               catalog: ${var.catalog}
               schema: ${var.schema}
+        - task_key: refresh_index
+          depends_on: [{ task_key: load }]
+          notebook_task:
+            notebook_path: ./src/refresh_index.py
       schedule:
         quartz_cron_expression: "0 0 6 * * ?"
         timezone_id: "America/Montevideo"
 ```
 
 ::: notes
-La app apunta a source_code_path donde vive app.yaml con el comando Streamlit y las env vars. El serving endpoint bindeado como recurso inyecta autenticación automática — el código no maneja tokens. El job de refresh usa base_parameters para recibir catalog y schema del bundle — sin hardcoding. Corre todos los días a las 6 AM Montevideo.
-:::
-
-## Ingesta de la base de conocimiento
-
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
-#| fig-width: 9
-#| fig-height: 4.5
-#| fig-align: center
-library(ggplot2)
-
-ggplot() +
-    annotate("rect", xmin = -0.3, xmax = 12.3, ymin = -0.3, ymax = 4.8,
-             fill = "#f8fafc", color = NA) +
-
-    # Title
-    annotate("label", x = 6, y = 4.5,
-             label = "  Pipeline de conocimiento: Blog + Docs \u2192 Vector Search  ",
-             fill = "#1e293b", color = "white", size = 3.2,
-             label.size = 0, label.r = unit(5, "pt"), fontface = "bold") +
-
-    # Step 1: Sources
-    annotate("rect", xmin = 0, xmax = 2.5, ymin = 2.8, ymax = 3.8,
-             fill = "#64748b", color = "#475569", linewidth = 0.4) +
-    annotate("text", x = 1.25, y = 3.5, label = "Blog (HTML)",
-             color = "white", size = 2.3, fontface = "bold") +
-    annotate("text", x = 1.25, y = 3.15, label = "Scraping directo",
-             color = "#cbd5e1", size = 1.8) +
-    annotate("text", x = 1.25, y = 2.95, label = "del sitio publico",
-             color = "#cbd5e1", size = 1.8) +
-
-    # Arrow 1
-    annotate("segment", x = 2.65, xend = 3.35, y = 3.3, yend = 3.3,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#cbd5e1", linewidth = 0.45) +
-
-    # Step 2: Load Job
-    annotate("rect", xmin = 3.5, xmax = 6, ymin = 2.8, ymax = 3.8,
-             fill = "#593196", color = "#4c1d95", linewidth = 0.4) +
-    annotate("text", x = 4.75, y = 3.52, label = "Load KB Job",
-             color = "white", size = 2.3, fontface = "bold") +
-    annotate("text", x = 4.75, y = 3.2, label = "BeautifulSoup",
-             color = "#c4b5fd", size = 1.8) +
-    annotate("text", x = 4.75, y = 3.0, label = "chunks + metadata",
-             color = "#c4b5fd", size = 1.8) +
-
-    # Arrow 2
-    annotate("segment", x = 6.15, xend = 6.85, y = 3.3, yend = 3.3,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#cbd5e1", linewidth = 0.45) +
-
-    # Step 3: Delta Table
-    annotate("rect", xmin = 7, xmax = 9.5, ymin = 2.8, ymax = 3.8,
-             fill = "#0d9488", color = "#0f766e", linewidth = 0.4) +
-    annotate("text", x = 8.25, y = 3.5, label = "Delta Table",
-             color = "white", size = 2.3, fontface = "bold") +
-    annotate("text", x = 8.25, y = 3.15, label = "catalog.schema",
-             color = "#99f6e4", size = 1.8) +
-    annotate("text", x = 8.25, y = 2.95, label = ".soporte_docs",
-             color = "#99f6e4", size = 1.8) +
-
-    # Arrow 3
-    annotate("segment", x = 9.65, xend = 10.35, y = 3.3, yend = 3.3,
-             arrow = arrow(length = unit(0.12, "cm"), type = "closed"),
-             color = "#cbd5e1", linewidth = 0.45) +
-
-    # Step 4: Vector Index
-    annotate("rect", xmin = 10.5, xmax = 12.2, ymin = 2.8, ymax = 3.8,
-             fill = "#1e293b", color = "#0f172a", linewidth = 0.4) +
-    annotate("text", x = 11.35, y = 3.5, label = "Vector",
-             color = "white", size = 2.3, fontface = "bold") +
-    annotate("text", x = 11.35, y = 3.2, label = "Search",
-             color = "white", size = 2.3, fontface = "bold") +
-    annotate("text", x = 11.35, y = 2.95, label = "Index",
-             color = "#FFA166", size = 1.8) +
-
-    # Blog posts list (bottom left)
-    annotate("rect", xmin = 0.2, xmax = 3.8, ymin = 0.3, ymax = 2.2,
-             fill = "white", color = "#e2e8f0", linewidth = 0.3) +
-    annotate("text", x = 2.0, y = 2.0, label = "Posts scrapeados",
-             color = "#1e293b", size = 2.2, fontface = "bold") +
-    annotate("text", x = 2.0, y = 1.65, label = "Tips #2: Delta Lake",
-             color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 1.4, label = "Tips #3: Unity Catalog",
-             color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 1.15, label = "Tips #8: Jobs & Workflows",
-             color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 0.9, label = "Data Contracts Framework",
-             color = "#64748b", size = 1.8, hjust = 0.5) +
-    annotate("text", x = 2.0, y = 0.65, label = paste0("... ", length(list.files("../../blog/posts")), " posts"),
-             color = "#94a3b8", size = 2.0, hjust = 0.5) +
-
-    # Code snippet (bottom right)
-    annotate("rect", xmin = 4.5, xmax = 12, ymin = 0.3, ymax = 2.2,
-             fill = "#1e293b", color = "#334155", linewidth = 0.3) +
-    annotate("text", x = 4.8, y = 2.0,
-             label = "# load_knowledge_base.py",
-             color = "#94a3b8", size = 1.7, hjust = 0, family = "mono") +
-    annotate("text", x = 4.8, y = 1.7,
-             label = 'posts = get_post_urls(BLOG_URL)',
-             color = "#FFA166", size = 1.7, hjust = 0, family = "mono") +
-    annotate("text", x = 4.8, y = 1.45,
-             label = 'for post in posts:',
-             color = "#FFA166", size = 1.7, hjust = 0, family = "mono") +
-    annotate("text", x = 4.8, y = 1.2,
-             label = '    content = fetch_post_content(post["url"])',
-             color = "#FFA166", size = 1.7, hjust = 0, family = "mono") +
-    annotate("text", x = 4.8, y = 0.9,
-             label = '    chunks = chunk_text(content, max=2000)',
-             color = "#c4b5fd", size = 1.7, hjust = 0, family = "mono") +
-    annotate("text", x = 4.8, y = 0.65,
-             label = 'spark.createDataFrame(docs).saveAsTable(...)',
-             color = "#c4b5fd", size = 1.7, hjust = 0, family = "mono") +
-
-    coord_cartesian(xlim = c(-0.2, 12.2), ylim = c(0.1, 4.7)) +
-    theme_void() +
-    theme(plot.margin = margin(2, 2, 2, 2))
-```
-
-::: notes
-Así se ingesta la base de conocimiento. Un Job de Databricks scrapea directamente el blog con requests y BeautifulSoup — va a la URL pública, extrae las URLs de todos los posts, descarga cada uno, y genera chunks de ~2000 caracteres con título, categoría y fuente. Se escriben a una tabla Delta en Unity Catalog. Vector Search sincroniza automáticamente esa tabla y genera el índice con embeddings. Si mañana publico un post nuevo, el job lo levanta solo en el próximo run. Todo declarado en el bundle.
+El job tiene 2 tasks encadenadas: primero carga la KB scrapeando el blog, luego sincroniza el Vector Search index. Ya no hay register_model — el agente es code-first, no necesita registrarse como modelo en Unity Catalog. Corre todos los días a las 6 AM Montevideo.
 :::
 
 ## `databricks.yml` — targets {auto-animate="true"}
@@ -1124,53 +472,56 @@ Los targets son la magia. En dev, todo se prefija con tu usuario y los triggers 
 ## Un deploy completo
 
 ``` bash
-databricks bundle validate -t prod   # Validar
-databricks bundle plan -t prod       # Ver cambios
-databricks bundle deploy -t prod     # Deployar
+databricks bundle validate -t prod   # Validar sintaxis y config
+databricks bundle plan -t prod       # Preview de cambios
+databricks bundle deploy -t prod     # Deployar recursos
+databricks bundle run mauro_bot_app  # Iniciar/reiniciar la app
 ```
 
 . . .
 
-**Eso es todo.** Un comando deploya 7 recursos: experiment, modelo, serving endpoint, vector search, Lakebase, app, y job.
+**Eso es todo.** 4 comandos → 5 recursos en producción.
+
+[experiment · vector search · Lakebase · app · job]{style="color: #94a3b8; font-size: 0.85em;"}
 
 ::: notes
-Tres comandos: validate para chequear sintaxis y configuración, plan para ver los cambios, deploy para aplicar. En un solo deploy tenés todo el stack del agente en producción. Y si algo sale mal, el estado es idempotente — corrés deploy de nuevo y vuelve al estado deseado.
+Cuatro comandos: validate chequea sintaxis, plan muestra los cambios, deploy sube código y configura recursos, y run inicia o reinicia la app. Deploy solo sube archivos y configura — run es necesario para que la app arranque con el código nuevo. En un solo deploy tenés todo el stack del agente en producción. Y si algo sale mal, el estado es idempotente.
 :::
 
-## El agente: LangGraph + Lakebase
+## El agente: `agent-langgraph-advanced`
 
-``` {.python code-line-numbers="1-4|6-11|13-18|20-26"}
-from langgraph.checkpoint.postgres import PostgresSaver
-from langgraph.graph import END, MessagesState, StateGraph
+``` {.python code-line-numbers="1-5|7-12|14-18|20-27"}
+from databricks_langchain import ChatDatabricks
+from langgraph.graph import END, StateGraph
+from mlflow.genai.agent_server import invoke, stream
+from mlflow.types.responses import *
 
-graph = StateGraph(MessagesState)
-
-def retrieve(state: MessagesState):
-    question = state["messages"][-1].content
-    results = vs_index.similarity_search(
-        query_text=question, columns=["content", "source"], num_results=5
-    )
-    return {"context": "\n".join(r["content"] for r in results["result"]["data_array"])}
-
-def generate(state: MessagesState):
-    messages = [
-        {"role": "system", "content": f"{SYSTEM_PROMPT}\n\nContexto:\n{state['context']}"},
-        *[{"role": m.type, "content": m.content} for m in state["messages"]],
-    ]
-    return {"messages": [llm.invoke(messages)]}
-
+graph = StateGraph(AgentState)
+graph.add_node("retrieve", retrieve)   # Vector Search → context
+graph.add_node("generate", generate)   # ChatDatabricks → respuesta
 graph.set_entry_point("retrieve")
-graph.add_node("retrieve", retrieve)
-graph.add_node("generate", generate)
 graph.add_edge("retrieve", "generate")
 graph.add_edge("generate", END)
 
-checkpointer = PostgresSaver.from_conn_string(LAKEBASE_URL)
-app = graph.compile(checkpointer=checkpointer)
+@invoke()
+async def invoke_handler(request: ResponsesAgentRequest) -> ResponsesAgentResponse:
+    outputs = [e.item async for e in stream_handler(request)
+               if e.type == "response.output_item.done"]
+    return ResponsesAgentResponse(output=outputs)
+
+@stream()
+async def stream_handler(request: ResponsesAgentRequest):
+    checkpointer, _ = get_lakebase_resources()  # Global desde lifespan
+    agent = graph.compile(checkpointer=checkpointer)
+    config = {"configurable": {"thread_id": get_thread_id(request)}}
+    async for event in agent.astream(input_state, config,
+                                     stream_mode=["updates", "messages"]):
+        # Emite ResponsesAgentStreamEvent token a token
+        yield delta_event(event)
 ```
 
 ::: notes
-El agente usa LangGraph con dos nodos: retrieve busca en Vector Search, generate llama al LLM con el contexto. La clave es el checkpointer: PostgresSaver conecta a Lakebase y guarda el estado de cada conversación. Cada thread_id es una conversación independiente — el agente recuerda lo que dijiste antes sin que tengas que repetir contexto. Y todo esto se deploya con el mismo databricks.yml.
+El agente sigue el patrón agent-langgraph-advanced. Dos nodos: retrieve busca en Vector Search, generate llama al LLM. La clave es el patrón @invoke delega a @stream: invoke consume el stream completo y devuelve la respuesta final, stream emite tokens de a uno para la UI. El checkpointer viene del lifespan del server (se inicializa una vez al startup conectando a Lakebase). Cada thread_id persiste la conversación completa. stream_mode=["updates", "messages"] permite emitir deltas por token sin esperar a que termine el nodo.
 :::
 
 ##  {data-background-color="#0d9488"}
@@ -1189,8 +540,8 @@ Ahora que tenemos el bundle, necesitamos automatizar el deploy. No queremos que 
 
 ## GitHub Actions
 
-``` {.yaml code-line-numbers="1-5|7-15|17-24"}
-name: Deploy Spark de Ideas Bot
+``` {.yaml code-line-numbers="1-5|7-15|17-26"}
+name: Deploy Mauro Bot
 on:
   push: { branches: [main] }
   pull_request: { branches: [main] }
@@ -1214,72 +565,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: databricks/setup-cli@main
       - run: databricks bundle deploy -t prod
+      - run: databricks bundle run mauro_bot_app -t prod
 ```
 
 ::: notes
-El workflow tiene dos jobs. Validate corre en PRs — valida el bundle y muestra el plan como comentario en el PR. Deploy corre solo en main, con approval de ambiente en GitHub. No necesitamos la env var DATABRICKS_BUNDLE_ENGINE porque engine: direct ya está declarado en el YAML. Dos secrets: host y token del workspace.
+El workflow tiene dos jobs. Validate corre en PRs — valida el bundle y muestra el plan. En el repo real hay un step extra con actions/github-script que comenta el plan como comentario en el PR — lo simplifiqué acá para que entre en la slide. Deploy corre solo en main: primero deploy sube código y configura recursos, luego run inicia o reinicia la app con el código nuevo. Sin el run, la app sigue corriendo con el código anterior. Dos secrets: host y token del workspace.
 :::
 
 ## El flujo completo
 
-```{r}
-#| echo: false
-#| warning: false
-#| message: false
-#| fig-width: 9
-#| fig-height: 3
-#| fig-align: center
-library(ggplot2)
-
-nodes <- data.frame(
-    x = c(1, 3, 5, 7, 9),
-    y = c(1, 1, 1, 1, 1),
-    label = c(
-        "PR\nCreado",
-        "Validate\n+ Plan",
-        "Code\nReview",
-        "Merge\na main",
-        "Deploy\nProd"
-    ),
-    color = c("#64748b", "#FFA166", "#593196", "#0d9488", "#1e293b")
-)
-
-arrows <- data.frame(
-    x = c(1.7, 3.7, 5.7, 7.7),
-    xend = c(2.3, 4.3, 6.3, 8.3),
-    y = c(1, 1, 1, 1),
-    yend = c(1, 1, 1, 1)
-)
-
-ggplot() +
-    geom_tile(
-        data = nodes,
-        aes(x = x, y = y, fill = color),
-        width = 1.5,
-        height = 1.2,
-        color = NA,
-        show.legend = FALSE
-    ) +
-    geom_text(
-        data = nodes,
-        aes(x = x, y = y, label = label),
-        color = "white",
-        size = 3.5,
-        fontface = "bold",
-        lineheight = 0.9
-    ) +
-    geom_segment(
-        data = arrows,
-        aes(x = x, xend = xend, y = y, yend = yend),
-        arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
-        color = "#94a3b8",
-        linewidth = 0.6
-    ) +
-    scale_fill_identity() +
-    coord_cartesian(xlim = c(-0.2, 10.2), ylim = c(0.1, 1.9)) +
-    theme_void() +
-    theme(plot.margin = margin(5, 10, 5, 10))
-```
+![](cicd-flow.png){fig-align="center" width="80%"}
 
 . . .
 
@@ -1301,26 +596,31 @@ Este es el flujo ideal. El developer crea un PR, el CI valida el bundle y muestr
 
 ## Gotchas
 
-**1. `scale_to_zero` tiene cold start de \~60 seg.** Para agentes con SLA de latencia, considerá mantener una instancia mínima.
-
-. . .
-
-**2. El `entity_version` no se auto-bumpa.** Tenés que actualizar el YAML manualmente o usar un script de CI que lo haga.
-
-. . .
-
-**3. Un bundle por dominio, no un mega-bundle.** Si metés 50 jobs de 5 equipos en un bundle, los deploys van a ser lentos y los conflictos en Git constantes.
-
-. . .
-
-**4. Migrá al Direct Engine ya.** Terraform engine se remueve a fin de 2026. `bundle deployment migrate` es seguro e idempotente.
-
-. . .
-
-**5. `bundle plan` es tu mejor amigo.** Corré plan antes de cada deploy. Especialmente después de un merge de otro equipo.
+| # | Gotcha | Tip |
+|---|--------|-----|
+| 1 | Apps tienen cold start de ~30 seg | Usar `scale_to_zero: false` si hay SLA |
+| 2 | Un bundle por dominio, no un mega-bundle | Separar por dominio: ingesta, agente, analytics |
+| 3 | Migrá al Direct Engine ya | `bundle deployment migrate` — seguro e idempotente |
+| 4 | `bundle plan` es tu mejor amigo | Corré plan antes de cada deploy |
+| 5 | `uv` > `pip` en Databricks Apps | Startup 10x más rápido, lockfile reproducible |
+| 6 | `app.yaml` usa `valueFrom` (camelCase) | En `databricks.yml` es `value_from` (snake) |
 
 ::: notes
-Estos son los que me costaron horas. El de entity_version es el más molesto — en el próximo release esperamos que se pueda referenciar "latest" o un alias. Lo del mega-bundle es un anti-patrón que vi en varios equipos: un solo databricks.yml con 200 recursos. Separar por dominio: un bundle para ingesta, otro para serving, otro para el agente. Y bundle plan — usalo siempre. Es gratis, es rápido, y te evita sorpresas. Otros anti-patrones comunes: extraer metadata vía dbutils.notebook.entry_point (roto en serverless), sacar tokens del contexto del notebook, detectar branch con subprocess en vez de usar bundle.git.branch — todos son workarounds pre-DABs que la plataforma ya resolvió nativamente. Y ojo: los recursos gestionados por bundles no se deben editar en la UI — los cambios manuales se sobreescriben en el próximo deploy.
+Estos son los que me costaron horas. El de cold start afecta la primera request después de un deploy. Mega-bundle es un anti-patrón que vi en varios equipos. Bundle plan — usalo siempre. El de valueFrom es sutil: en app.yaml (que la plataforma lee en runtime) es camelCase, en databricks.yml (que el bundle resuelve en deploy time) es snake_case. Me costó una hora de debugging. Otros anti-patrones: extraer metadata vía dbutils.notebook.entry_point (roto en serverless), sacar tokens del contexto del notebook. Para rollbacks: revertí el commit en Git y deployeá de nuevo.
+:::
+
+## Gotcha #7: Direct Engine — issues abiertos
+
+![](github-issue-crop.png){fig-align="center" width="70%"}
+
+`postgres_projects` no es idempotente — el re-deploy falla con *"project slug already exists"* porque el CLI siempre hace POST.
+
+. . .
+
+> El repo `databricks/cli` es abierto y el equipo responde rápido. Contribuir issues es parte de la adopción.
+
+::: notes
+Este es un issue real. postgres_projects no soporta re-deploy — siempre hace POST en vez de PUT. El workaround: crear el proyecto Lakebase una vez (via UI o CLI) y no incluirlo en el YAML. Otro gotcha de Lakebase: el SP de la app con CAN_CONNECT_AND_CREATE no recibe CREATE ON SCHEMA public — tuve que crear las tablas como superuser y luego conceder permisos al SP. Estos gaps van a mejorar, pero por ahora hay que hacer setup manual la primera vez. El Direct Engine funciona muy bien para el 95% de los recursos.
 :::
 
 ##  {data-background-color="#FFA166"}
@@ -1337,96 +637,139 @@ Estos son los que me costaron horas. El de entity_version es el más molesto —
 Y ahora lo que estaban esperando — demo en vivo. Les presento a mi réplica: Spark de Ideas Bot. Un chatbot que responde sobre buenas prácticas de Databricks basándose en mi blog y documentación oficial. Tiene humor, tiene links a la documentación, y tiene memoria entre conversaciones gracias a Lakebase.
 :::
 
-## Preguntas para la demo
+## Probemos el bot
 
-1. **"¿Qué es Liquid Clustering y cuándo debería usarlo?"**
-2. **"Tengo una tabla con 500 particiones, ¿cómo migro?"**
-3. **"¿Cómo configuro CI/CD para DABs con GitHub Actions?"**
-4. **"¿Cuál es la diferencia entre Delta Live Tables y Lakeflow?"**
-5. **"Dame 3 tips para reducir costos en Databricks"**
+1. *"¿Qué es Liquid Clustering?"*
+2. *"Tengo 500 particiones, ¿cómo migro?"*
+3. *"¿Cómo configuro CI/CD para DABs?"*
+4. *"¿Cuál es la diferencia entre DLT y Lakeflow?"*
+5. *"Dame 3 tips para reducir costos"*
 
 . . .
 
-> Probalo vos: [soporte-bot-XXX.azure.databricksapps.com]{style="color: #593196;"}
+> El código completo va a estar disponible en el blog post de la charla.
 
 ::: notes
-Estas son algunas preguntas para probar. La primera sobre Liquid Clustering muestra que el bot conoce los contenidos del blog a fondo. La segunda es un caso práctico de migración. La tercera es sobre el pipeline de CI/CD que acabamos de ver. La cuarta testea la diferenciación entre productos que Databricks cambió de nombre. Y la quinta es sobre optimización de costos. Si tienen ganas, pueden probar ustedes mismos desde sus celulares con la URL.
+Preguntas para probar en vivo. La primera sobre Liquid Clustering muestra que el bot conoce los contenidos del blog a fondo. La segunda es un caso práctico. La cuarta testea la diferenciación entre productos que Databricks renombró. Hago la demo yo desde mi cuenta porque la app requiere auth de Databricks.
 :::
 
 ## Qué está listo para producción (junio 2026)
 
-| Feature                                           | Estado                 |
-|---------------------------------------------------|------------------------|
-| YAML bundles (jobs, pipelines, models, endpoints) | **GA**                 |
-| Direct Deployment Engine                          | **GA**                 |
-| Python bundles (pyDABs)                           | **GA**                 |
-| Bundles en Workspace UI                           | **GA**                 |
-| Databricks Apps en bundles                        | **GA**                 |
-| Lakebase Postgres en bundles                      | **GA**                 |
-| `bundle plan` (JSON output)                       | **GA**                 |
-| `model_serving_endpoints` en pyDABs               | **Preview**            |
-| Thoughtworks Radar                                | **Adopt** (abril 2026) |
+| Feature | Estado |
+|---------|--------|
+| YAML bundles (jobs, pipelines, models, endpoints) | {{< fa circle-check >}} **GA** |
+| Direct Deployment Engine | {{< fa circle-check >}} **GA** |
+| Python bundles (pyDABs) | {{< fa circle-check >}} **GA** |
+| Bundles en Workspace UI | {{< fa circle-check >}} **GA** |
+| Databricks Apps en bundles | {{< fa circle-check >}} **GA** |
+| Lakebase Postgres en bundles | {{< fa circle-check >}} **GA** |
+| `bundle plan` (JSON output) | {{< fa circle-check >}} **GA** |
+| `model_serving_endpoints` en pyDABs | {{< fa flask >}} Preview |
+| Thoughtworks Technology Radar | {{< fa star >}} **Adopt** |
 
 ::: notes
 Para el que pregunta "¿está maduro?": sí. Está en GA, Thoughtworks lo puso en Adopt, y el Direct Engine elimina las dependencias de Terraform que eran el mayor punto de fricción. Si estás empezando, arrancá hoy.
 :::
 
+## Lo que viene del DAIS 2026
+
+| Anuncio | Qué cambia | Estado |
+|---------|-----------|--------|
+| **ResponsesAgent** (MLflow) | Nueva interfaz para agentes — wrappea cualquier framework | {{< fa circle-check >}} GA |
+| **Unity AI Gateway** | Gobernanza runtime: cost caps, smart routing, guardrails | {{< fa circle-check >}} GA |
+| **MCP en Databricks** | Agentes se conectan a Genie, SQL, GitHub, Slack via MCP | {{< fa flask >}} Preview |
+| **CLEARS Framework** | 6 dimensiones para evaluar agentes como quality gate en CI | {{< fa circle-check >}} GA |
+| **Lakebase Search** | Retrieval híbrido vector + full-text nativo en Postgres | {{< fa flask >}} Beta |
+| **LTAP** | OLTP + OLAP en una sola copia — elimina ETL para agentes | {{< fa clock >}} Coming soon |
+| **Migrate Serving → Apps** | Databricks recomienda mover agentes de endpoints a Apps | Docs disponibles |
+
+::: notes
+Estos anuncios son del Data + AI Summit 2026, la semana pasada. ResponsesAgent reemplaza el patrón PyFunc que usamos en el bot — permite wrappear cualquier framework (LangGraph, OpenAI, CrewAI) y obtener tracing, eval y monitoring automático. Unity AI Gateway ya lo usamos para rate limits, pero ahora incluye cost caps y smart routing entre modelos. MCP permite que los agentes se conecten a tools externos — GitHub, Slack, Jira — declarativamente. CLEARS es el framework de evaluación estandarizado: Correctness, Latency, Execution, Adherence, Relevance, Safety. Lakebase Search es el futuro del Vector Search: retrieval híbrido dentro de Postgres con 32x compresión. Y LTAP es la visión a largo plazo — que los agentes lean, razonen y escriban sobre una sola capa de storage sin cruzar fronteras OLTP/OLAP.
+:::
+
+## El stack: `agent-langgraph-advanced`
+
+``` text
+Agent (LangGraph + RAG)
+  → MLflow ResponsesAgent (@invoke / @stream)
+    → Databricks App (FastAPI + chat.html con marked.js)
+      → Lakebase (AsyncCheckpointSaver — memoria por thread_id)
+      → Vector Search (RAG del blog)
+      → MLflow Experiment (tracing automático)
+```
+
+. . .
+
+- **Sin Model Serving Endpoint** — el agente corre en la App directamente
+- **Sin registrar modelo** en UC — es code-first, versionado en Git
+- **Chat HTML custom** — streaming SSE + markdown rendering
+
+> Template oficial: `databricks apps init --template agent-langgraph-advanced`
+
+::: notes
+Este es el stack que usamos. El agente sigue el template oficial agent-langgraph-advanced de Databricks. LangGraph para el grafo RAG, ResponsesAgent de MLflow para la interfaz con @stream que genera tokens de a uno, y la App corre todo directamente — sin pasar por Model Serving. La memoria conversacional usa AsyncCheckpointSaver de databricks_langchain que conecta a Lakebase via OAuth automático. El chat es un HTML custom que consume el endpoint /responses con streaming SSE y renderiza markdown con marked.js. Todo se deploya con un solo databricks.yml.
+:::
+
 ##  {data-background-color="#1e293b"}
 
-::: {style="color: white; text-align: center; margin-top: 1em;"}
-### El takeaway
+::: {style="color: white; text-align: center; margin-top: 2em;"}
 
-[**Si tu agente no se deploya con `bundle deploy`,**]{style="color: #FFA166; font-size: 1.3em;"}
+[Si tu agente no se deploya con]{style="font-size: 1.2em;"}
 
-[**no está listo para producción.**]{style="color: #FFA166; font-size: 1.3em;"}
+[`bundle deploy`]{style="color: #FFA166; font-size: 2.2em; font-weight: 700; display: block; margin: 0.3em 0;"}
 
-[IaC no es opcional. Es la diferencia entre una demo y un producto.]{style="color: #94a3b8; font-size: 0.85em; display: block; margin-top: 0.5em;"}
+[no está listo para producción.]{style="font-size: 1.2em;"}
+
+::: {style="margin-top: 1.5em; border-top: 1px solid rgba(148,163,184,0.3); padding-top: 1em;"}
+[IaC no es opcional. Es la diferencia entre una demo y un producto.]{style="color: #94a3b8; font-size: 0.9em;"}
+:::
 :::
 
 ::: notes
 Este es el mensaje. Un agente que se deploya manualmente es una demo. Un agente que se deploya con DABs, versionado en Git, con CI/CD, con permisos y monitoring — eso es un producto. La diferencia no es técnica, es de madurez. El agente más inteligente se cae si no tiene deploy reproducible, governance, y memoria persistente. DABs te da todo eso en un archivo.
 :::
 
-## Recursos
+## Para seguir
 
--   [Documentación oficial de DABs](https://docs.databricks.com/aws/en/dev-tools/bundles)
--   [Lakebase con DABs](https://learn.microsoft.com/en-us/azure/databricks/oltp/projects/manage-with-bundles)
--   [Agent memory con Lakebase](https://learn.microsoft.com/en-us/azure/databricks/generative-ai/agent-framework/stateful-agents)
--   [Agent Bricks](https://www.databricks.com/company/newsroom/press-releases/databricks-launches-agent-bricks-new-approach-building-ai-agents)
--   [Direct Deployment Engine](https://docs.databricks.com/aws/en/dev-tools/bundles/direct)
--   [Thoughtworks Radar — DABs en Adopt](https://www.thoughtworks.com/en-us/radar/languages-and-frameworks/declarative-automation-bundles)
+::: columns
+::: {.column width="50%"}
+**Documentación y herramientas**
 
-. . .
+- [{{< fa rocket >}} DevHub](https://developers.databricks.com) — Portal de developers con templates y guías
+- [{{< fa code >}} AppKit](https://github.com/databricks/appkit) — SDK TypeScript/React para Databricks Apps
+- [{{< fa book >}} DABs docs](https://docs.databricks.com/aws/en/dev-tools/bundles)
+- [{{< fa database >}} Agent memory](https://learn.microsoft.com/en-us/azure/databricks/generative-ai/agent-framework/stateful-agents)
+- [{{< fa gear >}} Direct Engine](https://docs.databricks.com/aws/en/dev-tools/bundles/direct)
+:::
 
-**Blog**: [Spark de Ideas](https://mauroloprete.github.io/mauroloprete/)
+::: {.column width="50%"}
+**Blog y comunidad**
 
--   [Databricks Tips #1: Asset Bundles — lo que no te cuentan](https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-asset-bundles-advanced/)
--   [Databricks Tips #10: Unity AI Gateway](https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-10-ai-gateway/)
-
-. . .
-
-**Lectura recomendada** (blogs de la comunidad):
-
--   [Production-Ready Projects with Bundles](https://www.sunnydata.ai/blog/production-ready-databricks-projects-databricks-bundles) — SunnyData
--   [5 Patterns That Break in Production](https://www.sunnydata.ai/blog/databricks-anti-patterns-production) — SunnyData
--   [Building Secure RAG in Databricks](https://qubika.com/blog/databricks-secure-rag-architecture/) — Qubika
+- [Tips #1: Asset Bundles](https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-asset-bundles-advanced/) — Spark de Ideas
+- [Tips #10: AI Gateway](https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-10-ai-gateway/) — Spark de Ideas
+- [Production-Ready Bundles](https://www.sunnydata.ai/blog/production-ready-databricks-projects-databricks-bundles) — SunnyData
+- [Thoughtworks Radar](https://www.thoughtworks.com/en-us/radar/languages-and-frameworks/declarative-automation-bundles)
+:::
+:::
 
 ::: notes
-Links para profundizar. Tips #1 cubre DABs en profundidad — variables complejas, lookups, monorepo patterns, presets. Tips #10 cubre AI Gateway. En la sección de lectura recomendada: el post de production-ready tiene las 5 prácticas no negociables para que DABs funcione de verdad, el de anti-patterns son workarounds pre-DABs que se rompen en serverless, y el de secure RAG detalla las 5 capas de protección que mencioné.
+A la izquierda la documentación oficial — empezar por DABs docs y Lakebase con DABs. A la derecha, posts del blog y de la comunidad. Tips #1 cubre DABs en profundidad, Tips #10 cubre AI Gateway. SunnyData tiene excelentes posts sobre patrones de producción.
 :::
 
 ##  {data-background-color="#1e293b" visibility="uncounted"}
 
-::: {style="color: white; text-align: center; margin-top: 1em;"}
-![](../spark-de-ideas-cover.jpg){width="160" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"}
+::: {style="color: white; text-align: center; margin-top: 1.5em;"}
+![](../spark-de-ideas-cover.jpg){width="140" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"}
 
-[**Gracias!**]{style="font-size: 1.5em; color: #FFA166; display: block; margin-top: 0.3em;"}
+[**Gracias!**]{style="font-size: 2em; color: #FFA166; display: block; margin-top: 0.4em;"}
 
-[Preguntas?]{style="font-size: 1em;"}
+[Preguntas, feedback, puteadas — todo vale]{style="font-size: 0.95em; display: block; margin-top: 0.2em;"}
 
-[{{< fa globe >}} Blog](https://mauroloprete.github.io/mauroloprete/){style="color: #FFA166; margin-right: 1.5em;"} [{{< fa brands github >}} GitHub](https://github.com/mauroloprete){style="color: #FFA166;"}
+::: {style="margin-top: 1em;"}
+[{{< fa globe >}} sparkdeideas.com](https://mauroloprete.github.io/mauroloprete/){style="color: #FFA166; margin-right: 1.2em; font-size: 0.9em;"} [{{< fa brands github >}} mauroloprete](https://github.com/mauroloprete){style="color: #FFA166; margin-right: 1.2em; font-size: 0.9em;"} [{{< fa brands linkedin >}} mauroloprete](https://linkedin.com/in/mauroloprete){style="color: #FFA166; font-size: 0.9em;"}
+:::
 
-[Databricks Meetup Uruguay]{style="font-size: 0.8em; color: #94a3b8; display: block; margin-top: 1em;"}
+[Databricks Meetup Uruguay · Junio 2026]{style="font-size: 0.75em; color: #64748b; display: block; margin-top: 1em;"}
 :::
 
 ## Backup: DABs vs Terraform {visibility="uncounted"}

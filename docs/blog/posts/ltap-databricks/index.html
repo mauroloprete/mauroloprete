@@ -2,16 +2,18 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.6.39">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-06-19">
 <meta name="description" content="LTAP unifica OLTP y OLAP en una sola copia de datos sobre Delta e Iceberg. Qué es, cómo funciona, en qué se diferencia de HTAP y Zero ETL, y un ejemplo concreto de cómo cambiaría tu stack.">
 
 <title>LTAP: Databricks quiere eliminar el ETL entre tu base y tu warehouse – Mauro Loprete</title>
 <style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
 div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -34,15 +36,16 @@ ul.task-list li input[type="checkbox"] {
 <script src="../../../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../../../">
 <link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
-<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="../../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -101,7 +104,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <meta name="twitter:image-width" content="1500">
 </head>
 
-<body class="nav-fixed">
+<body class="nav-fixed quarto-light">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
@@ -182,7 +185,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
   <li><a href="#disaster-recovery-cross-cloud" id="toc-disaster-recovery-cross-cloud" class="nav-link" data-scroll-target="#disaster-recovery-cross-cloud">Disaster Recovery cross-cloud</a></li>
   <li><a href="#branching-estilo-git" id="toc-branching-estilo-git" class="nav-link" data-scroll-target="#branching-estilo-git">Branching estilo Git</a></li>
   <li><a href="#operaciones-autónomas" id="toc-operaciones-autónomas" class="nav-link" data-scroll-target="#operaciones-autónomas">Operaciones autónomas</a></li>
-  <li><a href="#lakebase-search" id="toc-lakebase-search" class="nav-link" data-scroll-target="#lakebase-search">Lakebase Search</a></li>
+  <li><a href="#lakebase-search-beta" id="toc-lakebase-search-beta" class="nav-link" data-scroll-target="#lakebase-search-beta">Lakebase Search (Beta)</a></li>
   </ul></li>
   <li><a href="#quién-ya-lo-usa" id="toc-quién-ya-lo-usa" class="nav-link" data-scroll-target="#quién-ya-lo-usa">Quién ya lo usa</a></li>
   <li><a href="#lo-que-todavía-no-sabemos" id="toc-lo-que-todavía-no-sabemos" class="nav-link" data-scroll-target="#lo-que-todavía-no-sabemos">Lo que todavía no sabemos</a></li>
@@ -223,7 +226,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">June 19, 2026</p>
+      <p class="date">19 de junio de 2026</p>
     </div>
   </div>
   
@@ -244,14 +247,14 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-TL;DR
+<span class="screen-reader-only">Note</span>TL;DR
 </div>
 </div>
 <div class="callout-body-container callout-body">
 <ul>
 <li><strong>LTAP</strong> = Lake Transactional/Analytical Processing. Unifica OLTP y OLAP sobre una sola copia de datos.</li>
-<li><strong>Lakebase</strong> (Postgres serverless) escribe directamente en Delta e Iceberg. Sin ETL, sin réplicas.</li>
-<li>Elimina tres categorías de infra: <strong>CDC/ETL</strong> de ida, <strong>Reverse ETL</strong> de vuelta, y <strong>serving layers</strong> de cache.</li>
+<li><strong>Lakebase</strong> (Postgres serverless), con LTAP, escribirá directamente en Delta e Iceberg. Sin ETL, sin réplicas.</li>
+<li>Elimina <strong>CDC/ETL</strong> de ida, reduce significativamente la necesidad de <strong>Reverse ETL</strong> de vuelta, y simplifica <strong>serving layers</strong> de cache.</li>
 <li>Los <strong>agentes AI</strong> se benefician directamente: read + reason + write sobre un solo backend, sin cruzar fronteras OLTP/OLAP.</li>
 <li>No es HTAP (que sacrifica performance) ni Zero ETL (que oculta el pipeline). Es unificación en la capa de storage.</li>
 <li>Estado actual: <strong>coming soon</strong> — todavía no está GA.</li>
@@ -262,11 +265,11 @@ TL;DR
 <section id="qué-es-ltap" class="level2">
 <h2 class="anchored" data-anchor-id="qué-es-ltap">Qué es LTAP</h2>
 <p>LTAP significa <strong>Lake Transactional/Analytical Processing</strong>. Es una arquitectura que combina <a href="https://www.databricks.com/blog/announcing-lakebase-search-agent-native-retrieval-built-lakebase-postgres">Lakebase</a> (el Postgres serverless de Databricks, que corre sobre object storage abierto) con el Lakehouse, bajo un solo modelo de gobernanza, un solo source of truth y una sola capa de storage.</p>
-<p>La idea central: los datos transaccionales se escriben <strong>directamente en Delta e Iceberg desde el punto de escritura</strong>. No después, no con un CDC de por medio, no con un job batch nocturno. Desde el momento cero.</p>
+<p>La idea central: con LTAP, los datos transaccionales se escribirán <strong>directamente en Delta e Iceberg desde el punto de escritura</strong>. No después, no con un CDC de por medio, no con un job batch nocturno. Desde el momento cero.</p>
 <p>Ali Ghodsi lo dijo en el keynote:</p>
 <blockquote class="blockquote">
 <p><em>“For forty years we’ve lived with a separation between OLTP and OLAP… For the first time, we think we’ve cracked the unification code.”</em></p>
-<p>— Ali Ghodsi, CEO de Databricks — DAIS 2026 Keynote</p>
+<p>— Ali Ghodsi, CEO de Databricks (DAIS 2026)</p>
 </blockquote>
 <p>Cuarenta años. Desde que se inventaron los data warehouses, la industria asumió que los datos operacionales y los analíticos viven en mundos separados y que necesitás un pipeline para conectarlos. LTAP dice que no.</p>
 <hr>
@@ -290,7 +293,7 @@ TL;DR
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;"><strong>Lakebase</strong></td>
+<td style="text-align: left;"><strong>Lakebase (GA)</strong></td>
 <td style="text-align: left;">Motor transaccional</td>
 <td style="text-align: left;">Postgres serverless sobre object storage abierto. 12M launches/día.</td>
 </tr>
@@ -305,9 +308,9 @@ TL;DR
 <td style="text-align: left;">Un modelo de identidad, permisos y auditoría para ambos mundos.</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>Lakehouse//RT</strong></td>
+<td style="text-align: left;"><strong>Lakehouse//RT (Beta)</strong></td>
 <td style="text-align: left;">Serving real-time</td>
-<td style="text-align: left;">Queries sub-milisegundo sobre datos gobernados en Delta/Iceberg.</td>
+<td style="text-align: left;">Queries sub-100ms sobre datos gobernados en Delta/Iceberg.</td>
 </tr>
 </tbody>
 </table>
@@ -391,7 +394,7 @@ Important
 </tr>
 </tbody>
 </table>
-<p>La diferencia clave: HTAP intentó meter todo en un motor y nadie lo usó en producción seria porque un query analítico pesado te mataba las transacciones. Zero ETL (como el de AWS entre Aurora y Redshift) automatiza la copia, pero seguís teniendo dos copias con latencia entre ellas.</p>
+<p>La diferencia clave: HTAP intentó meter todo en un motor, pero tuvo adopción limitada en producción por los trade-offs de aislamiento y performance. Zero ETL (como el de AWS entre Aurora y Redshift) automatiza la copia, pero seguís teniendo dos copias con latencia entre ellas.</p>
 <p>LTAP toma otro camino: mantiene motores separados (Postgres para OLTP, Lakehouse para OLAP) pero los sienta sobre la misma capa de storage. El dato es uno solo. No hay copia, no hay sincronización, no hay pipeline que se pueda romper.</p>
 <hr>
 </section>
@@ -416,7 +419,7 @@ flowchart TD
     BRONZE("&lt;b&gt;Delta Lake&lt;/b&gt;&lt;br&gt;&lt;small&gt;Bronze&lt;/small&gt;")
     DBT("&lt;b&gt;dbt&lt;/b&gt;&lt;br&gt;&lt;small&gt;Silver → Gold&lt;/small&gt;")
     DASH("&lt;b&gt;Dashboards / ML&lt;/b&gt;")
-    RETL("&lt;b&gt;Reverse ETL&lt;/b&gt;&lt;br&gt;&lt;small&gt;Census, Hightouch...&lt;/small&gt;")
+    RETL("&lt;b&gt;Reverse ETL&lt;/b&gt;&lt;br&gt;&lt;small&gt;Census, Hightouch…&lt;/small&gt;")
     SERVE("&lt;b&gt;CRM, Redis, Serving&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving / API cache&lt;/small&gt;")
 
     PG --&gt; CDC --&gt; KAFKA --&gt; SS --&gt; BRONZE --&gt; DBT
@@ -475,12 +478,12 @@ flowchart TD
     LB("&lt;b&gt;Lakebase&lt;/b&gt;&lt;br&gt;&lt;small&gt;Postgres serverless&lt;/small&gt;")
     UC("&lt;b&gt;Unity Catalog&lt;/b&gt;&lt;br&gt;&lt;small&gt;Gobernanza unificada&lt;/small&gt;")
     DBT2("&lt;b&gt;dbt&lt;/b&gt;&lt;br&gt;&lt;small&gt;Silver → Gold&lt;/small&gt;")
-    RT("&lt;b&gt;Lakehouse//RT&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving sub-ms&lt;/small&gt;")
+    RT("&lt;b&gt;Lakehouse//RT&lt;/b&gt;&lt;br&gt;&lt;small&gt;Serving sub-100ms&lt;/small&gt;")
     APPS("&lt;b&gt;Apps / APIs&lt;/b&gt;&lt;br&gt;&lt;small&gt;Leen directo&lt;/small&gt;")
     AGENTS("&lt;b&gt;Agentes AI&lt;/b&gt;&lt;br&gt;&lt;small&gt;Read + reason + write&lt;/small&gt;")
     DASH2("&lt;b&gt;Dashboards / ML&lt;/b&gt;")
 
-    LB -- "escribe directo en Delta / Iceberg" --&gt; UC
+    LB -- "escribirá directo en Delta / Iceberg" --&gt; UC
     UC --&gt; DBT2 --&gt; DASH2
     UC --&gt; RT
     UC --&gt; APPS
@@ -501,12 +504,12 @@ flowchart TD
 </div>
 <p>Lo que cambia:</p>
 <ul>
-<li><strong>No hay Debezium</strong>. No hay CDC. Lakebase escribe nativamente en Delta/Iceberg.</li>
+<li><strong>No hay Debezium</strong>. No hay CDC. Con LTAP, Lakebase escribirá nativamente en Delta/Iceberg.</li>
 <li><strong>No hay Kafka</strong>. No hay sistema de mensajería intermedio.</li>
 <li><strong>No hay Structured Streaming</strong> para ingestar. El dato ya está en el lake.</li>
-<li><strong>No hay Reverse ETL</strong>. La app y el warehouse leen del mismo storage. Si tu modelo Gold calcula un score de churn y querés usarlo en la app, no necesitás empujarlo de vuelta — ya está ahí, accesible desde Lakebase.</li>
-<li><strong>No hay serving layer separada</strong>. Lakehouse//RT resuelve queries sub-milisegundo directamente sobre los datos gobernados. No necesitás Redis ni Pinot como cache intermedio.</li>
-<li><strong>Latencia cero</strong> entre la escritura operacional y la disponibilidad analítica. Es el mismo dato.</li>
+<li><strong>Menos Reverse ETL</strong>. La app y el warehouse leen del mismo storage. Si tu modelo Gold calcula un score de churn y querés usarlo en la app, en muchos casos no necesitás empujarlo de vuelta — ya está ahí, accesible desde Lakebase. Para SaaS externos, puede seguir haciendo falta.</li>
+<li><strong>No hay serving layer separada</strong>. Lakehouse//RT (Beta) resuelve queries sub-100ms directamente sobre los datos gobernados. No necesitás Redis ni Pinot como cache intermedio.</li>
+<li><strong>Sin pipeline de sincronización</strong> entre la escritura operacional y la disponibilidad analítica. Es el mismo dato.</li>
 <li><strong>Un solo sistema de gobernanza</strong>. Unity Catalog para permisos, lineage, auditoría.</li>
 <li><strong>dbt sigue existiendo</strong> — pero transforma datos que ya están en Delta, no datos que tuvieron que viajar por tres sistemas para llegar.</li>
 </ul>
@@ -531,7 +534,7 @@ Tip
 <p>Reynold Xin lo dijo en el keynote:</p>
 <blockquote class="blockquote">
 <p><em>“The agents really prefer a much simpler stack, because they can move way faster.”</em></p>
-<p>— Reynold Xin, Co-founder de Databricks — DAIS 2026 Keynote</p>
+<p>— Reynold Xin, Co-founder de Databricks (DAIS 2026 Keynote)</p>
 </blockquote>
 <p>Y no es una frase de marketing — hay una razón técnica concreta.</p>
 <p>Un agente AI típico necesita hacer tres cosas:</p>
@@ -546,7 +549,7 @@ Tip
 <li>Lee datos históricos y analíticos → Lakehouse (misma copia de datos)</li>
 <li>Escribe resultados operacionales → Lakebase (misma copia de datos)</li>
 <li>El resultado es inmediatamente consultable para analítica, sin esperar a ningún pipeline</li>
-<li>Con Lakebase Search, el retrieval (vector + full-text) también corre en el mismo backend</li>
+<li>Con Lakebase Search (Beta), el retrieval (vector + full-text) también corre en el mismo backend</li>
 </ul>
 <p>El loop completo — <strong>retrieve → reason → act → remember</strong> — pasa sobre una sola capa de storage. No hay latencia de sincronización entre lo que el agente hizo y lo que el sistema de monitoreo puede ver.</p>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -559,14 +562,14 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Esto explica por qué Databricks está empujando LTAP tan fuerte en el contexto de su plataforma agentic. Si tenés Genie, Agent Bricks, o agentes custom corriendo en producción, cada milisegundo de latencia y cada pipeline intermedio es fricción. LTAP elimina esa fricción de raíz.</p>
+<p>Esto explica por qué Databricks está empujando LTAP tan fuerte en el contexto de su plataforma agentic. Si tenés Genie, Agent Bricks, o agentes custom corriendo en producción, cada milisegundo de latencia y cada pipeline intermedio es fricción. LTAP reduce esa fricción de raíz.</p>
 </div>
 </div>
 <hr>
 </section>
 <section id="lo-que-viene-con-lakebase" class="level2">
 <h2 class="anchored" data-anchor-id="lo-que-viene-con-lakebase">Lo que viene con Lakebase</h2>
-<p>Además de LTAP, Lakebase trajo features propios que vale la pena conocer:</p>
+<p>Además de LTAP (Coming soon), Lakebase (GA) trajo funcionalidades propias que vale la pena conocer:</p>
 <section id="disaster-recovery-cross-cloud" class="level3">
 <h3 class="anchored" data-anchor-id="disaster-recovery-cross-cloud">Disaster Recovery cross-cloud</h3>
 <p>Replicación entre nubes y regiones. Si tu Lakebase en AWS US-East se cae, tenés failover a otra región o incluso a Azure. Para quienes están construyendo arquitecturas multi-cloud, esto es significativo.</p>
@@ -579,20 +582,21 @@ Note
 <h3 class="anchored" data-anchor-id="operaciones-autónomas">Operaciones autónomas</h3>
 <p>Agentes que monitorean la salud de la base, detectan slowdowns, proponen índices y asisten en recovery. La idea de Databricks es que la administración de la base de datos se automatice progresivamente. Lo mismo que Genie ZeroOps hace para pipelines, pero para la base transaccional.</p>
 </section>
-<section id="lakebase-search" class="level3">
-<h3 class="anchored" data-anchor-id="lakebase-search">Lakebase Search</h3>
+<section id="lakebase-search-beta" class="level3">
+<h3 class="anchored" data-anchor-id="lakebase-search-beta">Lakebase Search (Beta)</h3>
 <p>Retrieval híbrido — vector y full-text — nativo dentro de Postgres. Dos extensiones:</p>
 <ul>
 <li><code>lakebase_vector</code>: pgvector con indexing avanzado para embeddings</li>
 <li><code>lakebase_text</code>: BM25 para búsqueda full-text clásica</li>
 </ul>
-<p>El loop completo de un agente (retrieve → reason → act → remember) puede correr sobre un solo backend. Te ahorrás montar un Pinecone o Weaviate al lado.</p>
+<p>Es el mismo loop de agente sobre un solo backend, ahora con retrieval nativo. Te ahorrás montar un Pinecone o Weaviate al lado.</p>
+<p>Para serving de baja latencia sobre datos gobernados, Lakehouse//RT (Beta) completa la historia del lado operacional.</p>
 <hr>
 </section>
 </section>
 <section id="quién-ya-lo-usa" class="level2">
 <h2 class="anchored" data-anchor-id="quién-ya-lo-usa">Quién ya lo usa</h2>
-<p>Lakebase (la base de LTAP) ya está en producción con clientes grandes:</p>
+<p>Lakebase (la base de LTAP) ya está en producción con clientes grandes. Esto refiere a Lakebase (GA), no a LTAP, que Databricks anunció como coming soon.</p>
 <ul>
 <li><strong>Block</strong> (Square, Cash App)</li>
 <li><strong>Superhuman</strong> (email)</li>
@@ -635,7 +639,7 @@ Important
 <h2 class="anchored" data-anchor-id="mi-lectura">Mi lectura</h2>
 <p>LTAP me parece el anuncio más relevante del DAIS 2026 a nivel arquitectónico. No por lo que hace hoy (que todavía no está GA), sino por lo que implica si funciona como prometen.</p>
 <p>Reynold Xin lo dijo bien: <em>“The agents really prefer a much simpler stack.”</em> Y tiene razón — no solo los agentes. Cualquiera que haya mantenido un pipeline de sincronización OLTP → OLAP sabe que la complejidad está en la logística, no en la lógica de negocio.</p>
-<p>Si LTAP cumple, hay una cantidad significativa de infraestructura que va a dejar de tener razón de ser. Debezium, Kafka Connect para CDC, Structured Streaming como paso de ingesta, las tablas Bronze que son copias crudas de la fuente, las herramientas de Reverse ETL, las serving layers de cache — todo eso se simplifica drásticamente.</p>
+<p>Si LTAP cumple, hay una cantidad significativa de infraestructura que va a dejar de tener razón de ser o a simplificarse drásticamente. Debezium, Kafka Connect para CDC, Structured Streaming como paso de ingesta, las tablas Bronze que son copias crudas de la fuente, parte de las herramientas de Reverse ETL, las serving layers de cache — todo eso cambia de peso en la arquitectura.</p>
 <p>¿Significa que los data engineers nos quedamos sin trabajo? No.&nbsp;Significa que dejamos de gastar tiempo en plomería y podemos enfocarnos en lo que realmente importa: modelado, calidad de datos, y construir productos de datos que generen valor.</p>
 <p>Voy a estar siguiendo de cerca cómo avanza. Cuando salga en GA, planeo hacer un benchmark real comparando el stack clásico contra LTAP. Stay tuned.</p>
 <hr>
@@ -777,236 +781,243 @@ window.addEventListener("quarto-page-loaded", function() {
 });
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
-    }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
       }
+      return false;
     }
-    return false;
-  }
-  const onCopySuccess = function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
       }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  }
-  const getTextToCopy = function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
         }
       }
       return codeEl.innerText;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
-    text: getTextToCopy
-  });
-  clipboard.on('success', onCopySuccess);
-  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
-      text: getTextToCopy,
-      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-    clipboardModal.on('success', onCopySuccess);
-  }
-    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
-    var mailtoRegex = new RegExp(/^mailto:/);
-      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
-    var isInternal = (href) => {
-        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-    // Inspect non-navigation links and adorn them if external
- 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
-    for (var i=0; i<links.length; i++) {
-      const link = links[i];
-      if (!isInternal(link.href)) {
-        // undo the damage that might have been done by quarto-nav.js in the case of
-        // links that we want to consider external
-        if (link.dataset.originalHref !== undefined) {
-          link.href = link.dataset.originalHref;
-        }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
-    }
-  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
-    const config = {
-      allowHTML: true,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start',
-    };
-    if (contentFn) {
-      config.content = contentFn;
-    }
-    if (onTriggerFn) {
-      config.onTrigger = onTriggerFn;
-    }
-    if (onUntriggerFn) {
-      config.onUntrigger = onUntriggerFn;
-    }
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      if (note) {
-        return note.innerHTML;
-      } else {
-        return "";
-      }
-    });
-  }
-  const xrefs = window.document.querySelectorAll('a.quarto-xref');
-  const processXRef = (id, note) => {
-    // Strip column container classes
-    const stripColumnClz = (el) => {
-      el.classList.remove("page-full", "page-columns");
-      if (el.children) {
-        for (const child of el.children) {
-          stripColumnClz(child);
-        }
-      }
-    }
-    stripColumnClz(note)
-    if (id === null || id.startsWith('sec-')) {
-      // Special case sections, only their first couple elements
-      const container = document.createElement("div");
-      if (note.children && note.children.length > 2) {
-        container.appendChild(note.children[0].cloneNode(true));
-        for (let i = 1; i < note.children.length; i++) {
-          const child = note.children[i];
-          if (child.tagName === "P" && child.innerText === "") {
-            continue;
-          } else {
-            container.appendChild(child.cloneNode(true));
-            break;
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
         }
-        if (window.Quarto?.typesetMath) {
-          window.Quarto.typesetMath(container);
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
         }
-        return container.innerHTML
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
       } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
         if (window.Quarto?.typesetMath) {
           window.Quarto.typesetMath(note);
         }
-        return note.innerHTML;
-      }
-    } else {
-      // Remove any anchor links if they are present
-      const anchorLink = note.querySelector('a.anchorjs-link');
-      if (anchorLink) {
-        anchorLink.remove();
-      }
-      if (window.Quarto?.typesetMath) {
-        window.Quarto.typesetMath(note);
-      }
-      if (note.classList.contains("callout")) {
-        return note.outerHTML;
-      } else {
-        return note.innerHTML;
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
       }
     }
-  }
-  for (var i=0; i<xrefs.length; i++) {
-    const xref = xrefs[i];
-    tippyHover(xref, undefined, function(instance) {
-      instance.disable();
-      let url = xref.getAttribute('href');
-      let hash = undefined; 
-      if (url.startsWith('#')) {
-        hash = url;
-      } else {
-        try { hash = new URL(url).hash; } catch {}
-      }
-      if (hash) {
-        const id = hash.replace(/^#\/?/, "");
-        const note = window.document.getElementById(id);
-        if (note !== null) {
-          try {
-            const html = processXRef(id, note.cloneNode(true));
-            instance.setContent(html);
-          } finally {
-            instance.enable();
-            instance.show();
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
           }
         } else {
-          // See if we can fetch this
-          fetch(url.split('#')[0])
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
           .then(res => res.text())
           .then(html => {
             const parser = new DOMParser();
             const htmlDoc = parser.parseFromString(html, "text/html");
-            const note = htmlDoc.getElementById(id);
+            const note = htmlDoc.querySelector('main.content');
             if (note !== null) {
-              const html = processXRef(id, note);
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
               instance.setContent(html);
             } 
           }).finally(() => {
@@ -1014,189 +1025,190 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             instance.show();
           });
         }
-      } else {
-        // See if we can fetch a full url (with no hash to target)
-        // This is a special case and we should probably do some content thinning / targeting
-        fetch(url)
-        .then(res => res.text())
-        .then(html => {
-          const parser = new DOMParser();
-          const htmlDoc = parser.parseFromString(html, "text/html");
-          const note = htmlDoc.querySelector('main.content');
-          if (note !== null) {
-            // This should only happen for chapter cross references
-            // (since there is no id in the URL)
-            // remove the first header
-            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
-              note.children[0].remove();
-            }
-            const html = processXRef(null, note);
-            instance.setContent(html);
-          } 
-        }).finally(() => {
-          instance.enable();
-          instance.show();
-        });
-      }
-    }, function(instance) {
-    });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            div.style.left = 0;
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-        // Handle positioning of the toggle
-    window.addEventListener(
-      "resize",
-      throttle(() => {
-        elRect = undefined;
-        if (selectedAnnoteEl) {
-          selectCodeLines(selectedAnnoteEl);
-        }
-      }, 10)
-    );
-    function throttle(fn, ms) {
-    let throttle = false;
-    let timer;
-      return (...args) => {
-        if(!throttle) { // first call gets through
-            fn.apply(this, args);
-            throttle = true;
-        } else { // all the others get throttled
-            if(timer) clearTimeout(timer); // cancel #2
-            timer = setTimeout(() => {
-              fn.apply(this, args);
-              timer = throttle = false;
-            }, ms);
-        }
-      };
-    }
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
-    }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
-          }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+      }, function(instance) {
       });
     }
-  }
-});
-</script>
-<script src="https://giscus.app/client.js" data-repo="mauroloprete/mauroloprete" data-repo-id="R_kgDORVoiEQ" data-category="Announcements" data-category-id="DIC_kwDORVoiEc4C_LKu" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light_protanopia" data-lang="../../../es" crossorigin="anonymous" data-loading="lazy" async="">
-</script>
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 <input type="hidden" id="giscus-base-theme" value="light_protanopia">
 <input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "../../../es";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">
