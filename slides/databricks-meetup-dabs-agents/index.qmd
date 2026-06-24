@@ -93,7 +93,7 @@ Todos hemos estado acá. El agente funciona en un notebook, la demo sale genial,
 
 -   **MLflow Experiment** — tracking de runs y métricas
 -   **Registered Model** en Unity Catalog — versionado
--   **Model Serving Endpoint + AI Gateway** — rate limits, guardrails, PII
+-   **Model Serving Endpoint + AI Gateway** — rate limits, guardrails, PII, jailbreak
 -   **Vector Search Index** — retrieval de documentos
 -   **Job de refresh** — actualizar el índice periódicamente
 -   **Databricks App** — interfaz de chat para los usuarios
@@ -386,34 +386,33 @@ Arrancamos con lo básico: nombre del bundle y variables. El catalog cambia entr
 
 ## `databricks.yml` — app (el agente) {auto-animate="true"}
 
-``` yaml
+``` {.yaml code-line-numbers="4-5|11-12|14-18"}
   apps:
     mauro_bot_app:
       name: mauro-bot
+      user_api_scopes:                              # on-behalf-of-user
+        - ai-gateway                                # para AI Gateway V2
       source_code_path: ./
       config:
         command: ["uv", "run", "start-app"]
         env:
           - name: LAKEBASE_AUTOSCALING_ENDPOINT
-            value_from: postgres
-          - name: MLFLOW_EXPERIMENT_NAME
-            value: ${resources.experiments.agent_experiment.name}
-          - name: VS_INDEX_NAME
-            value: ${var.catalog}.${var.schema}.mauro_bot_vs_index
+            value_from: postgres                    # inyecta el endpoint
           - name: LLM_ENDPOINT
-            value: ${resources.model_serving_endpoints.llm_gateway.name}
+            value: mauro-bot-llm-endpoint           # AI Gateway V2
       resources:
         - name: postgres
-          postgres:
-            branch: "projects/${var.lakebase_project_id}/branches/production"
-            database: "projects/.../databases/databricks-postgres"
-            permission: CAN_CONNECT_AND_CREATE
+          postgres: { permission: CAN_CONNECT_AND_CREATE }
+        - name: llm-gateway
+          serving_endpoint:
+            name: ${resources.model_serving_endpoints.llm_gateway.name}
+            permission: CAN_QUERY                   # SP → serving endpoint
 ```
 
-> `value_from` inyecta el endpoint de Lakebase. `LLM_ENDPOINT` apunta al AI Gateway.
+> `user_api_scopes` habilita on-behalf-of-user para V2. `serving_endpoint` resource otorga `CAN_QUERY` al SP.
 
 ::: notes
-La app ES el agente. El código corre directamente dentro de la Databricks App con FastAPI y un chat.html custom. Lakebase se bindea como recurso postgres: value_from inyecta el autoscaling endpoint via OAuth. Clave: LLM_ENDPOINT no apunta al Foundation Model directo sino al AI Gateway — todas las llamadas al LLM pasan por el gateway que aplica rate limits y guardrails. El app.yaml en el source root también define valueFrom (camelCase).
+La app ES el agente. Dos cosas nuevas: user_api_scopes con ai-gateway habilita on-behalf-of-user auth — la app usa el token del usuario logueado para llamar a AI Gateway V2 con guardrails de jailbreak. El serving_endpoint resource le da CAN_QUERY al Service Principal para el gateway legacy. Lakebase se bindea como recurso postgres: value_from inyecta el autoscaling endpoint via OAuth. LLM_ENDPOINT apunta al endpoint V2 con guardrails LLM-based.
 :::
 
 ## `databricks.yml` — AI Gateway {auto-animate="true"}
@@ -557,9 +556,9 @@ databricks bundle run mauro_bot_app  # Iniciar/reiniciar la app
 
 . . .
 
-**Eso es todo.** 4 comandos → 5 recursos en producción.
+**Eso es todo.** 4 comandos → 6 recursos en producción.
 
-[experiment · vector search · Lakebase · app · job]{style="color: #94a3b8; font-size: 0.85em;"}
+[experiment · vector search · AI gateway · Lakebase · app · job]{style="color: #94a3b8; font-size: 0.85em;"}
 
 ::: notes
 Cuatro comandos: validate chequea sintaxis, plan muestra los cambios, deploy sube código y configura recursos, y run inicia o reinicia la app. Deploy solo sube archivos y configura — run es necesario para que la app arranque con el código nuevo. En un solo deploy tenés todo el stack del agente en producción. Y si algo sale mal, el estado es idempotente.
@@ -598,7 +597,7 @@ async def stream_handler(request: ResponsesAgentRequest):
 ```
 
 ::: notes
-El agente sigue el patrón agent-langgraph-advanced. Dos nodos: retrieve busca en Vector Search, generate llama al LLM via DatabricksOpenAI — el cliente oficial que soporta AI Gateway V2 con use_ai_gateway=True. La clave es el patrón @invoke delega a @stream: invoke consume el stream completo y devuelve la respuesta final, stream emite tokens de a uno para la UI. El checkpointer viene del lifespan del server (se inicializa una vez al startup conectando a Lakebase). Cada thread_id persiste la conversación completa. stream_mode=["updates", "messages"] permite emitir deltas por token sin esperar a que termine el nodo.
+El agente sigue el patrón agent-langgraph-advanced. Dos nodos: retrieve busca en Vector Search, generate llama al LLM via DatabricksOpenAI — el cliente oficial que usa la interfaz de OpenAI pero soporta cualquier modelo de Databricks: Llama, Claude, Gemma, Qwen, lo que sea. Con use_ai_gateway=True rutea por AI Gateway V2. La clave es el patrón @invoke delega a @stream: invoke consume el stream completo y devuelve la respuesta final, stream emite tokens de a uno para la UI. El checkpointer viene del lifespan del server (se inicializa una vez al startup conectando a Lakebase). Cada thread_id persiste la conversación completa. stream_mode=["updates", "messages"] permite emitir deltas por token sin esperar a que termine el nodo.
 :::
 
 ##  {data-background-color="#0d9488"}
@@ -681,12 +680,13 @@ Este es el flujo ideal. El developer crea un PR, el CI valida el bundle y muestr
 | 4 | `bundle plan` es tu mejor amigo | Corré plan antes de cada deploy |
 | 5 | `uv` > `pip` en Databricks Apps | Startup 10x más rápido, lockfile reproducible |
 | 6 | `app.yaml` usa `valueFrom` (camelCase) | En `databricks.yml` es `value_from` (snake) |
+| 7 | AI Gateway V2 necesita `user_api_scopes` | El SP no tiene permiso en V2 — usar on-behalf-of-user |
 
 ::: notes
-Estos son los que me costaron horas. El de cold start afecta la primera request después de un deploy. Mega-bundle es un anti-patrón que vi en varios equipos. Bundle plan — usalo siempre. El de valueFrom es sutil: en app.yaml (que la plataforma lee en runtime) es camelCase, en databricks.yml (que el bundle resuelve en deploy time) es snake_case. Me costó una hora de debugging. Otros anti-patrones: extraer metadata vía dbutils.notebook.entry_point (roto en serverless), sacar tokens del contexto del notebook. Para rollbacks: revertí el commit en Git y deployeá de nuevo.
+Estos son los que me costaron horas. El de cold start afecta la primera request después de un deploy. Mega-bundle es un anti-patrón que vi en varios equipos. Bundle plan — usalo siempre. El de valueFrom es sutil: en app.yaml (que la plataforma lee en runtime) es camelCase, en databricks.yml (que el bundle resuelve en deploy time) es snake_case. El 7 es nuevo: los endpoints de AI Gateway V2 no se pueden declarar como serving_endpoint resource porque son un recurso separado. El Service Principal de la app no tiene permiso — la solución es user_api_scopes: [ai-gateway] para usar on-behalf-of-user auth. Además, en Python 3.11 los contextvars no se propagan a thread pools, así que hay que pasar el token por el state de LangGraph.
 :::
 
-## Gotcha #7: Direct Engine — issues abiertos
+## Gotcha #8: Direct Engine — issues abiertos
 
 ![](github-issue-crop.png){fig-align="center" width="70%"}
 
@@ -758,7 +758,7 @@ Para el que pregunta "¿está maduro?": sí. Está en GA, Thoughtworks lo puso e
 | Anuncio | Qué cambia | Estado |
 |---------|-----------|--------|
 | **ResponsesAgent** (MLflow) | Nueva interfaz para agentes — wrappea cualquier framework | {{< fa circle-check >}} GA |
-| **Unity AI Gateway V2** | Guardrails LLM-based (jailbreak, hallucination), budgets, metrics | {{< fa flask >}} Beta |
+| **Unity AI Gateway V2** | Guardrails LLM-based (jailbreak, hallucination) — funciona con Apps via `user_api_scopes` | {{< fa flask >}} Beta |
 | **MCP en Databricks** | Agentes se conectan a Genie, SQL, GitHub, Slack via MCP | {{< fa flask >}} Preview |
 | **CLEARS Framework** | 6 dimensiones para evaluar agentes como quality gate en CI | {{< fa circle-check >}} GA |
 | **Lakebase Search** | Retrieval híbrido vector + full-text nativo en Postgres | {{< fa flask >}} Beta |
@@ -821,7 +821,7 @@ Este es el mensaje. Un agente que se deploya manualmente es una demo. Un agente 
 **Documentación y herramientas**
 
 - [{{< fa rocket >}} DevHub](https://developers.databricks.com) — Portal de developers con templates y guías
-- [{{< fa code >}} AppKit](https://github.com/databricks/appkit) — SDK TypeScript/React para Databricks Apps
+- [{{< fa shield-halved >}} AI Gateway V2](https://docs.databricks.com/aws/en/ai-gateway/) — Guardrails LLM-based
 - [{{< fa book >}} DABs docs](https://docs.databricks.com/aws/en/dev-tools/bundles)
 - [{{< fa database >}} Agent memory](https://learn.microsoft.com/en-us/azure/databricks/generative-ai/agent-framework/stateful-agents)
 - [{{< fa gear >}} Direct Engine](https://docs.databricks.com/aws/en/dev-tools/bundles/direct)
