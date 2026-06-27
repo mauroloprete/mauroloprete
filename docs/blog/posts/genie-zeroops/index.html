@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-06-27">
+<meta name="description" content="Detect, Assess, Remediate, Verify — cómo funciona el agente de Databricks que monitorea, diagnostica y propone fixes para tus pipelines en producción.">
+
+<title>Genie ZeroOps: Databricks quiere que tus pipelines se arreglen solos – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Genie ZeroOps: Databricks quiere que tus pipelines se arreglen solos – Mauro Loprete">
+<meta property="og:description" content="Detect, Assess, Remediate, Verify — cómo funciona el agente de Databricks que monitorea, diagnostica y propone fixes para tus pipelines en producción.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/genie-zeroops/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Genie ZeroOps: Databricks quiere que tus pipelines se arreglen solos – Mauro Loprete">
+<meta name="twitter:description" content="Detect, Assess, Remediate, Verify — cómo funciona el agente de Databricks que monitorea, diagnostica y propone fixes para tus pipelines en producción.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/genie-zeroops/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#el-problema-construir-es-más-rápido-que-mantener" id="toc-el-problema-construir-es-más-rápido-que-mantener" class="nav-link active" data-scroll-target="#el-problema-construir-es-más-rápido-que-mantener">El problema: construir es más rápido que mantener</a></li>
+  <li><a href="#qué-es-zeroops-el-concepto" id="toc-qué-es-zeroops-el-concepto" class="nav-link" data-scroll-target="#qué-es-zeroops-el-concepto">Qué es ZeroOps (el concepto)</a></li>
+  <li><a href="#dónde-encaja-zeroops-en-databricks" id="toc-dónde-encaja-zeroops-en-databricks" class="nav-link" data-scroll-target="#dónde-encaja-zeroops-en-databricks">Dónde encaja ZeroOps en Databricks</a></li>
+  <li><a href="#cómo-funciona-genie-zeroops" id="toc-cómo-funciona-genie-zeroops" class="nav-link" data-scroll-target="#cómo-funciona-genie-zeroops">Cómo funciona Genie ZeroOps</a></li>
+  <li><a href="#paso-1-detect-monitoreo-continuo" id="toc-paso-1-detect-monitoreo-continuo" class="nav-link" data-scroll-target="#paso-1-detect-monitoreo-continuo">Paso 1: Detect — monitoreo continuo</a></li>
+  <li><a href="#paso-2-assess-root-cause-con-lineage" id="toc-paso-2-assess-root-cause-con-lineage" class="nav-link" data-scroll-target="#paso-2-assess-root-cause-con-lineage">Paso 2: Assess — root cause con lineage</a></li>
+  <li><a href="#paso-3-remediate-genera-el-fix" id="toc-paso-3-remediate-genera-el-fix" class="nav-link" data-scroll-target="#paso-3-remediate-genera-el-fix">Paso 3: Remediate — genera el fix</a></li>
+  <li><a href="#paso-4-verify-sandbox-aislado" id="toc-paso-4-verify-sandbox-aislado" class="nav-link" data-scroll-target="#paso-4-verify-sandbox-aislado">Paso 4: Verify — sandbox aislado</a></li>
+  <li><a href="#qué-soporta-hoy-y-qué-viene" id="toc-qué-soporta-hoy-y-qué-viene" class="nav-link" data-scroll-target="#qué-soporta-hoy-y-qué-viene">Qué soporta hoy y qué viene</a></li>
+  <li><a href="#cómo-se-conecta-con-todo-lo-anterior" id="toc-cómo-se-conecta-con-todo-lo-anterior" class="nav-link" data-scroll-target="#cómo-se-conecta-con-todo-lo-anterior">Cómo se conecta con todo lo anterior</a></li>
+  <li><a href="#genie-code-vs-genie-zeroops" id="toc-genie-code-vs-genie-zeroops" class="nav-link" data-scroll-target="#genie-code-vs-genie-zeroops">Genie Code vs Genie ZeroOps</a></li>
+  <li><a href="#gotchas-y-preguntas-abiertas" id="toc-gotchas-y-preguntas-abiertas" class="nav-link" data-scroll-target="#gotchas-y-preguntas-abiertas">Gotchas y preguntas abiertas</a></li>
+  <li><a href="#cuándo-no-necesitás-zeroops" id="toc-cuándo-no-necesitás-zeroops" class="nav-link" data-scroll-target="#cuándo-no-necesitás-zeroops">Cuándo NO necesitás ZeroOps</a></li>
+  <li><a href="#disclaimer-no-lo-pudimos-probar" id="toc-disclaimer-no-lo-pudimos-probar" class="nav-link" data-scroll-target="#disclaimer-no-lo-pudimos-probar">Disclaimer: no lo pudimos probar</a></li>
+  <li><a href="#mi-opinión-cambia-el-juego" id="toc-mi-opinión-cambia-el-juego" class="nav-link" data-scroll-target="#mi-opinión-cambia-el-juego">Mi opinión: ¿cambia el juego?</a></li>
+  <li><a href="#referencias" id="toc-referencias" class="nav-link" data-scroll-target="#referencias">Referencias</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Genie ZeroOps: Databricks quiere que tus pipelines se arreglen solos</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">MLOps</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Detect, Assess, Remediate, Verify — cómo funciona el agente de Databricks que monitorea, diagnostica y propone fixes para tus pipelines en producción.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 27, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Configuraste <a href="../databricks-asset-bundles-advanced/">Databricks Asset Bundles</a>, armaste <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">pipelines declarativos con Lakeflow</a>, pusiste <a href="../databricks-tips-08-jobs-workflows/">triggers event-driven</a> — y aún así a las 3 AM te suena el teléfono porque un pipeline falló. Te levantás, abrís el notebook, rastreás el error, descubrís que alguien cambió un schema tres tablas upstream, lo arreglás, lo testeás a mano, lo pusheás, y a las 6 AM te volvés a dormir.</p>
+<p>Al día siguiente, lo mismo con otro pipeline.</p>
+<p>En el <a href="https://www.databricks.com/dataaisummit">Data + AI Summit 2026</a>, Databricks presentó <strong>Genie ZeroOps</strong>: un agente de AI que corre en background, monitorea tus workloads en producción, diagnostica la causa raíz usando el lineage de Unity Catalog, genera el fix, lo testea en un sandbox aislado y te lo presenta para que lo apruebes.</p>
+<p>¿Es el fin de las guardias de datos? Veamos.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Genie ZeroOps</strong> es un agente de AI en background que monitorea jobs, pipelines, tablas y modelos ML.</li>
+<li>Funciona en 4 pasos: <strong>Detect</strong> → <strong>Assess</strong> (root cause con lineage) → <strong>Remediate</strong> (genera el fix) → <strong>Verify</strong> (sandbox aislado con zero-copy clones).</li>
+<li><strong>No aplica cambios sin aprobación humana</strong> — el agente propone, vos decidís.</li>
+<li>Forma parte de <strong>Genie One</strong> (familia) y <strong>Lakeflow</strong> (plataforma de data engineering).</li>
+<li>Está en <strong>Private Preview</strong>. Soporta Jobs, Pipelines DLT, Tables, ML models. Roadmap: Apps, Lakebase.</li>
+<li>No lo pudimos probar todavía — todo lo que cubrimos viene de docs oficiales y sesiones de DAIS 2026.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="el-problema-construir-es-más-rápido-que-mantener" class="level2">
+<h2 class="anchored" data-anchor-id="el-problema-construir-es-más-rápido-que-mantener">El problema: construir es más rápido que mantener</h2>
+<p>Con herramientas de AI coding, crear pipelines es cada vez más rápido. Un engineer que antes tardaba una semana en armar un pipeline de ingesta ahora lo hace en un día con Genie Code. Pero el mantenimiento no escala igual: cada pipeline nuevo que ponés en producción es un pipeline más que puede romperse, degradarse o quedar silenciosamente desactualizado.</p>
+<p>El resultado: la mayoría de los equipos de datos pasan más tiempo apagando incendios que construyendo cosas nuevas.</p>
+<table class="table-striped table-hover caption-top table">
+<caption>El gap build vs maintain</caption>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Build</th>
+<th>Maintain</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Tendencia</strong></td>
+<td>Cada vez más rápido (AI coding, IaC, declarativo)</td>
+<td>Crece linealmente con la cantidad de assets</td>
+</tr>
+<tr class="even">
+<td><strong>Quién lo hace</strong></td>
+<td>Engineers, con ayuda de AI</td>
+<td>Los mismos engineers, sin ayuda</td>
+</tr>
+<tr class="odd">
+<td><strong>Impacto</strong></td>
+<td>Más assets en producción</td>
+<td>Más guardias, más incidentes, más fatiga</td>
+</tr>
+</tbody>
+</table>
+<p>Es como construir casas cada vez más rápido sin contratar más plomeros. En algún momento, todo se empieza a romper.</p>
+<hr>
+</section>
+<section id="qué-es-zeroops-el-concepto" class="level2">
+<h2 class="anchored" data-anchor-id="qué-es-zeroops-el-concepto">Qué es ZeroOps (el concepto)</h2>
+<p>ZeroOps no es un producto — es una filosofía: <strong>cero intervención manual en el steady state</strong> de tus pipelines de datos. No significa que nadie opera. Significa que el sistema se opera solo: vos diseñás las reglas, la plataforma las ejecuta.</p>
+<table class="table-striped table-hover caption-top table">
+<caption>DevOps → DataOps → ZeroOps</caption>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Concepto</th>
+<th>Automatiza…</th>
+<th>Ejemplo</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DevOps</strong></td>
+<td>El deploy</td>
+<td>CI/CD, IaC, containers</td>
+</tr>
+<tr class="even">
+<td><strong>DataOps</strong></td>
+<td>El ciclo de datos</td>
+<td>Testing, quality gates, observabilidad</td>
+</tr>
+<tr class="odd">
+<td><strong>ZeroOps</strong></td>
+<td>La operación</td>
+<td>Detect → diagnose → fix → verify, sin humanos</td>
+</tr>
+</tbody>
+</table>
+<p>En posts anteriores cubrimos las piezas de DataOps: <a href="../databricks-asset-bundles-advanced/">DABs para IaC</a>, <a href="../databricks-tips-09-sql-warehouses/">SQL Warehouses serverless</a>, <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Lakeflow DLT para pipelines declarativos</a>, <a href="../databricks-tips-08-jobs-workflows/">Jobs con triggers event-driven</a>, y <a href="../../posts/dataops-pipelines/">DataOps como práctica</a>. ZeroOps es la capa que falta: la que cierra el loop cuando algo se rompe.</p>
+<p>El test ácido: <strong>¿podés irte de vacaciones 2 semanas sin que te llamen por un pipeline?</strong> Si no, no tenés ZeroOps.</p>
+<hr>
+</section>
+<section id="dónde-encaja-zeroops-en-databricks" class="level2">
+<h2 class="anchored" data-anchor-id="dónde-encaja-zeroops-en-databricks">Dónde encaja ZeroOps en Databricks</h2>
+<p>Antes de entrar en el producto, ubicamos las piezas:</p>
+<p><strong>Genie One</strong> es la familia de agentes de AI de Databricks:</p>
+<table class="table-striped table-hover caption-top table">
+<caption>La familia Genie One</caption>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Agente</th>
+<th>Función</th>
+<th>Analogía</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Genie Code</strong></td>
+<td>Desarrollo — te ayuda a escribir pipelines, SQL, notebooks</td>
+<td>Tu copilot</td>
+</tr>
+<tr class="even">
+<td><strong>Genie Spaces</strong></td>
+<td>Análisis — responde preguntas de negocio sobre tus datos</td>
+<td>Tu analista</td>
+</tr>
+<tr class="odd">
+<td><strong>Genie ZeroOps</strong></td>
+<td>Operaciones — monitorea y arregla pipelines en producción</td>
+<td>Tu SRE automático</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Lakeflow</strong> es la plataforma unificada de data engineering:</p>
+<ul>
+<li><strong>Connect</strong>: ingesta con 100+ connectors nativos</li>
+<li><strong>Pipelines</strong>: transformaciones declarativas (ex DLT)</li>
+<li><strong>Designer</strong>: construcción visual no-code</li>
+<li><strong>ZeroOps</strong>: operaciones automáticas</li>
+</ul>
+<p>Genie Code te ayuda a <em>construir</em>. Genie ZeroOps <em>opera</em> lo que construiste. Son complementarios.</p>
+<hr>
+</section>
+<section id="cómo-funciona-genie-zeroops" class="level2">
+<h2 class="anchored" data-anchor-id="cómo-funciona-genie-zeroops">Cómo funciona Genie ZeroOps</h2>
+<p>El agente opera en 4 pasos. Cada paso usa un componente nativo de la plataforma — no es un tool externo que se conecta por API.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Los 4 pasos de Genie ZeroOps: Detect → Assess → Remediate → Verify."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Los 4 pasos de Genie ZeroOps: Detect → Assess → Remediate → Verify."></a></p>
+</figure>
+</div>
+<figcaption>Los 4 pasos de Genie ZeroOps: Detect → Assess → Remediate → Verify.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="paso-1-detect-monitoreo-continuo" class="level2">
+<h2 class="anchored" data-anchor-id="paso-1-detect-monitoreo-continuo">Paso 1: Detect — monitoreo continuo</h2>
+<p>El agente corre en background y monitorea jobs, pipelines DLT, tablas y modelos ML. Pero lo interesante no es que detecta errores — eso ya lo hace cualquier alerta. Lo interesante es que detecta <strong>silent failures</strong>: problemas que no tiran excepción pero que degradan tus datos.</p>
+<p>Qué detecta:</p>
+<table class="table-striped table-hover caption-top table">
+<caption>Tipos de fallas que Genie ZeroOps detecta</caption>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tipo</th>
+<th>Ejemplo</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Error explícito</strong></td>
+<td>Job falló con <code>SchemaEvolutionException</code></td>
+</tr>
+<tr class="even">
+<td><strong>Silent failure</strong></td>
+<td>Pipeline completó OK pero la tabla tiene 0 rows</td>
+</tr>
+<tr class="odd">
+<td><strong>Data quality</strong></td>
+<td>Expectation de DLT empezó a fallar en el 15% de los rows</td>
+</tr>
+<tr class="even">
+<td><strong>Schema drift</strong></td>
+<td>Un campo cambió de <code>INT</code> a <code>STRING</code> tres tablas upstream</td>
+</tr>
+<tr class="odd">
+<td><strong>Late-arriving data</strong></td>
+<td>La tabla no se actualizó en las últimas 4 horas</td>
+</tr>
+<tr class="even">
+<td><strong>ML model drift</strong></td>
+<td>Las predicciones del modelo empezaron a degradarse</td>
+</tr>
+</tbody>
+</table>
+<p>Usa la telemetría nativa de la plataforma (system tables, event logs de DLT, métricas de data quality) y no necesita que configures nada externo. Está ahí porque vive <em>dentro</em> de Databricks.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Silent failures: el verdadero enemigo
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>La mayoría de las herramientas de monitoreo te avisan cuando algo falla. Pocas te avisan cuando algo <strong>parece que funciona pero los datos están mal</strong>. Un pipeline que completa con 0 rows sin error es técnicamente exitoso — pero tu dashboard queda vacío. ZeroOps apunta a detectar eso.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="paso-2-assess-root-cause-con-lineage" class="level2">
+<h2 class="anchored" data-anchor-id="paso-2-assess-root-cause-con-lineage">Paso 2: Assess — root cause con lineage</h2>
+<p>Acá es donde se pone interesante. Cuando ZeroOps detecta un problema, no te dice “el job X falló” y listo. Usa el <strong>dependency graph de Unity Catalog</strong> para rastrear la causa raíz a través de toda la cadena.</p>
+<p>¿El error está en tu pipeline? ¿O es un schema change que alguien hizo tres tablas upstream? ¿O datos inválidos que introdujo otro equipo en una tabla compartida?</p>
+<p>ZeroOps correlaciona:</p>
+<ul>
+<li><strong>Logs de ejecución</strong> del job que falló</li>
+<li><strong>Lineage de Unity Catalog</strong> (tabla → tabla → tabla hasta el origen)</li>
+<li><strong>Data quality metrics</strong> (expectations, null rates, row counts)</li>
+<li><strong>Contexto del workload</strong> (cuándo fue la última ejecución exitosa, qué cambió desde entonces)</li>
+</ul>
+<p>Esto es lo que haría un engineer senior con experiencia en tu plataforma — pero en segundos, no en horas.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>El lineage nativo es la diferencia clave
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Herramientas como Monte Carlo, Datadog o PagerDuty hacen pedazos de esto. Pero se conectan por API, ven metadata parcial, y no tienen acceso al grafo completo de dependencias. ZeroOps tiene acceso <em>nativo</em> a todo el lineage de Unity Catalog — cada tabla, cada columna, cada transformación. Eso es lo que le permite trazar un error hasta el origen sin configuración adicional.</p>
+</div>
+</div>
+<p>En la <a href="https://www.databricks.com/dataaisummit/session/genie-zeroops-data-quality-and-compliance-scale">sesión de DAIS sobre Data Quality</a>, mostraron un caso concreto: un dashboard de revenue roto. ZeroOps rastreó la causa hasta un schema change en una tabla upstream y propuso el fix en minutos.</p>
+<hr>
+</section>
+<section id="paso-3-remediate-genera-el-fix" class="level2">
+<h2 class="anchored" data-anchor-id="paso-3-remediate-genera-el-fix">Paso 3: Remediate — genera el fix</h2>
+<p>Una vez que identificó la causa raíz, ZeroOps genera el fix concreto usando <strong>agentic code generation</strong>. No es una sugerencia vaga — es código (SQL, Python, config) que podés revisar y aplicar.</p>
+<p>Lo que hace diferente a esta generación de código:</p>
+<ul>
+<li><strong>Está informado por el lineage</strong>: sabe qué tablas dependen de qué, qué campos se usan downstream</li>
+<li><strong>Conoce tu workflow de desarrollo</strong>: GitHub PRs, Jira tickets (cuando están integrados)</li>
+<li><strong>Tiene contexto del historial</strong>: sabe cuándo fue la última ejecución exitosa y qué cambió</li>
+</ul>
+<p>Para <strong>modelos de ML</strong>, el flujo es aún más específico:</p>
+<ol type="1">
+<li>Detecta que el modelo degradó (drift en predictions o en métricas de evaluación)</li>
+<li>Construye un <strong>modelo candidato corregido</strong></li>
+<li>Lo evalúa con el <strong>mismo evaluation suite</strong> que usás en producción</li>
+<li>Solo lo propone si performa <strong>mediblemente mejor</strong> que el modelo actual</li>
+</ol>
+<p>No te reemplaza el modelo sin preguntarte. Te dice: “construí este candidato, acá están las métricas comparadas contra tu modelo actual, ¿lo querés deployar?”</p>
+<hr>
+</section>
+<section id="paso-4-verify-sandbox-aislado" class="level2">
+<h2 class="anchored" data-anchor-id="paso-4-verify-sandbox-aislado">Paso 4: Verify — sandbox aislado</h2>
+<p>Este es el paso que separa a ZeroOps de un script que aplica fixes automáticamente. <strong>Nada se aplica en producción sin que vos lo apruebes.</strong></p>
+<p>El sandbox tiene 3 capas de seguridad:</p>
+<table class="table-striped table-hover caption-top table">
+<caption>Las 3 capas de seguridad del sandbox</caption>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Capa</th>
+<th>Qué hace</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Zero-copy shallow clones</strong></td>
+<td>Usa los datos reales sin copiarlos. No duplica storage, no crea réplicas.</td>
+</tr>
+<tr class="even">
+<td><strong>Scoped permissions</strong></td>
+<td>El agente solo accede a lo que necesita para testear el fix.</td>
+</tr>
+<tr class="odd">
+<td><strong>Network isolation</strong></td>
+<td>El sandbox está aislado de producción — si el fix tiene un bug, no afecta nada.</td>
+</tr>
+</tbody>
+</table>
+<p>El flujo:</p>
+<ol type="1">
+<li>ZeroOps genera el fix</li>
+<li>Lo ejecuta en el sandbox contra tus datos reales (vía shallow clone)</li>
+<li>Compara resultados: ¿el fix resuelve el problema? ¿introduce regresiones?</li>
+<li>Te presenta todo en una <strong>UI inbox-style</strong>: el issue, la causa raíz, el fix propuesto, y los resultados del sandbox</li>
+<li>Vos aprobás, editás, o rechazás</li>
+</ol>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Human-in-the-loop: no es opcional
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>ZeroOps requiere aprobación humana explícita antes de aplicar cualquier cambio en producción. Esto no es un setting que se puede desactivar — es parte del diseño. Y tiene sentido: un agente que aplica fixes automáticamente sin supervisión es un agente que puede romper cosas silenciosamente.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="qué-soporta-hoy-y-qué-viene" class="level2">
+<h2 class="anchored" data-anchor-id="qué-soporta-hoy-y-qué-viene">Qué soporta hoy y qué viene</h2>
+<table class="table-striped table-hover caption-top table">
+<caption>Soporte de Genie ZeroOps por workload</caption>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Workload</th>
+<th>Estado</th>
+<th>Qué detecta/arregla</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Jobs</strong></td>
+<td>Private Preview</td>
+<td>Failures, timeout, resource issues</td>
+</tr>
+<tr class="even">
+<td><strong>Pipelines (Lakeflow DLT)</strong></td>
+<td>Private Preview</td>
+<td>Expectations fallidas, schema drift, CDC issues</td>
+</tr>
+<tr class="odd">
+<td><strong>Tables (Unity Catalog)</strong></td>
+<td>Private Preview</td>
+<td>Data quality, freshness, schema changes</td>
+</tr>
+<tr class="even">
+<td><strong>ML Models</strong></td>
+<td>Private Preview</td>
+<td>Model drift, prediction degradation</td>
+</tr>
+<tr class="odd">
+<td><strong>Apps</strong></td>
+<td>Roadmap</td>
+<td>TBD</td>
+</tr>
+<tr class="even">
+<td><strong>Lakebase</strong></td>
+<td>Roadmap</td>
+<td>TBD</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Disponibilidad</strong>: Private Preview en AWS, Azure y GCP — sin fechas confirmadas de GA. Para acceder hay que contactar a tu account team de Databricks.</p>
+<hr>
+</section>
+<section id="cómo-se-conecta-con-todo-lo-anterior" class="level2">
+<h2 class="anchored" data-anchor-id="cómo-se-conecta-con-todo-lo-anterior">Cómo se conecta con todo lo anterior</h2>
+<p>Si venís leyendo la serie, ZeroOps es el eslabón que conecta todas las piezas:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-2-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Las 5 capas del stack ZeroOps en Databricks."><img src="index_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Las 5 capas del stack ZeroOps en Databricks."></a></p>
+</figure>
+</div>
+<figcaption>Las 5 capas del stack ZeroOps en Databricks.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Cada capa la cubrimos en un post. ZeroOps es la capa final que cierra el loop: cuando algo se rompe en las capas 1-4, la capa 5 lo detecta, diagnostica y propone el fix.</p>
+<table class="table-striped table-hover caption-top table">
+<caption>El stack completo de ZeroOps</caption>
+<thead>
+<tr class="header">
+<th>Capa</th>
+<th>Post</th>
+<th>Qué automatiza</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>IaC</td>
+<td><a href="../databricks-asset-bundles-advanced/">Tips #1: DABs</a></td>
+<td>Creación de recursos (jobs, pipelines, permisos)</td>
+</tr>
+<tr class="even">
+<td>Pipelines</td>
+<td><a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Tips #11: Lakeflow DLT</a></td>
+<td>Orquestación, quality gates, CDC</td>
+</tr>
+<tr class="odd">
+<td>Compute</td>
+<td><a href="../databricks-tips-08-jobs-workflows/">Tips #8</a> / <a href="../databricks-tips-09-sql-warehouses/">#9</a></td>
+<td>Triggers, auto-scaling, serverless</td>
+</tr>
+<tr class="even">
+<td>Observabilidad</td>
+<td><a href="../../posts/dataops-pipelines/">DataOps</a></td>
+<td>Monitoreo, alertas, SLAs</td>
+</tr>
+<tr class="odd">
+<td>Auto-healing</td>
+<td><strong>Este post</strong></td>
+<td>Detect → diagnose → fix → verify</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="genie-code-vs-genie-zeroops" class="level2">
+<h2 class="anchored" data-anchor-id="genie-code-vs-genie-zeroops">Genie Code vs Genie ZeroOps</h2>
+<p>Esto genera confusión porque ambos son “Genie” y ambos generan código. Pero hacen cosas fundamentalmente distintas:</p>
+<table class="table-striped table-hover caption-top table">
+<caption>Genie Code vs Genie ZeroOps</caption>
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Genie Code</th>
+<th>Genie ZeroOps</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Cuándo</strong></td>
+<td>Mientras desarrollás</td>
+<td>Mientras tus pipelines corren en prod</td>
+</tr>
+<tr class="even">
+<td><strong>Cómo</strong></td>
+<td>Vos le pedís ayuda</td>
+<td>Él detecta problemas solo</td>
+</tr>
+<tr class="odd">
+<td><strong>Qué genera</strong></td>
+<td>Pipelines, queries, notebooks nuevos</td>
+<td>Fixes para pipelines existentes</td>
+</tr>
+<tr class="even">
+<td><strong>Interacción</strong></td>
+<td>Chat interactivo (copilot)</td>
+<td>Inbox async (issues priorizados)</td>
+</tr>
+<tr class="odd">
+<td><strong>Analogía</strong></td>
+<td>Pair programmer</td>
+<td>SRE automático</td>
+</tr>
+</tbody>
+</table>
+<p>Son complementarios: Code te ayuda a construir más rápido, ZeroOps te ayuda a que lo que construiste no se rompa.</p>
+<hr>
+</section>
+<section id="gotchas-y-preguntas-abiertas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas-y-preguntas-abiertas">Gotchas y preguntas abiertas</h2>
+<ol type="1">
+<li><p><strong>Private Preview = puede cambiar</strong>. Todo lo que cubrimos acá es pre-GA. Features, UI, limitaciones — todo puede ser distinto cuando salga a público.</p></li>
+<li><p><strong>False positives</strong>. ¿Qué pasa si el fix propuesto es incorrecto? El sandbox mitiga el riesgo, pero si el agente te llena la inbox de fixes innecesarios, dejás de prestarle atención. La señal/ruido va a ser clave.</p></li>
+<li><p><strong>Skill atrophy</strong>. Si los engineers dejan de debuggear porque el agente lo hace por ellos, pierden la capacidad de resolver lo que el agente <em>no puede</em> resolver. Métrica a monitorear: <strong>% de fixes aprobados sin editar</strong>. Si es muy alto, o el agente es perfecto (improbable) o tu equipo dejó de revisar.</p></li>
+<li><p><strong>Costo del agente</strong>. ¿Cuánto compute consume el agente corriendo en background 24/7? No hay pricing publicado. Para equipos con presupuesto ajustado, esto puede ser un deal-breaker.</p></li>
+<li><p><strong>Vendor lock-in</strong>. Todo el stack ZeroOps (lineage, sandbox, code generation) es 100% Databricks. Si tu estrategia es multi-cloud o multi-vendor, esto te ata más a la plataforma.</p></li>
+<li><p><strong>Data Mesh</strong>. ¿El agente respeta los boundaries de dominio? Si el equipo de Marketing tiene sus pipelines y el de Finance los suyos, ¿ZeroOps puede proponer un fix que cruce dominios? ¿O se limita al scope del equipo?</p></li>
+</ol>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Métricas que un CIO debería trackear
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si tu organización adopta ZeroOps, estas son las métricas que importan: MTTD/MTTR (tiempo de detección y resolución), % de incidentes cerrados sin intervención humana, accuracy del root cause analysis, false positive rate de los fixes propuestos, costo por incidente neto del compute del agente, y proporción de fixes aprobados sin editar.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="cuándo-no-necesitás-zeroops" class="level2">
+<h2 class="anchored" data-anchor-id="cuándo-no-necesitás-zeroops">Cuándo NO necesitás ZeroOps</h2>
+<table class="table-striped table-hover caption-top table">
+<caption>Cuándo NO te conviene ZeroOps</caption>
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Escenario</th>
+<th>Mejor approach</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Equipo de 1-2 personas, pocos pipelines</td>
+<td>DataOps básico + alertas</td>
+</tr>
+<tr class="even">
+<td>Pipelines experimentales o ad-hoc</td>
+<td>Notebooks interactivos</td>
+</tr>
+<tr class="odd">
+<td>No tenés Unity Catalog configurado</td>
+<td>Primero governance, después ZeroOps</td>
+</tr>
+<tr class="even">
+<td>Tu organización exige aprobación manual de cada cambio</td>
+<td>ZeroOps tiene human-in-the-loop, pero verificá que cumple tu compliance</td>
+</tr>
+<tr class="odd">
+<td>Presupuesto muy ajustado</td>
+<td>Job Clusters + cron + alertas manuales</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="disclaimer-no-lo-pudimos-probar" class="level2">
+<h2 class="anchored" data-anchor-id="disclaimer-no-lo-pudimos-probar">Disclaimer: no lo pudimos probar</h2>
+<p>Genie ZeroOps está en <strong>Private Preview</strong>. No hay acceso público, no hay free trial, no hay sandbox para jugar. Todo lo que cubrimos en este post viene de la <a href="https://www.databricks.com/blog/introducing-genie-zeroops">documentación oficial de Databricks</a>, las <a href="https://www.databricks.com/dataaisummit/session/genie-zeroops-data-quality-and-compliance-scale">sesiones de DAIS 2026</a>, y fuentes de terceros.</p>
+<p>No vimos la UI en persona, no probamos el sandbox, no validamos la calidad de los fixes. <strong>Hasta que no lo uses en tus propios pipelines, es marketing.</strong> Cuando esté disponible en GA (o en public preview), vamos a hacer un post de follow-up con pruebas reales y opinión honesta.</p>
+<hr>
+</section>
+<section id="mi-opinión-cambia-el-juego" class="level2">
+<h2 class="anchored" data-anchor-id="mi-opinión-cambia-el-juego">Mi opinión: ¿cambia el juego?</h2>
+<p>Si funciona como prometen, Genie ZeroOps es el feature más importante de DAIS 2026 para engineers que operan pipelines en producción. No porque sea revolucionario en concepto — PagerDuty, Datadog y Monte Carlo hacen pedazos de esto hace años. Lo nuevo es tenerlo <em>nativo</em>, con acceso al lineage completo, telemetría de primera mano y un sandbox integrado que no requiere configuración.</p>
+<p>La diferencia de posicionamiento importa: la mayoría de los vendors de agents apuntan al <strong>build layer</strong> (escribir código más rápido) o al <strong>use layer</strong> (hacer preguntas sobre datos). ZeroOps apunta al <strong>operate layer</strong> — el que nadie quiere tocar pero donde se pierde la mayor cantidad de tiempo.</p>
+<p>El human-in-the-loop es clave. Sin eso, nadie confiaría. La pregunta real no es si ZeroOps puede detectar y proponer fixes — es <strong>cuánto del 80% de mantenimiento puede automatizar en la práctica</strong>. Eso solo lo vamos a saber cuando lo probemos.</p>
+<p>Lo probamos y les cuento.</p>
+<hr>
+</section>
+<section id="referencias" class="level2">
+<h2 class="anchored" data-anchor-id="referencias">Referencias</h2>
+<ul>
+<li><a href="https://www.databricks.com/blog/introducing-genie-zeroops">Introducing Genie ZeroOps — Databricks Blog</a></li>
+<li><a href="https://www.infoworld.com/article/4186796/databricks-targets-ai-operations-bottlenecks-with-zeroops.html">Databricks targets AI operations bottlenecks with ZeroOps — InfoWorld</a></li>
+<li><a href="https://www.talentbricks.ai/en/blog/2026-06-16-genie-zerops-databricks">Genie ZeroOps: Automatic Diagnosis and Remediation — TalentBricks</a></li>
+<li><a href="https://completeaitraining.com/news/databricks-genie-zeroops-shifts-engineers-from-firefighting/">Genie ZeroOps shifts engineers from firefighting — CompleteAITraining</a></li>
+<li><a href="https://www.databricks.com/dataaisummit/session/genie-zeroops-data-quality-and-compliance-scale">Sesión DAIS: Genie ZeroOps for Data Quality and Compliance at Scale</a></li>
+<li><a href="https://www.databricks.com/blog/lakeflow-new-era-agentic-data-engineering">Lakeflow: A new era of agentic data engineering — Databricks Blog</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-launches-genie-one-all-new-agentic-coworker-every-team">Databricks Launches Genie One — Press Release</a></li>
+</ul>
+<hr>
+<p><em>En la <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">próxima entrega de Databricks Tips</a> vamos a seguir profundizando en el ecosistema de Databricks. Si tenés acceso a la Private Preview de ZeroOps y querés compartir tu experiencia, escribime — me encantaría hacer el follow-up con datos reales.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "../../../es";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

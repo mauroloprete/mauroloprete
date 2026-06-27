@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.6.39">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -12,6 +12,9 @@
 
 <title>Databricks Tips #10: Unity AI Gateway — governance centralizada para LLMs en producción – Mauro Loprete</title>
 <style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
 div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -24,8 +27,9 @@ ul.task-list li input[type="checkbox"] {
   vertical-align: middle;
 }
 /* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -36,7 +40,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
   { counter-reset: source-line 0; }
@@ -68,15 +72,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../../../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../../../">
 <link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
-<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="../../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script src="../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -135,7 +140,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <meta name="twitter:image-width" content="1500">
 </head>
 
-<body class="nav-fixed">
+<body class="nav-fixed quarto-light">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
@@ -309,7 +314,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-TL;DR
+<span class="screen-reader-only">Note</span>TL;DR
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -360,19 +365,19 @@ TL;DR
 Listing&nbsp;1: Usar AI Gateway con el SDK de OpenAI: solo cambia base_url y api_key
 </figcaption>
 <div aria-describedby="lst-openai-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-openai-sdk"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-openai-sdk-1"><a href="#lst-openai-sdk-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> openai <span class="im">import</span> OpenAI</span>
-<span id="lst-openai-sdk-2"><a href="#lst-openai-sdk-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-openai-sdk-3"><a href="#lst-openai-sdk-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> OpenAI(</span>
-<span id="lst-openai-sdk-4"><a href="#lst-openai-sdk-4" aria-hidden="true" tabindex="-1"></a>    api_key<span class="op">=</span>DATABRICKS_TOKEN,</span>
-<span id="lst-openai-sdk-5"><a href="#lst-openai-sdk-5" aria-hidden="true" tabindex="-1"></a>    base_url<span class="op">=</span><span class="st">"https://&lt;workspace&gt;.azuredatabricks.net/ai-gateway/mlflow/v1"</span></span>
-<span id="lst-openai-sdk-6"><a href="#lst-openai-sdk-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="lst-openai-sdk-7"><a href="#lst-openai-sdk-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-openai-sdk-8"><a href="#lst-openai-sdk-8" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
-<span id="lst-openai-sdk-9"><a href="#lst-openai-sdk-9" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"databricks-claude-sonnet-4"</span>,</span>
-<span id="lst-openai-sdk-10"><a href="#lst-openai-sdk-10" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Qué es Delta Lake?"</span>}],</span>
-<span id="lst-openai-sdk-11"><a href="#lst-openai-sdk-11" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">256</span>,</span>
-<span id="lst-openai-sdk-12"><a href="#lst-openai-sdk-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="lst-openai-sdk-13"><a href="#lst-openai-sdk-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.choices[<span class="dv">0</span>].message.content)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> openai <span class="im">import</span> OpenAI</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> OpenAI(</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    api_key<span class="op">=</span>DATABRICKS_TOKEN,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    base_url<span class="op">=</span><span class="st">"https://&lt;workspace&gt;.azuredatabricks.net/ai-gateway/mlflow/v1"</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"databricks-claude-sonnet-4"</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Qué es Delta Lake?"</span>}],</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">256</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.choices[<span class="dv">0</span>].message.content)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -383,21 +388,21 @@ Listing&nbsp;1: Usar AI Gateway con el SDK de OpenAI: solo cambia base_url y api
 Listing&nbsp;2: API nativa de Anthropic a través de AI Gateway
 </figcaption>
 <div aria-describedby="lst-anthropic-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-anthropic-sdk"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-anthropic-sdk-1"><a href="#lst-anthropic-sdk-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> anthropic</span>
-<span id="lst-anthropic-sdk-2"><a href="#lst-anthropic-sdk-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-anthropic-sdk-3"><a href="#lst-anthropic-sdk-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> anthropic.Anthropic(</span>
-<span id="lst-anthropic-sdk-4"><a href="#lst-anthropic-sdk-4" aria-hidden="true" tabindex="-1"></a>    api_key<span class="op">=</span><span class="st">"unused"</span>,</span>
-<span id="lst-anthropic-sdk-5"><a href="#lst-anthropic-sdk-5" aria-hidden="true" tabindex="-1"></a>    base_url<span class="op">=</span><span class="st">"https://&lt;workspace&gt;.azuredatabricks.net/ai-gateway/anthropic"</span>,</span>
-<span id="lst-anthropic-sdk-6"><a href="#lst-anthropic-sdk-6" aria-hidden="true" tabindex="-1"></a>    default_headers<span class="op">=</span>{</span>
-<span id="lst-anthropic-sdk-7"><a href="#lst-anthropic-sdk-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Authorization"</span>: <span class="ss">f"Bearer </span><span class="sc">{</span>DATABRICKS_TOKEN<span class="sc">}</span><span class="ss">"</span>,</span>
-<span id="lst-anthropic-sdk-8"><a href="#lst-anthropic-sdk-8" aria-hidden="true" tabindex="-1"></a>    },</span>
-<span id="lst-anthropic-sdk-9"><a href="#lst-anthropic-sdk-9" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="lst-anthropic-sdk-10"><a href="#lst-anthropic-sdk-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-anthropic-sdk-11"><a href="#lst-anthropic-sdk-11" aria-hidden="true" tabindex="-1"></a>message <span class="op">=</span> client.messages.create(</span>
-<span id="lst-anthropic-sdk-12"><a href="#lst-anthropic-sdk-12" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"&lt;ai-gateway-endpoint&gt;"</span>,</span>
-<span id="lst-anthropic-sdk-13"><a href="#lst-anthropic-sdk-13" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">256</span>,</span>
-<span id="lst-anthropic-sdk-14"><a href="#lst-anthropic-sdk-14" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Qué es Delta Lake?"</span>}],</span>
-<span id="lst-anthropic-sdk-15"><a href="#lst-anthropic-sdk-15" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> anthropic</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> anthropic.Anthropic(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    api_key<span class="op">=</span><span class="st">"unused"</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    base_url<span class="op">=</span><span class="st">"https://&lt;workspace&gt;.azuredatabricks.net/ai-gateway/anthropic"</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    default_headers<span class="op">=</span>{</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Authorization"</span>: <span class="ss">f"Bearer </span><span class="sc">{</span>DATABRICKS_TOKEN<span class="sc">}</span><span class="ss">"</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>message <span class="op">=</span> client.messages.create(</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"&lt;ai-gateway-endpoint&gt;"</span>,</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">256</span>,</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Qué es Delta Lake?"</span>}],</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -520,7 +525,7 @@ Listing&nbsp;2: API nativa de Anthropic a través de AI Gateway
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Tip: bursts cortos pueden pasar
+<span class="screen-reader-only">Tip</span>Tip: bursts cortos pueden pasar
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -598,7 +603,7 @@ Tip: bursts cortos pueden pasar
 Listing&nbsp;3: Prompt de guardrail custom: bloquear preguntas off-topic para un bot de soporte
 </figcaption>
 <div aria-describedby="lst-custom-guardrail-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<pre id="lst-custom-guardrail" class="text"><code>You are evaluating whether a user message is off-topic for a
+<pre class="text"><code>You are evaluating whether a user message is off-topic for a
 customer support assistant for Databricks.
 
 A message is on-topic if it is about:
@@ -630,7 +635,7 @@ Examples:
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Limitaciones de guardrails
+<span class="screen-reader-only">Warning</span>Limitaciones de guardrails
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -726,19 +731,19 @@ Limitaciones de guardrails
 Listing&nbsp;4: Request tags para cost attribution por proyecto y equipo
 </figcaption>
 <div aria-describedby="lst-request-tags-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-request-tags"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-request-tags-1"><a href="#lst-request-tags-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
-<span id="lst-request-tags-2"><a href="#lst-request-tags-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-request-tags-3"><a href="#lst-request-tags-3" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
-<span id="lst-request-tags-4"><a href="#lst-request-tags-4" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"databricks-claude-sonnet-4"</span>,</span>
-<span id="lst-request-tags-5"><a href="#lst-request-tags-5" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Resumí este contrato"</span>}],</span>
-<span id="lst-request-tags-6"><a href="#lst-request-tags-6" aria-hidden="true" tabindex="-1"></a>    extra_headers<span class="op">=</span>{</span>
-<span id="lst-request-tags-7"><a href="#lst-request-tags-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Databricks-Ai-Gateway-Request-Tags"</span>: json.dumps({</span>
-<span id="lst-request-tags-8"><a href="#lst-request-tags-8" aria-hidden="true" tabindex="-1"></a>            <span class="st">"project"</span>: <span class="st">"legal-assistant"</span>,</span>
-<span id="lst-request-tags-9"><a href="#lst-request-tags-9" aria-hidden="true" tabindex="-1"></a>            <span class="st">"team"</span>: <span class="st">"legal-ops"</span>,</span>
-<span id="lst-request-tags-10"><a href="#lst-request-tags-10" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cost_center"</span>: <span class="st">"CC-420"</span>,</span>
-<span id="lst-request-tags-11"><a href="#lst-request-tags-11" aria-hidden="true" tabindex="-1"></a>        })</span>
-<span id="lst-request-tags-12"><a href="#lst-request-tags-12" aria-hidden="true" tabindex="-1"></a>    },</span>
-<span id="lst-request-tags-13"><a href="#lst-request-tags-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"databricks-claude-sonnet-4"</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Resumí este contrato"</span>}],</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    extra_headers<span class="op">=</span>{</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Databricks-Ai-Gateway-Request-Tags"</span>: json.dumps({</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>            <span class="st">"project"</span>: <span class="st">"legal-assistant"</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>            <span class="st">"team"</span>: <span class="st">"legal-ops"</span>,</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cost_center"</span>: <span class="st">"CC-420"</span>,</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>        })</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -751,15 +756,15 @@ Listing&nbsp;4: Request tags para cost attribution por proyecto y equipo
 Listing&nbsp;5: Usage tracking: tokens consumidos por usuario en los últimos 30 días
 </figcaption>
 <div aria-describedby="lst-usage-by-user-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-usage-by-user"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-usage-by-user-1"><a href="#lst-usage-by-user-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
-<span id="lst-usage-by-user-2"><a href="#lst-usage-by-user-2" aria-hidden="true" tabindex="-1"></a>  requester,</span>
-<span id="lst-usage-by-user-3"><a href="#lst-usage-by-user-3" aria-hidden="true" tabindex="-1"></a>  destination_model,</span>
-<span id="lst-usage-by-user-4"><a href="#lst-usage-by-user-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> requests,</span>
-<span id="lst-usage-by-user-5"><a href="#lst-usage-by-user-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(total_tokens) <span class="kw">AS</span> total_tokens</span>
-<span id="lst-usage-by-user-6"><a href="#lst-usage-by-user-6" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.ai_gateway.<span class="kw">usage</span></span>
-<span id="lst-usage-by-user-7"><a href="#lst-usage-by-user-7" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> event_time <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
-<span id="lst-usage-by-user-8"><a href="#lst-usage-by-user-8" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> requester, destination_model</span>
-<span id="lst-usage-by-user-9"><a href="#lst-usage-by-user-9" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  requester,</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  destination_model,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> requests,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(total_tokens) <span class="kw">AS</span> total_tokens</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.ai_gateway.<span class="kw">usage</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> event_time <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> requester, destination_model</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -769,14 +774,14 @@ Listing&nbsp;5: Usage tracking: tokens consumidos por usuario en los últimos 30
 Listing&nbsp;6: Consumo por proyecto usando request tags
 </figcaption>
 <div aria-describedby="lst-usage-by-tag-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-usage-by-tag"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-usage-by-tag-1"><a href="#lst-usage-by-tag-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
-<span id="lst-usage-by-tag-2"><a href="#lst-usage-by-tag-2" aria-hidden="true" tabindex="-1"></a>  request_tags[<span class="st">'project'</span>] <span class="kw">AS</span> project,</span>
-<span id="lst-usage-by-tag-3"><a href="#lst-usage-by-tag-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> requests,</span>
-<span id="lst-usage-by-tag-4"><a href="#lst-usage-by-tag-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(total_tokens) <span class="kw">AS</span> total_tokens</span>
-<span id="lst-usage-by-tag-5"><a href="#lst-usage-by-tag-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.ai_gateway.<span class="kw">usage</span></span>
-<span id="lst-usage-by-tag-6"><a href="#lst-usage-by-tag-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> request_tags[<span class="st">'project'</span>] <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
-<span id="lst-usage-by-tag-7"><a href="#lst-usage-by-tag-7" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> request_tags[<span class="st">'project'</span>]</span>
-<span id="lst-usage-by-tag-8"><a href="#lst-usage-by-tag-8" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  request_tags[<span class="st">'project'</span>] <span class="kw">AS</span> project,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> requests,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(total_tokens) <span class="kw">AS</span> total_tokens</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.ai_gateway.<span class="kw">usage</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> request_tags[<span class="st">'project'</span>] <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> request_tags[<span class="st">'project'</span>]</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -794,16 +799,16 @@ Listing&nbsp;6: Consumo por proyecto usando request tags
 Listing&nbsp;7: Costo en DBUs por endpoint en los últimos 30 días
 </figcaption>
 <div aria-describedby="lst-cost-endpoint-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cost-endpoint"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-cost-endpoint-1"><a href="#lst-cost-endpoint-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
-<span id="lst-cost-endpoint-2"><a href="#lst-cost-endpoint-2" aria-hidden="true" tabindex="-1"></a>  usage_metadata.ai_gateway_endpoint_name <span class="kw">AS</span> endpoint,</span>
-<span id="lst-cost-endpoint-3"><a href="#lst-cost-endpoint-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
-<span id="lst-cost-endpoint-4"><a href="#lst-cost-endpoint-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
-<span id="lst-cost-endpoint-5"><a href="#lst-cost-endpoint-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
-<span id="lst-cost-endpoint-6"><a href="#lst-cost-endpoint-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_metadata.ai_gateway_endpoint_name <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
-<span id="lst-cost-endpoint-7"><a href="#lst-cost-endpoint-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
-<span id="lst-cost-endpoint-8"><a href="#lst-cost-endpoint-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
-<span id="lst-cost-endpoint-9"><a href="#lst-cost-endpoint-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> endpoint</span>
-<span id="lst-cost-endpoint-10"><a href="#lst-cost-endpoint-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  usage_metadata.ai_gateway_endpoint_name <span class="kw">AS</span> endpoint,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_metadata.ai_gateway_endpoint_name <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> endpoint</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -813,16 +818,16 @@ Listing&nbsp;7: Costo en DBUs por endpoint en los últimos 30 días
 Listing&nbsp;8: Costo en DBUs por modelo destino
 </figcaption>
 <div aria-describedby="lst-cost-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cost-model"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-cost-model-1"><a href="#lst-cost-model-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
-<span id="lst-cost-model-2"><a href="#lst-cost-model-2" aria-hidden="true" tabindex="-1"></a>  usage_metadata.ai_gateway_destination_model <span class="kw">AS</span> model,</span>
-<span id="lst-cost-model-3"><a href="#lst-cost-model-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
-<span id="lst-cost-model-4"><a href="#lst-cost-model-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
-<span id="lst-cost-model-5"><a href="#lst-cost-model-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
-<span id="lst-cost-model-6"><a href="#lst-cost-model-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_metadata.ai_gateway_endpoint_name <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
-<span id="lst-cost-model-7"><a href="#lst-cost-model-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
-<span id="lst-cost-model-8"><a href="#lst-cost-model-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
-<span id="lst-cost-model-9"><a href="#lst-cost-model-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> model</span>
-<span id="lst-cost-model-10"><a href="#lst-cost-model-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  usage_metadata.ai_gateway_destination_model <span class="kw">AS</span> model,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_metadata.ai_gateway_endpoint_name <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> model</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -832,16 +837,16 @@ Listing&nbsp;8: Costo en DBUs por modelo destino
 Listing&nbsp;9: Costo en DBUs por equipo usando tags de endpoint
 </figcaption>
 <div aria-describedby="lst-cost-team-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cost-team"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-cost-team-1"><a href="#lst-cost-team-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
-<span id="lst-cost-team-2"><a href="#lst-cost-team-2" aria-hidden="true" tabindex="-1"></a>  custom_tags[<span class="st">'team'</span>] <span class="kw">AS</span> team,</span>
-<span id="lst-cost-team-3"><a href="#lst-cost-team-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
-<span id="lst-cost-team-4"><a href="#lst-cost-team-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
-<span id="lst-cost-team-5"><a href="#lst-cost-team-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
-<span id="lst-cost-team-6"><a href="#lst-cost-team-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> custom_tags[<span class="st">'team'</span>] <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
-<span id="lst-cost-team-7"><a href="#lst-cost-team-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
-<span id="lst-cost-team-8"><a href="#lst-cost-team-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
-<span id="lst-cost-team-9"><a href="#lst-cost-team-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> team</span>
-<span id="lst-cost-team-10"><a href="#lst-cost-team-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  custom_tags[<span class="st">'team'</span>] <span class="kw">AS</span> team,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> custom_tags[<span class="st">'team'</span>] <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> team</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -851,7 +856,7 @@ Listing&nbsp;9: Costo en DBUs por equipo usando tags de endpoint
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Costos de modelos externos
+<span class="screen-reader-only">Important</span>Costos de modelos externos
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -987,25 +992,25 @@ Costos de modelos externos
 Listing&nbsp;10: Crear endpoint de external model con API key de Anthropic
 </figcaption>
 <div aria-describedby="lst-external-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-external-model"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-external-model-1"><a href="#lst-external-model-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> mlflow.deployments</span>
-<span id="lst-external-model-2"><a href="#lst-external-model-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-external-model-3"><a href="#lst-external-model-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> mlflow.deployments.get_deploy_client(<span class="st">"databricks"</span>)</span>
-<span id="lst-external-model-4"><a href="#lst-external-model-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-external-model-5"><a href="#lst-external-model-5" aria-hidden="true" tabindex="-1"></a>client.create_endpoint(</span>
-<span id="lst-external-model-6"><a href="#lst-external-model-6" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"claude-via-gateway"</span>,</span>
-<span id="lst-external-model-7"><a href="#lst-external-model-7" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
-<span id="lst-external-model-8"><a href="#lst-external-model-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"served_entities"</span>: [{</span>
-<span id="lst-external-model-9"><a href="#lst-external-model-9" aria-hidden="true" tabindex="-1"></a>            <span class="st">"external_model"</span>: {</span>
-<span id="lst-external-model-10"><a href="#lst-external-model-10" aria-hidden="true" tabindex="-1"></a>                <span class="st">"name"</span>: <span class="st">"claude-sonnet-4-20250514"</span>,</span>
-<span id="lst-external-model-11"><a href="#lst-external-model-11" aria-hidden="true" tabindex="-1"></a>                <span class="st">"provider"</span>: <span class="st">"anthropic"</span>,</span>
-<span id="lst-external-model-12"><a href="#lst-external-model-12" aria-hidden="true" tabindex="-1"></a>                <span class="st">"task"</span>: <span class="st">"llm/v1/chat"</span>,</span>
-<span id="lst-external-model-13"><a href="#lst-external-model-13" aria-hidden="true" tabindex="-1"></a>                <span class="st">"anthropic_config"</span>: {</span>
-<span id="lst-external-model-14"><a href="#lst-external-model-14" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"anthropic_api_key"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/ai/anthropic_key</span><span class="sc">}}</span><span class="st">"</span></span>
-<span id="lst-external-model-15"><a href="#lst-external-model-15" aria-hidden="true" tabindex="-1"></a>                },</span>
-<span id="lst-external-model-16"><a href="#lst-external-model-16" aria-hidden="true" tabindex="-1"></a>            }</span>
-<span id="lst-external-model-17"><a href="#lst-external-model-17" aria-hidden="true" tabindex="-1"></a>        }]</span>
-<span id="lst-external-model-18"><a href="#lst-external-model-18" aria-hidden="true" tabindex="-1"></a>    },</span>
-<span id="lst-external-model-19"><a href="#lst-external-model-19" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> mlflow.deployments</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> mlflow.deployments.get_deploy_client(<span class="st">"databricks"</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>client.create_endpoint(</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"claude-via-gateway"</span>,</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"served_entities"</span>: [{</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>            <span class="st">"external_model"</span>: {</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>                <span class="st">"name"</span>: <span class="st">"claude-sonnet-4-20250514"</span>,</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>                <span class="st">"provider"</span>: <span class="st">"anthropic"</span>,</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>                <span class="st">"task"</span>: <span class="st">"llm/v1/chat"</span>,</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>                <span class="st">"anthropic_config"</span>: {</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"anthropic_api_key"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/ai/anthropic_key</span><span class="sc">}}</span><span class="st">"</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>                },</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>            }</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>        }]</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1015,24 +1020,24 @@ Listing&nbsp;10: Crear endpoint de external model con API key de Anthropic
 Listing&nbsp;11: External model con Amazon Bedrock
 </figcaption>
 <div aria-describedby="lst-external-bedrock-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-external-bedrock"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-external-bedrock-1"><a href="#lst-external-bedrock-1" aria-hidden="true" tabindex="-1"></a>client.create_endpoint(</span>
-<span id="lst-external-bedrock-2"><a href="#lst-external-bedrock-2" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"bedrock-claude"</span>,</span>
-<span id="lst-external-bedrock-3"><a href="#lst-external-bedrock-3" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
-<span id="lst-external-bedrock-4"><a href="#lst-external-bedrock-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"served_entities"</span>: [{</span>
-<span id="lst-external-bedrock-5"><a href="#lst-external-bedrock-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">"external_model"</span>: {</span>
-<span id="lst-external-bedrock-6"><a href="#lst-external-bedrock-6" aria-hidden="true" tabindex="-1"></a>                <span class="st">"name"</span>: <span class="st">"claude-v2"</span>,</span>
-<span id="lst-external-bedrock-7"><a href="#lst-external-bedrock-7" aria-hidden="true" tabindex="-1"></a>                <span class="st">"provider"</span>: <span class="st">"amazon-bedrock"</span>,</span>
-<span id="lst-external-bedrock-8"><a href="#lst-external-bedrock-8" aria-hidden="true" tabindex="-1"></a>                <span class="st">"task"</span>: <span class="st">"llm/v1/chat"</span>,</span>
-<span id="lst-external-bedrock-9"><a href="#lst-external-bedrock-9" aria-hidden="true" tabindex="-1"></a>                <span class="st">"amazon_bedrock_config"</span>: {</span>
-<span id="lst-external-bedrock-10"><a href="#lst-external-bedrock-10" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_region"</span>: <span class="st">"us-east-1"</span>,</span>
-<span id="lst-external-bedrock-11"><a href="#lst-external-bedrock-11" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_access_key_id"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/aws/access_key</span><span class="sc">}}</span><span class="st">"</span>,</span>
-<span id="lst-external-bedrock-12"><a href="#lst-external-bedrock-12" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_secret_access_key"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/aws/secret_key</span><span class="sc">}}</span><span class="st">"</span>,</span>
-<span id="lst-external-bedrock-13"><a href="#lst-external-bedrock-13" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"bedrock_provider"</span>: <span class="st">"anthropic"</span>,</span>
-<span id="lst-external-bedrock-14"><a href="#lst-external-bedrock-14" aria-hidden="true" tabindex="-1"></a>                },</span>
-<span id="lst-external-bedrock-15"><a href="#lst-external-bedrock-15" aria-hidden="true" tabindex="-1"></a>            }</span>
-<span id="lst-external-bedrock-16"><a href="#lst-external-bedrock-16" aria-hidden="true" tabindex="-1"></a>        }]</span>
-<span id="lst-external-bedrock-17"><a href="#lst-external-bedrock-17" aria-hidden="true" tabindex="-1"></a>    },</span>
-<span id="lst-external-bedrock-18"><a href="#lst-external-bedrock-18" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>client.create_endpoint(</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"bedrock-claude"</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"served_entities"</span>: [{</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">"external_model"</span>: {</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>                <span class="st">"name"</span>: <span class="st">"claude-v2"</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>                <span class="st">"provider"</span>: <span class="st">"amazon-bedrock"</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>                <span class="st">"task"</span>: <span class="st">"llm/v1/chat"</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>                <span class="st">"amazon_bedrock_config"</span>: {</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_region"</span>: <span class="st">"us-east-1"</span>,</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_access_key_id"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/aws/access_key</span><span class="sc">}}</span><span class="st">"</span>,</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_secret_access_key"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/aws/secret_key</span><span class="sc">}}</span><span class="st">"</span>,</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"bedrock_provider"</span>: <span class="st">"anthropic"</span>,</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>                },</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>            }</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>        }]</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1048,14 +1053,14 @@ Listing&nbsp;11: External model con Amazon Bedrock
 Listing&nbsp;12: ai_classify: clasificar texto usando LLM desde SQL
 </figcaption>
 <div aria-describedby="lst-ai-classify-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-ai-classify"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-ai-classify-1"><a href="#lst-ai-classify-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
-<span id="lst-ai-classify-2"><a href="#lst-ai-classify-2" aria-hidden="true" tabindex="-1"></a>  ticket_id,</span>
-<span id="lst-ai-classify-3"><a href="#lst-ai-classify-3" aria-hidden="true" tabindex="-1"></a>  ai_classify(</span>
-<span id="lst-ai-classify-4"><a href="#lst-ai-classify-4" aria-hidden="true" tabindex="-1"></a>    descripcion,</span>
-<span id="lst-ai-classify-5"><a href="#lst-ai-classify-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">ARRAY</span>(<span class="st">'bug'</span>, <span class="st">'feature_request'</span>, <span class="st">'billing'</span>, <span class="st">'question'</span>)</span>
-<span id="lst-ai-classify-6"><a href="#lst-ai-classify-6" aria-hidden="true" tabindex="-1"></a>  ) <span class="kw">AS</span> categoria</span>
-<span id="lst-ai-classify-7"><a href="#lst-ai-classify-7" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> soporte.tickets</span>
-<span id="lst-ai-classify-8"><a href="#lst-ai-classify-8" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> fecha <span class="op">&gt;=</span> <span class="st">'2026-01-01'</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  ticket_id,</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  ai_classify(</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    descripcion,</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">ARRAY</span>(<span class="st">'bug'</span>, <span class="st">'feature_request'</span>, <span class="st">'billing'</span>, <span class="st">'question'</span>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  ) <span class="kw">AS</span> categoria</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> soporte.tickets</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> fecha <span class="op">&gt;=</span> <span class="st">'2026-01-01'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1065,11 +1070,11 @@ Listing&nbsp;12: ai_classify: clasificar texto usando LLM desde SQL
 Listing&nbsp;13: ai_extract: extraer entidades estructuradas de texto libre
 </figcaption>
 <div aria-describedby="lst-ai-extract-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-ai-extract"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-ai-extract-1"><a href="#lst-ai-extract-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> ai_extract(</span>
-<span id="lst-ai-extract-2"><a href="#lst-ai-extract-2" aria-hidden="true" tabindex="-1"></a>  comentario,</span>
-<span id="lst-ai-extract-3"><a href="#lst-ai-extract-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">'producto STRING, sentimiento STRING, urgencia STRING'</span></span>
-<span id="lst-ai-extract-4"><a href="#lst-ai-extract-4" aria-hidden="true" tabindex="-1"></a>) <span class="kw">AS</span> entidades</span>
-<span id="lst-ai-extract-5"><a href="#lst-ai-extract-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> feedback.comentarios</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> ai_extract(</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  comentario,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">'producto STRING, sentimiento STRING, urgencia STRING'</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>) <span class="kw">AS</span> entidades</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> feedback.comentarios</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1079,10 +1084,10 @@ Listing&nbsp;13: ai_extract: extraer entidades estructuradas de texto libre
 Listing&nbsp;14: ai_summarize: resumir texto a escala con batch inference
 </figcaption>
 <div aria-describedby="lst-ai-summarize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-ai-summarize"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="lst-ai-summarize-1"><a href="#lst-ai-summarize-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
-<span id="lst-ai-summarize-2"><a href="#lst-ai-summarize-2" aria-hidden="true" tabindex="-1"></a>  contrato_id,</span>
-<span id="lst-ai-summarize-3"><a href="#lst-ai-summarize-3" aria-hidden="true" tabindex="-1"></a>  ai_summarize(texto_contrato) <span class="kw">AS</span> resumen</span>
-<span id="lst-ai-summarize-4"><a href="#lst-ai-summarize-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> legal.contratos</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  contrato_id,</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  ai_summarize(texto_contrato) <span class="kw">AS</span> resumen</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> legal.contratos</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1092,7 +1097,7 @@ Listing&nbsp;14: ai_summarize: resumir texto a escala con batch inference
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Batching automático
+<span class="screen-reader-only">Tip</span>Batching automático
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -1206,7 +1211,7 @@ Batching automático
 Listing&nbsp;15: Instalar ucode con uv (requiere Python 3.12+)
 </figcaption>
 <div aria-describedby="lst-ucode-install-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-ucode-install"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-ucode-install-1"><a href="#lst-ucode-install-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> tool install git+https://github.com/databricks/ucode</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> tool install git+https://github.com/databricks/ucode</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1219,20 +1224,20 @@ Listing&nbsp;15: Instalar ucode con uv (requiere Python 3.12+)
 Listing&nbsp;16: Configurar ucode: workspace, agentes y MCP servers
 </figcaption>
 <div aria-describedby="lst-ucode-configure-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-ucode-configure"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-ucode-configure-1"><a href="#lst-ucode-configure-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Setup interactivo (pregunta workspace y autentica)</span></span>
-<span id="lst-ucode-configure-2"><a href="#lst-ucode-configure-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure</span>
-<span id="lst-ucode-configure-3"><a href="#lst-ucode-configure-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-ucode-configure-4"><a href="#lst-ucode-configure-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Configurar agentes específicos</span></span>
-<span id="lst-ucode-configure-5"><a href="#lst-ucode-configure-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--agents</span> claude,codex</span>
-<span id="lst-ucode-configure-6"><a href="#lst-ucode-configure-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-ucode-configure-7"><a href="#lst-ucode-configure-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Multi-workspace</span></span>
-<span id="lst-ucode-configure-8"><a href="#lst-ucode-configure-8" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--workspaces</span> https://first.databricks.com,https://second.databricks.com</span>
-<span id="lst-ucode-configure-9"><a href="#lst-ucode-configure-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-ucode-configure-10"><a href="#lst-ucode-configure-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Agregar MCP servers de Databricks (SQL, Vector Search, UC Functions)</span></span>
-<span id="lst-ucode-configure-11"><a href="#lst-ucode-configure-11" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure mcp</span>
-<span id="lst-ucode-configure-12"><a href="#lst-ucode-configure-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-ucode-configure-13"><a href="#lst-ucode-configure-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Preview sin aplicar cambios</span></span>
-<span id="lst-ucode-configure-14"><a href="#lst-ucode-configure-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--dry-run</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Setup interactivo (pregunta workspace y autentica)</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Configurar agentes específicos</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--agents</span> claude,codex</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Multi-workspace</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--workspaces</span> https://first.databricks.com,https://second.databricks.com</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Agregar MCP servers de Databricks (SQL, Vector Search, UC Functions)</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure mcp</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Preview sin aplicar cambios</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--dry-run</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1245,20 +1250,20 @@ Listing&nbsp;16: Configurar ucode: workspace, agentes y MCP servers
 Listing&nbsp;17: Usar coding agents a través de AI Gateway con ucode
 </figcaption>
 <div aria-describedby="lst-ucode-usage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-ucode-usage"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-ucode-usage-1"><a href="#lst-ucode-usage-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Lanzar Claude Code</span></span>
-<span id="lst-ucode-usage-2"><a href="#lst-ucode-usage-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> claude</span>
-<span id="lst-ucode-usage-3"><a href="#lst-ucode-usage-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-ucode-usage-4"><a href="#lst-ucode-usage-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Resumir sesión anterior</span></span>
-<span id="lst-ucode-usage-5"><a href="#lst-ucode-usage-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> claude <span class="at">-r</span></span>
-<span id="lst-ucode-usage-6"><a href="#lst-ucode-usage-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-ucode-usage-7"><a href="#lst-ucode-usage-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Ver estado y modelos configurados</span></span>
-<span id="lst-ucode-usage-8"><a href="#lst-ucode-usage-8" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> status</span>
-<span id="lst-ucode-usage-9"><a href="#lst-ucode-usage-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-ucode-usage-10"><a href="#lst-ucode-usage-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Ver estadísticas de uso</span></span>
-<span id="lst-ucode-usage-11"><a href="#lst-ucode-usage-11" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> usage</span>
-<span id="lst-ucode-usage-12"><a href="#lst-ucode-usage-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-ucode-usage-13"><a href="#lst-ucode-usage-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Restaurar configs originales</span></span>
-<span id="lst-ucode-usage-14"><a href="#lst-ucode-usage-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> revert</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Lanzar Claude Code</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> claude</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Resumir sesión anterior</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> claude <span class="at">-r</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Ver estado y modelos configurados</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> status</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Ver estadísticas de uso</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> usage</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Restaurar configs originales</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> revert</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1277,7 +1282,7 @@ Listing&nbsp;17: Usar coding agents a través de AI Gateway con ucode
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Sin API keys separadas
+<span class="screen-reader-only">Tip</span>Sin API keys separadas
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -1532,236 +1537,243 @@ window.addEventListener("quarto-page-loaded", function() {
 });
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
-    }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
       }
+      return false;
     }
-    return false;
-  }
-  const onCopySuccess = function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
       }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  }
-  const getTextToCopy = function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
         }
       }
       return codeEl.innerText;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
-    text: getTextToCopy
-  });
-  clipboard.on('success', onCopySuccess);
-  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
-      text: getTextToCopy,
-      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-    clipboardModal.on('success', onCopySuccess);
-  }
-    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
-    var mailtoRegex = new RegExp(/^mailto:/);
-      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
-    var isInternal = (href) => {
-        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-    // Inspect non-navigation links and adorn them if external
- 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
-    for (var i=0; i<links.length; i++) {
-      const link = links[i];
-      if (!isInternal(link.href)) {
-        // undo the damage that might have been done by quarto-nav.js in the case of
-        // links that we want to consider external
-        if (link.dataset.originalHref !== undefined) {
-          link.href = link.dataset.originalHref;
-        }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
-    }
-  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
-    const config = {
-      allowHTML: true,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start',
-    };
-    if (contentFn) {
-      config.content = contentFn;
-    }
-    if (onTriggerFn) {
-      config.onTrigger = onTriggerFn;
-    }
-    if (onUntriggerFn) {
-      config.onUntrigger = onUntriggerFn;
-    }
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      if (note) {
-        return note.innerHTML;
-      } else {
-        return "";
-      }
-    });
-  }
-  const xrefs = window.document.querySelectorAll('a.quarto-xref');
-  const processXRef = (id, note) => {
-    // Strip column container classes
-    const stripColumnClz = (el) => {
-      el.classList.remove("page-full", "page-columns");
-      if (el.children) {
-        for (const child of el.children) {
-          stripColumnClz(child);
-        }
-      }
-    }
-    stripColumnClz(note)
-    if (id === null || id.startsWith('sec-')) {
-      // Special case sections, only their first couple elements
-      const container = document.createElement("div");
-      if (note.children && note.children.length > 2) {
-        container.appendChild(note.children[0].cloneNode(true));
-        for (let i = 1; i < note.children.length; i++) {
-          const child = note.children[i];
-          if (child.tagName === "P" && child.innerText === "") {
-            continue;
-          } else {
-            container.appendChild(child.cloneNode(true));
-            break;
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
         }
-        if (window.Quarto?.typesetMath) {
-          window.Quarto.typesetMath(container);
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
         }
-        return container.innerHTML
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
       } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
         if (window.Quarto?.typesetMath) {
           window.Quarto.typesetMath(note);
         }
-        return note.innerHTML;
-      }
-    } else {
-      // Remove any anchor links if they are present
-      const anchorLink = note.querySelector('a.anchorjs-link');
-      if (anchorLink) {
-        anchorLink.remove();
-      }
-      if (window.Quarto?.typesetMath) {
-        window.Quarto.typesetMath(note);
-      }
-      if (note.classList.contains("callout")) {
-        return note.outerHTML;
-      } else {
-        return note.innerHTML;
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
       }
     }
-  }
-  for (var i=0; i<xrefs.length; i++) {
-    const xref = xrefs[i];
-    tippyHover(xref, undefined, function(instance) {
-      instance.disable();
-      let url = xref.getAttribute('href');
-      let hash = undefined; 
-      if (url.startsWith('#')) {
-        hash = url;
-      } else {
-        try { hash = new URL(url).hash; } catch {}
-      }
-      if (hash) {
-        const id = hash.replace(/^#\/?/, "");
-        const note = window.document.getElementById(id);
-        if (note !== null) {
-          try {
-            const html = processXRef(id, note.cloneNode(true));
-            instance.setContent(html);
-          } finally {
-            instance.enable();
-            instance.show();
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
           }
         } else {
-          // See if we can fetch this
-          fetch(url.split('#')[0])
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
           .then(res => res.text())
           .then(html => {
             const parser = new DOMParser();
             const htmlDoc = parser.parseFromString(html, "text/html");
-            const note = htmlDoc.getElementById(id);
+            const note = htmlDoc.querySelector('main.content');
             if (note !== null) {
-              const html = processXRef(id, note);
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
               instance.setContent(html);
             } 
           }).finally(() => {
@@ -1769,189 +1781,190 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             instance.show();
           });
         }
-      } else {
-        // See if we can fetch a full url (with no hash to target)
-        // This is a special case and we should probably do some content thinning / targeting
-        fetch(url)
-        .then(res => res.text())
-        .then(html => {
-          const parser = new DOMParser();
-          const htmlDoc = parser.parseFromString(html, "text/html");
-          const note = htmlDoc.querySelector('main.content');
-          if (note !== null) {
-            // This should only happen for chapter cross references
-            // (since there is no id in the URL)
-            // remove the first header
-            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
-              note.children[0].remove();
-            }
-            const html = processXRef(null, note);
-            instance.setContent(html);
-          } 
-        }).finally(() => {
-          instance.enable();
-          instance.show();
-        });
-      }
-    }, function(instance) {
-    });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            div.style.left = 0;
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-        // Handle positioning of the toggle
-    window.addEventListener(
-      "resize",
-      throttle(() => {
-        elRect = undefined;
-        if (selectedAnnoteEl) {
-          selectCodeLines(selectedAnnoteEl);
-        }
-      }, 10)
-    );
-    function throttle(fn, ms) {
-    let throttle = false;
-    let timer;
-      return (...args) => {
-        if(!throttle) { // first call gets through
-            fn.apply(this, args);
-            throttle = true;
-        } else { // all the others get throttled
-            if(timer) clearTimeout(timer); // cancel #2
-            timer = setTimeout(() => {
-              fn.apply(this, args);
-              timer = throttle = false;
-            }, ms);
-        }
-      };
-    }
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
-    }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
-          }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+      }, function(instance) {
       });
     }
-  }
-});
-</script>
-<script src="https://giscus.app/client.js" data-repo="mauroloprete/mauroloprete" data-repo-id="R_kgDORVoiEQ" data-category="Announcements" data-category-id="DIC_kwDORVoiEc4C_LKu" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light_protanopia" data-lang="../../../es" crossorigin="anonymous" data-loading="lazy" async="">
-</script>
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 <input type="hidden" id="giscus-base-theme" value="light_protanopia">
 <input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "../../../es";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">

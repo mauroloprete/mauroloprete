@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.6.39">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -12,6 +12,9 @@
 
 <title>Databricks Tips #7: Docker en Databricks — contenedores custom para entornos que no se rompen – Mauro Loprete</title>
 <style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
 div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -24,8 +27,9 @@ ul.task-list li input[type="checkbox"] {
   vertical-align: middle;
 }
 /* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -36,7 +40,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
   { counter-reset: source-line 0; }
@@ -68,15 +72,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../../../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../../../">
 <link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
-<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="../../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/all.min.css" rel="stylesheet">
 <link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/latex-fontsize.css" rel="stylesheet">
 <script src="../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
@@ -137,7 +142,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <meta name="twitter:image-width" content="1200">
 </head>
 
-<body class="nav-fixed">
+<body class="nav-fixed quarto-light">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
@@ -293,10 +298,10 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 Listing&nbsp;1: Dockerfile básico: imagen base, dependencias y código
 </figcaption>
 <div aria-describedby="lst-dockerfile-basico-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-dockerfile-basico"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="lst-dockerfile-basico-1"><a href="#lst-dockerfile-basico-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Ejemplo básico de Dockerfile</span></span>
-<span id="lst-dockerfile-basico-2"><a href="#lst-dockerfile-basico-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> python:3.11-slim          <span class="co"># Partís de una imagen base</span></span>
-<span id="lst-dockerfile-basico-3"><a href="#lst-dockerfile-basico-3" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">pip</span> install pandas==2.2.3  <span class="co"># Instalás dependencias</span></span>
-<span id="lst-dockerfile-basico-4"><a href="#lst-dockerfile-basico-4" aria-hidden="true" tabindex="-1"></a><span class="kw">COPY</span> mi_script.py /app/        <span class="co"># Copiás tu código</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Ejemplo básico de Dockerfile</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> python:3.11-slim          <span class="co"># Partís de una imagen base</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">pip</span> install pandas==2.2.3  <span class="co"># Instalás dependencias</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">COPY</span> mi_script.py /app/        <span class="co"># Copiás tu código</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -341,15 +346,15 @@ Listing&nbsp;1: Dockerfile básico: imagen base, dependencias y código
 Listing&nbsp;2: Habilitar y verificar DCS en Azure vía Databricks CLI
 </figcaption>
 <div aria-describedby="lst-habilitar-dcs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-habilitar-dcs"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-habilitar-dcs-1"><a href="#lst-habilitar-dcs-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Habilitar DCS en Azure Databricks</span></span>
-<span id="lst-habilitar-dcs-2"><a href="#lst-habilitar-dcs-2" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> workspace-conf set-status <span class="at">--json</span> <span class="st">'{"enableDcs": "true"}'</span> <span class="at">--profile</span> <span class="op">&lt;</span>tu-profile<span class="op">&gt;</span></span>
-<span id="lst-habilitar-dcs-3"><a href="#lst-habilitar-dcs-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-habilitar-dcs-4"><a href="#lst-habilitar-dcs-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Verificar que quedó habilitado (tiene que devolver "true")</span></span>
-<span id="lst-habilitar-dcs-5"><a href="#lst-habilitar-dcs-5" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> workspace-conf get-status enableDcs <span class="at">--profile</span> <span class="op">&lt;</span>tu-profile<span class="op">&gt;</span></span>
-<span id="lst-habilitar-dcs-6"><a href="#lst-habilitar-dcs-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Respuesta esperada:</span></span>
-<span id="lst-habilitar-dcs-7"><a href="#lst-habilitar-dcs-7" aria-hidden="true" tabindex="-1"></a><span class="co"># {</span></span>
-<span id="lst-habilitar-dcs-8"><a href="#lst-habilitar-dcs-8" aria-hidden="true" tabindex="-1"></a><span class="co">#   "enableDcs": "true"</span></span>
-<span id="lst-habilitar-dcs-9"><a href="#lst-habilitar-dcs-9" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Habilitar DCS en Azure Databricks</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> workspace-conf set-status <span class="at">--json</span> <span class="st">'{"enableDcs": "true"}'</span> <span class="at">--profile</span> <span class="op">&lt;</span>tu-profile<span class="op">&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Verificar que quedó habilitado (tiene que devolver "true")</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> workspace-conf get-status enableDcs <span class="at">--profile</span> <span class="op">&lt;</span>tu-profile<span class="op">&gt;</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Respuesta esperada:</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># {</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">#   "enableDcs": "true"</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -372,21 +377,21 @@ Listing&nbsp;2: Habilitar y verificar DCS en Azure vía Databricks CLI
 Listing&nbsp;3: Golden container: dependencias fijas y librerías de sistema
 </figcaption>
 <div aria-describedby="lst-golden-container-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-golden-container"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="lst-golden-container-1"><a href="#lst-golden-container-1" aria-hidden="true" tabindex="-1"></a><span class="co"># golden.Dockerfile</span></span>
-<span id="lst-golden-container-2"><a href="#lst-golden-container-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> databricksruntime/standard:16.4-LTS</span>
-<span id="lst-golden-container-3"><a href="#lst-golden-container-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-golden-container-4"><a href="#lst-golden-container-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Dependencias fijas — NUNCA usar pip install sin versiones</span></span>
-<span id="lst-golden-container-5"><a href="#lst-golden-container-5" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/pip</span> install <span class="at">--no-cache-dir</span> <span class="dt">\</span></span>
-<span id="lst-golden-container-6"><a href="#lst-golden-container-6" aria-hidden="true" tabindex="-1"></a>    pandas==2.2.3 <span class="dt">\</span></span>
-<span id="lst-golden-container-7"><a href="#lst-golden-container-7" aria-hidden="true" tabindex="-1"></a>    scikit-learn==1.5.2 <span class="dt">\</span></span>
-<span id="lst-golden-container-8"><a href="#lst-golden-container-8" aria-hidden="true" tabindex="-1"></a>    great-expectations==1.3.0 <span class="dt">\</span></span>
-<span id="lst-golden-container-9"><a href="#lst-golden-container-9" aria-hidden="true" tabindex="-1"></a>    delta-spark==3.3.0</span>
-<span id="lst-golden-container-10"><a href="#lst-golden-container-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-golden-container-11"><a href="#lst-golden-container-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Librerías de sistema que pip no puede instalar</span></span>
-<span id="lst-golden-container-12"><a href="#lst-golden-container-12" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">apt-get</span> update <span class="kw">&amp;&amp;</span> <span class="ex">apt-get</span> install <span class="at">-y</span> <span class="at">--no-install-recommends</span> <span class="dt">\</span></span>
-<span id="lst-golden-container-13"><a href="#lst-golden-container-13" aria-hidden="true" tabindex="-1"></a>    libgdal-dev <span class="dt">\</span></span>
-<span id="lst-golden-container-14"><a href="#lst-golden-container-14" aria-hidden="true" tabindex="-1"></a>    libgeos-dev <span class="dt">\</span></span>
-<span id="lst-golden-container-15"><a href="#lst-golden-container-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">&amp;&amp;</span> <span class="fu">rm</span> <span class="at">-rf</span> /var/lib/apt/lists/<span class="pp">*</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># golden.Dockerfile</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> databricksruntime/standard:16.4-LTS</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Dependencias fijas — NUNCA usar pip install sin versiones</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/pip</span> install <span class="at">--no-cache-dir</span> <span class="dt">\</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    pandas==2.2.3 <span class="dt">\</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    scikit-learn==1.5.2 <span class="dt">\</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    great-expectations==1.3.0 <span class="dt">\</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    delta-spark==3.3.0</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Librerías de sistema que pip no puede instalar</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">apt-get</span> update <span class="kw">&amp;&amp;</span> <span class="ex">apt-get</span> install <span class="at">-y</span> <span class="at">--no-install-recommends</span> <span class="dt">\</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    libgdal-dev <span class="dt">\</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    libgeos-dev <span class="dt">\</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">&amp;&amp;</span> <span class="fu">rm</span> <span class="at">-rf</span> /var/lib/apt/lists/<span class="pp">*</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -396,9 +401,9 @@ Listing&nbsp;3: Golden container: dependencias fijas y librerías de sistema
 Listing&nbsp;4: Build y push de la imagen golden al registry
 </figcaption>
 <div aria-describedby="lst-build-push-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-build-push"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-build-push-1"><a href="#lst-build-push-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build + push</span></span>
-<span id="lst-build-push-2"><a href="#lst-build-push-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> build <span class="at">-f</span> golden.Dockerfile <span class="at">-t</span> mi-ecr.amazonaws.com/dbx-golden:v2.1.0 .</span>
-<span id="lst-build-push-3"><a href="#lst-build-push-3" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> push mi-ecr.amazonaws.com/dbx-golden:v2.1.0</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build + push</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> build <span class="at">-f</span> golden.Dockerfile <span class="at">-t</span> mi-ecr.amazonaws.com/dbx-golden:v2.1.0 .</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> push mi-ecr.amazonaws.com/dbx-golden:v2.1.0</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -422,25 +427,25 @@ Listing&nbsp;4: Build y push de la imagen golden al registry
 Listing&nbsp;5: Crear cluster con imagen Docker vía REST API
 </figcaption>
 <div aria-describedby="lst-cluster-api-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cluster-api"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-cluster-api-1"><a href="#lst-cluster-api-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST <span class="st">"https://&lt;tu-workspace&gt;.cloud.databricks.com/api/2.0/clusters/create"</span> <span class="dt">\</span></span>
-<span id="lst-cluster-api-2"><a href="#lst-cluster-api-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">"Authorization: Bearer </span><span class="va">$DATABRICKS_TOKEN</span><span class="st">"</span> <span class="dt">\</span></span>
-<span id="lst-cluster-api-3"><a href="#lst-cluster-api-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">"Content-Type: application/json"</span> <span class="dt">\</span></span>
-<span id="lst-cluster-api-4"><a href="#lst-cluster-api-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">'{</span></span>
-<span id="lst-cluster-api-5"><a href="#lst-cluster-api-5" aria-hidden="true" tabindex="-1"></a><span class="st">    "cluster_name": "prod-golden-container",</span></span>
-<span id="lst-cluster-api-6"><a href="#lst-cluster-api-6" aria-hidden="true" tabindex="-1"></a><span class="st">    "spark_version": "16.4.x-scala2.12",</span></span>
-<span id="lst-cluster-api-7"><a href="#lst-cluster-api-7" aria-hidden="true" tabindex="-1"></a><span class="st">    "docker_image": {</span></span>
-<span id="lst-cluster-api-8"><a href="#lst-cluster-api-8" aria-hidden="true" tabindex="-1"></a><span class="st">      "url": "mi-ecr.amazonaws.com/dbx-golden:v2.1.0",</span></span>
-<span id="lst-cluster-api-9"><a href="#lst-cluster-api-9" aria-hidden="true" tabindex="-1"></a><span class="st">      "basic_auth": {</span></span>
-<span id="lst-cluster-api-10"><a href="#lst-cluster-api-10" aria-hidden="true" tabindex="-1"></a><span class="st">        "username": "{{secrets/docker/user}}",</span></span>
-<span id="lst-cluster-api-11"><a href="#lst-cluster-api-11" aria-hidden="true" tabindex="-1"></a><span class="st">        "password": "{{secrets/docker/pass}}"</span></span>
-<span id="lst-cluster-api-12"><a href="#lst-cluster-api-12" aria-hidden="true" tabindex="-1"></a><span class="st">      }</span></span>
-<span id="lst-cluster-api-13"><a href="#lst-cluster-api-13" aria-hidden="true" tabindex="-1"></a><span class="st">    },</span></span>
-<span id="lst-cluster-api-14"><a href="#lst-cluster-api-14" aria-hidden="true" tabindex="-1"></a><span class="st">    "node_type_id": "i3.xlarge",</span></span>
-<span id="lst-cluster-api-15"><a href="#lst-cluster-api-15" aria-hidden="true" tabindex="-1"></a><span class="st">    "autoscale": {</span></span>
-<span id="lst-cluster-api-16"><a href="#lst-cluster-api-16" aria-hidden="true" tabindex="-1"></a><span class="st">      "min_workers": 1,</span></span>
-<span id="lst-cluster-api-17"><a href="#lst-cluster-api-17" aria-hidden="true" tabindex="-1"></a><span class="st">      "max_workers": 4</span></span>
-<span id="lst-cluster-api-18"><a href="#lst-cluster-api-18" aria-hidden="true" tabindex="-1"></a><span class="st">    }</span></span>
-<span id="lst-cluster-api-19"><a href="#lst-cluster-api-19" aria-hidden="true" tabindex="-1"></a><span class="st">  }'</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST <span class="st">"https://&lt;tu-workspace&gt;.cloud.databricks.com/api/2.0/clusters/create"</span> <span class="dt">\</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">"Authorization: Bearer </span><span class="va">$DATABRICKS_TOKEN</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">"Content-Type: application/json"</span> <span class="dt">\</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">'{</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="st">    "cluster_name": "prod-golden-container",</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="st">    "spark_version": "16.4.x-scala2.12",</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="st">    "docker_image": {</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="st">      "url": "mi-ecr.amazonaws.com/dbx-golden:v2.1.0",</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="st">      "basic_auth": {</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="st">        "username": "{{secrets/docker/user}}",</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="st">        "password": "{{secrets/docker/pass}}"</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="st">      }</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="st">    },</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="st">    "node_type_id": "i3.xlarge",</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="st">    "autoscale": {</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="st">      "min_workers": 1,</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="st">      "max_workers": 4</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="st">    }</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="st">  }'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -451,22 +456,22 @@ Listing&nbsp;5: Crear cluster con imagen Docker vía REST API
 Listing&nbsp;6: Crear cluster con imagen Docker vía Databricks CLI
 </figcaption>
 <div aria-describedby="lst-cluster-cli-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cluster-cli"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-cluster-cli-1"><a href="#lst-cluster-cli-1" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> clusters create <span class="at">--json</span> <span class="st">'{</span></span>
-<span id="lst-cluster-cli-2"><a href="#lst-cluster-cli-2" aria-hidden="true" tabindex="-1"></a><span class="st">  "cluster_name": "prod-golden-container",</span></span>
-<span id="lst-cluster-cli-3"><a href="#lst-cluster-cli-3" aria-hidden="true" tabindex="-1"></a><span class="st">  "spark_version": "16.4.x-scala2.12",</span></span>
-<span id="lst-cluster-cli-4"><a href="#lst-cluster-cli-4" aria-hidden="true" tabindex="-1"></a><span class="st">  "docker_image": {</span></span>
-<span id="lst-cluster-cli-5"><a href="#lst-cluster-cli-5" aria-hidden="true" tabindex="-1"></a><span class="st">    "url": "mi-ecr.amazonaws.com/dbx-golden:v2.1.0",</span></span>
-<span id="lst-cluster-cli-6"><a href="#lst-cluster-cli-6" aria-hidden="true" tabindex="-1"></a><span class="st">    "basic_auth": {</span></span>
-<span id="lst-cluster-cli-7"><a href="#lst-cluster-cli-7" aria-hidden="true" tabindex="-1"></a><span class="st">      "username": "{{secrets/docker/user}}",</span></span>
-<span id="lst-cluster-cli-8"><a href="#lst-cluster-cli-8" aria-hidden="true" tabindex="-1"></a><span class="st">      "password": "{{secrets/docker/pass}}"</span></span>
-<span id="lst-cluster-cli-9"><a href="#lst-cluster-cli-9" aria-hidden="true" tabindex="-1"></a><span class="st">    }</span></span>
-<span id="lst-cluster-cli-10"><a href="#lst-cluster-cli-10" aria-hidden="true" tabindex="-1"></a><span class="st">  },</span></span>
-<span id="lst-cluster-cli-11"><a href="#lst-cluster-cli-11" aria-hidden="true" tabindex="-1"></a><span class="st">  "node_type_id": "i3.xlarge",</span></span>
-<span id="lst-cluster-cli-12"><a href="#lst-cluster-cli-12" aria-hidden="true" tabindex="-1"></a><span class="st">  "autoscale": {</span></span>
-<span id="lst-cluster-cli-13"><a href="#lst-cluster-cli-13" aria-hidden="true" tabindex="-1"></a><span class="st">    "min_workers": 1,</span></span>
-<span id="lst-cluster-cli-14"><a href="#lst-cluster-cli-14" aria-hidden="true" tabindex="-1"></a><span class="st">    "max_workers": 4</span></span>
-<span id="lst-cluster-cli-15"><a href="#lst-cluster-cli-15" aria-hidden="true" tabindex="-1"></a><span class="st">  }</span></span>
-<span id="lst-cluster-cli-16"><a href="#lst-cluster-cli-16" aria-hidden="true" tabindex="-1"></a><span class="st">}'</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> clusters create <span class="at">--json</span> <span class="st">'{</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="st">  "cluster_name": "prod-golden-container",</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="st">  "spark_version": "16.4.x-scala2.12",</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="st">  "docker_image": {</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="st">    "url": "mi-ecr.amazonaws.com/dbx-golden:v2.1.0",</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="st">    "basic_auth": {</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="st">      "username": "{{secrets/docker/user}}",</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="st">      "password": "{{secrets/docker/pass}}"</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="st">    }</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="st">  },</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="st">  "node_type_id": "i3.xlarge",</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="st">  "autoscale": {</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="st">    "min_workers": 1,</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="st">    "max_workers": 4</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="st">  }</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="st">}'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -536,14 +541,14 @@ Listing&nbsp;6: Crear cluster con imagen Docker vía Databricks CLI
 Listing&nbsp;7: Error frecuente: instalar paquetes en el path correcto
 </figcaption>
 <div aria-describedby="lst-python-path-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-python-path"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="lst-python-path-1"><a href="#lst-python-path-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MALO — instala en el Python del sistema</span></span>
-<span id="lst-python-path-2"><a href="#lst-python-path-2" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">pip</span> install pandas==2.2.3</span>
-<span id="lst-python-path-3"><a href="#lst-python-path-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-python-path-4"><a href="#lst-python-path-4" aria-hidden="true" tabindex="-1"></a><span class="co"># MALO — crea un virtualenv separado</span></span>
-<span id="lst-python-path-5"><a href="#lst-python-path-5" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">python</span> <span class="at">-m</span> venv /opt/myenv <span class="kw">&amp;&amp;</span> <span class="ex">/opt/myenv/bin/pip</span> install pandas==2.2.3</span>
-<span id="lst-python-path-6"><a href="#lst-python-path-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-python-path-7"><a href="#lst-python-path-7" aria-hidden="true" tabindex="-1"></a><span class="co"># BIEN — usa el Python de Databricks</span></span>
-<span id="lst-python-path-8"><a href="#lst-python-path-8" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/pip</span> install pandas==2.2.3</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MALO — instala en el Python del sistema</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">pip</span> install pandas==2.2.3</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># MALO — crea un virtualenv separado</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">python</span> <span class="at">-m</span> venv /opt/myenv <span class="kw">&amp;&amp;</span> <span class="ex">/opt/myenv/bin/pip</span> install pandas==2.2.3</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># BIEN — usa el Python de Databricks</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/pip</span> install pandas==2.2.3</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -568,26 +573,26 @@ Listing&nbsp;7: Error frecuente: instalar paquetes en el path correcto
 Listing&nbsp;8: Dockerfile geoespacial: GDAL, GeoPandas y Prophet
 </figcaption>
 <div aria-describedby="lst-dockerfile-geo-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-dockerfile-geo"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="lst-dockerfile-geo-1"><a href="#lst-dockerfile-geo-1" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> databricksruntime/standard:16.4-LTS</span>
-<span id="lst-dockerfile-geo-2"><a href="#lst-dockerfile-geo-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-dockerfile-geo-3"><a href="#lst-dockerfile-geo-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Librerías de sistema para geoespacial</span></span>
-<span id="lst-dockerfile-geo-4"><a href="#lst-dockerfile-geo-4" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">apt-get</span> update <span class="kw">&amp;&amp;</span> <span class="ex">apt-get</span> install <span class="at">-y</span> <span class="at">--no-install-recommends</span> <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-5"><a href="#lst-dockerfile-geo-5" aria-hidden="true" tabindex="-1"></a>    libgdal-dev <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-6"><a href="#lst-dockerfile-geo-6" aria-hidden="true" tabindex="-1"></a>    libgeos-dev <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-7"><a href="#lst-dockerfile-geo-7" aria-hidden="true" tabindex="-1"></a>    libproj-dev <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-8"><a href="#lst-dockerfile-geo-8" aria-hidden="true" tabindex="-1"></a>    gdal-bin <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-9"><a href="#lst-dockerfile-geo-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">&amp;&amp;</span> <span class="fu">rm</span> <span class="at">-rf</span> /var/lib/apt/lists/<span class="pp">*</span></span>
-<span id="lst-dockerfile-geo-10"><a href="#lst-dockerfile-geo-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-dockerfile-geo-11"><a href="#lst-dockerfile-geo-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Stack geoespacial + forecasting</span></span>
-<span id="lst-dockerfile-geo-12"><a href="#lst-dockerfile-geo-12" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/pip</span> install <span class="at">--no-cache-dir</span> <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-13"><a href="#lst-dockerfile-geo-13" aria-hidden="true" tabindex="-1"></a>    geopandas==1.0.1 <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-14"><a href="#lst-dockerfile-geo-14" aria-hidden="true" tabindex="-1"></a>    shapely==2.0.6 <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-15"><a href="#lst-dockerfile-geo-15" aria-hidden="true" tabindex="-1"></a>    fiona==1.10.1 <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-16"><a href="#lst-dockerfile-geo-16" aria-hidden="true" tabindex="-1"></a>    prophet==1.1.6 <span class="dt">\</span></span>
-<span id="lst-dockerfile-geo-17"><a href="#lst-dockerfile-geo-17" aria-hidden="true" tabindex="-1"></a>    pystan==3.10.0</span>
-<span id="lst-dockerfile-geo-18"><a href="#lst-dockerfile-geo-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-dockerfile-geo-19"><a href="#lst-dockerfile-geo-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Validar que GDAL se linkea bien (esto falla silenciosamente si no)</span></span>
-<span id="lst-dockerfile-geo-20"><a href="#lst-dockerfile-geo-20" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/python</span> <span class="at">-c</span> <span class="st">"from osgeo import gdal; print(f'GDAL {gdal.__version__}')"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> databricksruntime/standard:16.4-LTS</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Librerías de sistema para geoespacial</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">apt-get</span> update <span class="kw">&amp;&amp;</span> <span class="ex">apt-get</span> install <span class="at">-y</span> <span class="at">--no-install-recommends</span> <span class="dt">\</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    libgdal-dev <span class="dt">\</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    libgeos-dev <span class="dt">\</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    libproj-dev <span class="dt">\</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    gdal-bin <span class="dt">\</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">&amp;&amp;</span> <span class="fu">rm</span> <span class="at">-rf</span> /var/lib/apt/lists/<span class="pp">*</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Stack geoespacial + forecasting</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/pip</span> install <span class="at">--no-cache-dir</span> <span class="dt">\</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    geopandas==1.0.1 <span class="dt">\</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    shapely==2.0.6 <span class="dt">\</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    fiona==1.10.1 <span class="dt">\</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    prophet==1.1.6 <span class="dt">\</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>    pystan==3.10.0</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Validar que GDAL se linkea bien (esto falla silenciosamente si no)</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/python</span> <span class="at">-c</span> <span class="st">"from osgeo import gdal; print(f'GDAL {gdal.__version__}')"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -599,30 +604,30 @@ Listing&nbsp;8: Dockerfile geoespacial: GDAL, GeoPandas y Prophet
 Listing&nbsp;9: Pipeline geoespacial: forecast de demanda por zona con Prophet
 </figcaption>
 <div aria-describedby="lst-pipeline-geo-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-pipeline-geo"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="lst-pipeline-geo-1"><a href="#lst-pipeline-geo-1" aria-hidden="true" tabindex="-1"></a><span class="co"># El notebook solo tiene lógica de negocio — cero setup</span></span>
-<span id="lst-pipeline-geo-2"><a href="#lst-pipeline-geo-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> geopandas <span class="im">as</span> gpd</span>
-<span id="lst-pipeline-geo-3"><a href="#lst-pipeline-geo-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> prophet <span class="im">import</span> Prophet</span>
-<span id="lst-pipeline-geo-4"><a href="#lst-pipeline-geo-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-pipeline-geo-5"><a href="#lst-pipeline-geo-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Leer zonas de delivery desde Unity Catalog</span></span>
-<span id="lst-pipeline-geo-6"><a href="#lst-pipeline-geo-6" aria-hidden="true" tabindex="-1"></a>zonas <span class="op">=</span> spark.table(<span class="st">"prod.geo.zonas_delivery"</span>).toPandas()</span>
-<span id="lst-pipeline-geo-7"><a href="#lst-pipeline-geo-7" aria-hidden="true" tabindex="-1"></a>geo_zonas <span class="op">=</span> gpd.GeoDataFrame(zonas, geometry<span class="op">=</span>gpd.points_from_xy(zonas.lng, zonas.lat))</span>
-<span id="lst-pipeline-geo-8"><a href="#lst-pipeline-geo-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-pipeline-geo-9"><a href="#lst-pipeline-geo-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Forecast por zona</span></span>
-<span id="lst-pipeline-geo-10"><a href="#lst-pipeline-geo-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> zona_id <span class="kw">in</span> geo_zonas[<span class="st">"zona_id"</span>].unique():</span>
-<span id="lst-pipeline-geo-11"><a href="#lst-pipeline-geo-11" aria-hidden="true" tabindex="-1"></a>    historico <span class="op">=</span> spark.table(<span class="st">"prod.demand.historico"</span>) <span class="op">\</span></span>
-<span id="lst-pipeline-geo-12"><a href="#lst-pipeline-geo-12" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">filter</span>(<span class="ss">f"zona_id = '</span><span class="sc">{</span>zona_id<span class="sc">}</span><span class="ss">'"</span>) <span class="op">\</span></span>
-<span id="lst-pipeline-geo-13"><a href="#lst-pipeline-geo-13" aria-hidden="true" tabindex="-1"></a>        .select(<span class="st">"ds"</span>, <span class="st">"y"</span>).toPandas()</span>
-<span id="lst-pipeline-geo-14"><a href="#lst-pipeline-geo-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-pipeline-geo-15"><a href="#lst-pipeline-geo-15" aria-hidden="true" tabindex="-1"></a>    modelo <span class="op">=</span> Prophet(yearly_seasonality<span class="op">=</span><span class="va">True</span>, weekly_seasonality<span class="op">=</span><span class="va">True</span>)</span>
-<span id="lst-pipeline-geo-16"><a href="#lst-pipeline-geo-16" aria-hidden="true" tabindex="-1"></a>    modelo.fit(historico)</span>
-<span id="lst-pipeline-geo-17"><a href="#lst-pipeline-geo-17" aria-hidden="true" tabindex="-1"></a>    futuro <span class="op">=</span> modelo.make_future_dataframe(periods<span class="op">=</span><span class="dv">30</span>)</span>
-<span id="lst-pipeline-geo-18"><a href="#lst-pipeline-geo-18" aria-hidden="true" tabindex="-1"></a>    forecast <span class="op">=</span> modelo.predict(futuro)</span>
-<span id="lst-pipeline-geo-19"><a href="#lst-pipeline-geo-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-pipeline-geo-20"><a href="#lst-pipeline-geo-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Guardar predicciones como Delta table</span></span>
-<span id="lst-pipeline-geo-21"><a href="#lst-pipeline-geo-21" aria-hidden="true" tabindex="-1"></a>    spark.createDataFrame(forecast[[<span class="st">"ds"</span>, <span class="st">"yhat"</span>, <span class="st">"yhat_lower"</span>, <span class="st">"yhat_upper"</span>]]) <span class="op">\</span></span>
-<span id="lst-pipeline-geo-22"><a href="#lst-pipeline-geo-22" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"zona_id"</span>, lit(zona_id)) <span class="op">\</span></span>
-<span id="lst-pipeline-geo-23"><a href="#lst-pipeline-geo-23" aria-hidden="true" tabindex="-1"></a>        .write.mode(<span class="st">"append"</span>) <span class="op">\</span></span>
-<span id="lst-pipeline-geo-24"><a href="#lst-pipeline-geo-24" aria-hidden="true" tabindex="-1"></a>        .saveAsTable(<span class="st">"prod.demand.forecast_por_zona"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># El notebook solo tiene lógica de negocio — cero setup</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> geopandas <span class="im">as</span> gpd</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> prophet <span class="im">import</span> Prophet</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Leer zonas de delivery desde Unity Catalog</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>zonas <span class="op">=</span> spark.table(<span class="st">"prod.geo.zonas_delivery"</span>).toPandas()</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>geo_zonas <span class="op">=</span> gpd.GeoDataFrame(zonas, geometry<span class="op">=</span>gpd.points_from_xy(zonas.lng, zonas.lat))</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Forecast por zona</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> zona_id <span class="kw">in</span> geo_zonas[<span class="st">"zona_id"</span>].unique():</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    historico <span class="op">=</span> spark.table(<span class="st">"prod.demand.historico"</span>) <span class="op">\</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">filter</span>(<span class="ss">f"zona_id = '</span><span class="sc">{</span>zona_id<span class="sc">}</span><span class="ss">'"</span>) <span class="op">\</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>        .select(<span class="st">"ds"</span>, <span class="st">"y"</span>).toPandas()</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    modelo <span class="op">=</span> Prophet(yearly_seasonality<span class="op">=</span><span class="va">True</span>, weekly_seasonality<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>    modelo.fit(historico)</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>    futuro <span class="op">=</span> modelo.make_future_dataframe(periods<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    forecast <span class="op">=</span> modelo.predict(futuro)</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Guardar predicciones como Delta table</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    spark.createDataFrame(forecast[[<span class="st">"ds"</span>, <span class="st">"yhat"</span>, <span class="st">"yhat_lower"</span>, <span class="st">"yhat_upper"</span>]]) <span class="op">\</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"zona_id"</span>, lit(zona_id)) <span class="op">\</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>        .write.mode(<span class="st">"append"</span>) <span class="op">\</span></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>        .saveAsTable(<span class="st">"prod.demand.forecast_por_zona"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -636,44 +641,44 @@ Listing&nbsp;9: Pipeline geoespacial: forecast de demanda por zona con Prophet
 Listing&nbsp;10: GitHub Actions: CI/CD para build, test y push del golden container
 </figcaption>
 <div aria-describedby="lst-cicd-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cicd-workflow"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-cicd-workflow-1"><a href="#lst-cicd-workflow-1" aria-hidden="true" tabindex="-1"></a><span class="co"># .github/workflows/docker-dbx.yml</span></span>
-<span id="lst-cicd-workflow-2"><a href="#lst-cicd-workflow-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> Build &amp; Push Golden Container</span></span>
-<span id="lst-cicd-workflow-3"><a href="#lst-cicd-workflow-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-workflow-4"><a href="#lst-cicd-workflow-4" aria-hidden="true" tabindex="-1"></a><span class="fu">on</span><span class="kw">:</span></span>
-<span id="lst-cicd-workflow-5"><a href="#lst-cicd-workflow-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">push</span><span class="kw">:</span></span>
-<span id="lst-cicd-workflow-6"><a href="#lst-cicd-workflow-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">paths</span><span class="kw">:</span></span>
-<span id="lst-cicd-workflow-7"><a href="#lst-cicd-workflow-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="st">'docker/golden.Dockerfile'</span></span>
-<span id="lst-cicd-workflow-8"><a href="#lst-cicd-workflow-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="st">'docker/requirements.txt'</span></span>
-<span id="lst-cicd-workflow-9"><a href="#lst-cicd-workflow-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-workflow-10"><a href="#lst-cicd-workflow-10" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
-<span id="lst-cicd-workflow-11"><a href="#lst-cicd-workflow-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">build</span><span class="kw">:</span></span>
-<span id="lst-cicd-workflow-12"><a href="#lst-cicd-workflow-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">runs-on</span><span class="kw">:</span><span class="at"> ubuntu-latest</span></span>
-<span id="lst-cicd-workflow-13"><a href="#lst-cicd-workflow-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
-<span id="lst-cicd-workflow-14"><a href="#lst-cicd-workflow-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
-<span id="lst-cicd-workflow-15"><a href="#lst-cicd-workflow-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-workflow-16"><a href="#lst-cicd-workflow-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Build image</span></span>
-<span id="lst-cicd-workflow-17"><a href="#lst-cicd-workflow-17" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
-<span id="lst-cicd-workflow-18"><a href="#lst-cicd-workflow-18" aria-hidden="true" tabindex="-1"></a>          docker build -f docker/golden.Dockerfile \</span>
-<span id="lst-cicd-workflow-19"><a href="#lst-cicd-workflow-19" aria-hidden="true" tabindex="-1"></a>            -t ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} .</span>
-<span id="lst-cicd-workflow-20"><a href="#lst-cicd-workflow-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-workflow-21"><a href="#lst-cicd-workflow-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Test — verificar que los imports funcionan</span></span>
-<span id="lst-cicd-workflow-22"><a href="#lst-cicd-workflow-22" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
-<span id="lst-cicd-workflow-23"><a href="#lst-cicd-workflow-23" aria-hidden="true" tabindex="-1"></a>          docker run --rm ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} \</span>
-<span id="lst-cicd-workflow-24"><a href="#lst-cicd-workflow-24" aria-hidden="true" tabindex="-1"></a>            /databricks/python3/bin/python -c "</span>
-<span id="lst-cicd-workflow-25"><a href="#lst-cicd-workflow-25" aria-hidden="true" tabindex="-1"></a>              import pandas; import sklearn; import great_expectations</span>
-<span id="lst-cicd-workflow-26"><a href="#lst-cicd-workflow-26" aria-hidden="true" tabindex="-1"></a>              print('All imports OK')</span>
-<span id="lst-cicd-workflow-27"><a href="#lst-cicd-workflow-27" aria-hidden="true" tabindex="-1"></a>            "</span>
-<span id="lst-cicd-workflow-28"><a href="#lst-cicd-workflow-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-workflow-29"><a href="#lst-cicd-workflow-29" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Push to ECR</span></span>
-<span id="lst-cicd-workflow-30"><a href="#lst-cicd-workflow-30" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
-<span id="lst-cicd-workflow-31"><a href="#lst-cicd-workflow-31" aria-hidden="true" tabindex="-1"></a>          aws ecr get-login-password | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}</span>
-<span id="lst-cicd-workflow-32"><a href="#lst-cicd-workflow-32" aria-hidden="true" tabindex="-1"></a>          docker push ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }}</span>
-<span id="lst-cicd-workflow-33"><a href="#lst-cicd-workflow-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-workflow-34"><a href="#lst-cicd-workflow-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Tag como latest-stable</span></span>
-<span id="lst-cicd-workflow-35"><a href="#lst-cicd-workflow-35" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
-<span id="lst-cicd-workflow-36"><a href="#lst-cicd-workflow-36" aria-hidden="true" tabindex="-1"></a>          docker tag ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} \</span>
-<span id="lst-cicd-workflow-37"><a href="#lst-cicd-workflow-37" aria-hidden="true" tabindex="-1"></a>                     ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable</span>
-<span id="lst-cicd-workflow-38"><a href="#lst-cicd-workflow-38" aria-hidden="true" tabindex="-1"></a>          docker push ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># .github/workflows/docker-dbx.yml</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> Build &amp; Push Golden Container</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="fu">on</span><span class="kw">:</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">push</span><span class="kw">:</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">paths</span><span class="kw">:</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="st">'docker/golden.Dockerfile'</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="st">'docker/requirements.txt'</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">build</span><span class="kw">:</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">runs-on</span><span class="kw">:</span><span class="at"> ubuntu-latest</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Build image</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>          docker build -f docker/golden.Dockerfile \</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>            -t ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} .</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Test — verificar que los imports funcionan</span></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>          docker run --rm ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} \</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>            /databricks/python3/bin/python -c "</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>              import pandas; import sklearn; import great_expectations</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>              print('All imports OK')</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>            "</span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Push to ECR</span></span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>          aws ecr get-login-password | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}</span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>          docker push ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }}</span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Tag como latest-stable</span></span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>          docker tag ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} \</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>                     ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>          docker push ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -924,236 +929,243 @@ window.addEventListener("quarto-page-loaded", function() {
 });
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
-    }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
       }
+      return false;
     }
-    return false;
-  }
-  const onCopySuccess = function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
       }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  }
-  const getTextToCopy = function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
         }
       }
       return codeEl.innerText;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
-    text: getTextToCopy
-  });
-  clipboard.on('success', onCopySuccess);
-  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
-      text: getTextToCopy,
-      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-    clipboardModal.on('success', onCopySuccess);
-  }
-    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
-    var mailtoRegex = new RegExp(/^mailto:/);
-      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
-    var isInternal = (href) => {
-        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-    // Inspect non-navigation links and adorn them if external
- 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
-    for (var i=0; i<links.length; i++) {
-      const link = links[i];
-      if (!isInternal(link.href)) {
-        // undo the damage that might have been done by quarto-nav.js in the case of
-        // links that we want to consider external
-        if (link.dataset.originalHref !== undefined) {
-          link.href = link.dataset.originalHref;
-        }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
-    }
-  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
-    const config = {
-      allowHTML: true,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start',
-    };
-    if (contentFn) {
-      config.content = contentFn;
-    }
-    if (onTriggerFn) {
-      config.onTrigger = onTriggerFn;
-    }
-    if (onUntriggerFn) {
-      config.onUntrigger = onUntriggerFn;
-    }
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      if (note) {
-        return note.innerHTML;
-      } else {
-        return "";
-      }
-    });
-  }
-  const xrefs = window.document.querySelectorAll('a.quarto-xref');
-  const processXRef = (id, note) => {
-    // Strip column container classes
-    const stripColumnClz = (el) => {
-      el.classList.remove("page-full", "page-columns");
-      if (el.children) {
-        for (const child of el.children) {
-          stripColumnClz(child);
-        }
-      }
-    }
-    stripColumnClz(note)
-    if (id === null || id.startsWith('sec-')) {
-      // Special case sections, only their first couple elements
-      const container = document.createElement("div");
-      if (note.children && note.children.length > 2) {
-        container.appendChild(note.children[0].cloneNode(true));
-        for (let i = 1; i < note.children.length; i++) {
-          const child = note.children[i];
-          if (child.tagName === "P" && child.innerText === "") {
-            continue;
-          } else {
-            container.appendChild(child.cloneNode(true));
-            break;
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
         }
-        if (window.Quarto?.typesetMath) {
-          window.Quarto.typesetMath(container);
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
         }
-        return container.innerHTML
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
       } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
         if (window.Quarto?.typesetMath) {
           window.Quarto.typesetMath(note);
         }
-        return note.innerHTML;
-      }
-    } else {
-      // Remove any anchor links if they are present
-      const anchorLink = note.querySelector('a.anchorjs-link');
-      if (anchorLink) {
-        anchorLink.remove();
-      }
-      if (window.Quarto?.typesetMath) {
-        window.Quarto.typesetMath(note);
-      }
-      if (note.classList.contains("callout")) {
-        return note.outerHTML;
-      } else {
-        return note.innerHTML;
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
       }
     }
-  }
-  for (var i=0; i<xrefs.length; i++) {
-    const xref = xrefs[i];
-    tippyHover(xref, undefined, function(instance) {
-      instance.disable();
-      let url = xref.getAttribute('href');
-      let hash = undefined; 
-      if (url.startsWith('#')) {
-        hash = url;
-      } else {
-        try { hash = new URL(url).hash; } catch {}
-      }
-      if (hash) {
-        const id = hash.replace(/^#\/?/, "");
-        const note = window.document.getElementById(id);
-        if (note !== null) {
-          try {
-            const html = processXRef(id, note.cloneNode(true));
-            instance.setContent(html);
-          } finally {
-            instance.enable();
-            instance.show();
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
           }
         } else {
-          // See if we can fetch this
-          fetch(url.split('#')[0])
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
           .then(res => res.text())
           .then(html => {
             const parser = new DOMParser();
             const htmlDoc = parser.parseFromString(html, "text/html");
-            const note = htmlDoc.getElementById(id);
+            const note = htmlDoc.querySelector('main.content');
             if (note !== null) {
-              const html = processXRef(id, note);
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
               instance.setContent(html);
             } 
           }).finally(() => {
@@ -1161,189 +1173,190 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             instance.show();
           });
         }
-      } else {
-        // See if we can fetch a full url (with no hash to target)
-        // This is a special case and we should probably do some content thinning / targeting
-        fetch(url)
-        .then(res => res.text())
-        .then(html => {
-          const parser = new DOMParser();
-          const htmlDoc = parser.parseFromString(html, "text/html");
-          const note = htmlDoc.querySelector('main.content');
-          if (note !== null) {
-            // This should only happen for chapter cross references
-            // (since there is no id in the URL)
-            // remove the first header
-            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
-              note.children[0].remove();
-            }
-            const html = processXRef(null, note);
-            instance.setContent(html);
-          } 
-        }).finally(() => {
-          instance.enable();
-          instance.show();
-        });
-      }
-    }, function(instance) {
-    });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            div.style.left = 0;
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-        // Handle positioning of the toggle
-    window.addEventListener(
-      "resize",
-      throttle(() => {
-        elRect = undefined;
-        if (selectedAnnoteEl) {
-          selectCodeLines(selectedAnnoteEl);
-        }
-      }, 10)
-    );
-    function throttle(fn, ms) {
-    let throttle = false;
-    let timer;
-      return (...args) => {
-        if(!throttle) { // first call gets through
-            fn.apply(this, args);
-            throttle = true;
-        } else { // all the others get throttled
-            if(timer) clearTimeout(timer); // cancel #2
-            timer = setTimeout(() => {
-              fn.apply(this, args);
-              timer = throttle = false;
-            }, ms);
-        }
-      };
-    }
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
-    }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
-          }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+      }, function(instance) {
       });
     }
-  }
-});
-</script>
-<script src="https://giscus.app/client.js" data-repo="mauroloprete/mauroloprete" data-repo-id="R_kgDORVoiEQ" data-category="Announcements" data-category-id="DIC_kwDORVoiEc4C_LKu" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light_protanopia" data-lang="../../../es" crossorigin="anonymous" data-loading="lazy" async="">
-</script>
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 <input type="hidden" id="giscus-base-theme" value="light_protanopia">
 <input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "../../../es";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">

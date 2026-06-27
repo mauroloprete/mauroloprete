@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.6.39">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -12,6 +12,9 @@
 
 <title>Databricks Tips #1: Databricks Asset Bundles — lo que no te cuentan en la documentación – Mauro Loprete</title>
 <style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
 div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -24,8 +27,9 @@ ul.task-list li input[type="checkbox"] {
   vertical-align: middle;
 }
 /* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -36,7 +40,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
   { counter-reset: source-line 0; }
@@ -68,15 +72,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../../../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../../../">
 <link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
-<script src="../../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="../../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-e26003cea8cd680ca0c55a263523d882.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../../site_libs/bootstrap/bootstrap-b6254045a21d07dd46cfe160e8c2e3db.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/all.min.css" rel="stylesheet">
 <link href="../../../site_libs/quarto-contrib/fontawesome6-6.7.2/latex-fontsize.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
@@ -134,7 +139,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <meta name="twitter:image-width" content="1500">
 </head>
 
-<body class="nav-fixed">
+<body class="nav-fixed quarto-light">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top">
@@ -266,33 +271,33 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 Listing&nbsp;1: Variable complex: configuración de cluster reutilizable en DABs
 </figcaption>
 <div aria-describedby="lst-complex-var-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-complex-var"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-complex-var-1"><a href="#lst-complex-var-1" aria-hidden="true" tabindex="-1"></a><span class="fu">variables</span><span class="kw">:</span></span>
-<span id="lst-complex-var-2"><a href="#lst-complex-var-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cluster_config</span><span class="kw">:</span></span>
-<span id="lst-complex-var-3"><a href="#lst-complex-var-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Configuración del cluster reutilizable"</span></span>
-<span id="lst-complex-var-4"><a href="#lst-complex-var-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> complex</span></span>
-<span id="lst-complex-var-5"><a href="#lst-complex-var-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">default</span><span class="kw">:</span></span>
-<span id="lst-complex-var-6"><a href="#lst-complex-var-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">spark_version</span><span class="kw">:</span><span class="at"> </span><span class="st">"14.3.x-scala2.12"</span></span>
-<span id="lst-complex-var-7"><a href="#lst-complex-var-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">node_type_id</span><span class="kw">:</span><span class="at"> </span><span class="st">"i3.xlarge"</span></span>
-<span id="lst-complex-var-8"><a href="#lst-complex-var-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">num_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
-<span id="lst-complex-var-9"><a href="#lst-complex-var-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">spark_conf</span><span class="kw">:</span></span>
-<span id="lst-complex-var-10"><a href="#lst-complex-var-10" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">spark.speculation</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="lst-complex-var-11"><a href="#lst-complex-var-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">spark.databricks.delta.retentionDurationCheck.enabled</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
-<span id="lst-complex-var-12"><a href="#lst-complex-var-12" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">custom_tags</span><span class="kw">:</span></span>
-<span id="lst-complex-var-13"><a href="#lst-complex-var-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">team</span><span class="kw">:</span><span class="at"> data-engineering</span></span>
-<span id="lst-complex-var-14"><a href="#lst-complex-var-14" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">cost_center</span><span class="kw">:</span><span class="at"> analytics</span></span>
-<span id="lst-complex-var-15"><a href="#lst-complex-var-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-complex-var-16"><a href="#lst-complex-var-16" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
-<span id="lst-complex-var-17"><a href="#lst-complex-var-17" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
-<span id="lst-complex-var-18"><a href="#lst-complex-var-18" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">etl_job</span><span class="kw">:</span></span>
-<span id="lst-complex-var-19"><a href="#lst-complex-var-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"ETL diario"</span></span>
-<span id="lst-complex-var-20"><a href="#lst-complex-var-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">job_clusters</span><span class="kw">:</span></span>
-<span id="lst-complex-var-21"><a href="#lst-complex-var-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">job_cluster_key</span><span class="kw">:</span><span class="at"> main</span></span>
-<span id="lst-complex-var-22"><a href="#lst-complex-var-22" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">new_cluster</span><span class="kw">:</span><span class="at"> ${var.cluster_config}</span></span>
-<span id="lst-complex-var-23"><a href="#lst-complex-var-23" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
-<span id="lst-complex-var-24"><a href="#lst-complex-var-24" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> ingest</span></span>
-<span id="lst-complex-var-25"><a href="#lst-complex-var-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">job_cluster_key</span><span class="kw">:</span><span class="at"> main</span></span>
-<span id="lst-complex-var-26"><a href="#lst-complex-var-26" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">notebook_task</span><span class="kw">:</span></span>
-<span id="lst-complex-var-27"><a href="#lst-complex-var-27" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">notebook_path</span><span class="kw">:</span><span class="at"> ./src/ingest.py</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">variables</span><span class="kw">:</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cluster_config</span><span class="kw">:</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Configuración del cluster reutilizable"</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> complex</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">default</span><span class="kw">:</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">spark_version</span><span class="kw">:</span><span class="at"> </span><span class="st">"14.3.x-scala2.12"</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">node_type_id</span><span class="kw">:</span><span class="at"> </span><span class="st">"i3.xlarge"</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">num_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">spark_conf</span><span class="kw">:</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">spark.speculation</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">spark.databricks.delta.retentionDurationCheck.enabled</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">custom_tags</span><span class="kw">:</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">team</span><span class="kw">:</span><span class="at"> data-engineering</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">cost_center</span><span class="kw">:</span><span class="at"> analytics</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">etl_job</span><span class="kw">:</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"ETL diario"</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">job_clusters</span><span class="kw">:</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">job_cluster_key</span><span class="kw">:</span><span class="at"> main</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">new_cluster</span><span class="kw">:</span><span class="at"> ${var.cluster_config}</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> ingest</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">job_cluster_key</span><span class="kw">:</span><span class="at"> main</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">notebook_task</span><span class="kw">:</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">notebook_path</span><span class="kw">:</span><span class="at"> ./src/ingest.py</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -307,31 +312,31 @@ Listing&nbsp;1: Variable complex: configuración de cluster reutilizable en DABs
 Listing&nbsp;2: Lookups: resolver IDs de recursos por nombre en deploy time
 </figcaption>
 <div aria-describedby="lst-lookups-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-lookups"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-lookups-1"><a href="#lst-lookups-1" aria-hidden="true" tabindex="-1"></a><span class="fu">variables</span><span class="kw">:</span></span>
-<span id="lst-lookups-2"><a href="#lst-lookups-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">shared_cluster</span><span class="kw">:</span></span>
-<span id="lst-lookups-3"><a href="#lst-lookups-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Cluster compartido del equipo"</span></span>
-<span id="lst-lookups-4"><a href="#lst-lookups-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">lookup</span><span class="kw">:</span></span>
-<span id="lst-lookups-5"><a href="#lst-lookups-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">cluster</span><span class="kw">:</span><span class="at"> </span><span class="st">"shared-analytics-14.3"</span></span>
-<span id="lst-lookups-6"><a href="#lst-lookups-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-lookups-7"><a href="#lst-lookups-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">team_warehouse</span><span class="kw">:</span></span>
-<span id="lst-lookups-8"><a href="#lst-lookups-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"SQL Warehouse del equipo"</span></span>
-<span id="lst-lookups-9"><a href="#lst-lookups-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">lookup</span><span class="kw">:</span></span>
-<span id="lst-lookups-10"><a href="#lst-lookups-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">warehouse</span><span class="kw">:</span><span class="at"> </span><span class="st">"analytics-warehouse"</span></span>
-<span id="lst-lookups-11"><a href="#lst-lookups-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-lookups-12"><a href="#lst-lookups-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">deploy_sp</span><span class="kw">:</span></span>
-<span id="lst-lookups-13"><a href="#lst-lookups-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Service principal para deploy"</span></span>
-<span id="lst-lookups-14"><a href="#lst-lookups-14" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">lookup</span><span class="kw">:</span></span>
-<span id="lst-lookups-15"><a href="#lst-lookups-15" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">service_principal</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-data-deploy"</span></span>
-<span id="lst-lookups-16"><a href="#lst-lookups-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-lookups-17"><a href="#lst-lookups-17" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
-<span id="lst-lookups-18"><a href="#lst-lookups-18" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
-<span id="lst-lookups-19"><a href="#lst-lookups-19" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">reporting_job</span><span class="kw">:</span></span>
-<span id="lst-lookups-20"><a href="#lst-lookups-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"Reporting semanal"</span></span>
-<span id="lst-lookups-21"><a href="#lst-lookups-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
-<span id="lst-lookups-22"><a href="#lst-lookups-22" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> generate_report</span></span>
-<span id="lst-lookups-23"><a href="#lst-lookups-23" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">existing_cluster_id</span><span class="kw">:</span><span class="at"> ${var.shared_cluster}</span></span>
-<span id="lst-lookups-24"><a href="#lst-lookups-24" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">notebook_task</span><span class="kw">:</span></span>
-<span id="lst-lookups-25"><a href="#lst-lookups-25" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">notebook_path</span><span class="kw">:</span><span class="at"> ./src/report.py</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">variables</span><span class="kw">:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">shared_cluster</span><span class="kw">:</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Cluster compartido del equipo"</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">lookup</span><span class="kw">:</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">cluster</span><span class="kw">:</span><span class="at"> </span><span class="st">"shared-analytics-14.3"</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">team_warehouse</span><span class="kw">:</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"SQL Warehouse del equipo"</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">lookup</span><span class="kw">:</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">warehouse</span><span class="kw">:</span><span class="at"> </span><span class="st">"analytics-warehouse"</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">deploy_sp</span><span class="kw">:</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Service principal para deploy"</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">lookup</span><span class="kw">:</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">service_principal</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-data-deploy"</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">reporting_job</span><span class="kw">:</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"Reporting semanal"</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> generate_report</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">existing_cluster_id</span><span class="kw">:</span><span class="at"> ${var.shared_cluster}</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">notebook_task</span><span class="kw">:</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">notebook_path</span><span class="kw">:</span><span class="at"> ./src/report.py</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -346,37 +351,37 @@ Listing&nbsp;2: Lookups: resolver IDs de recursos por nombre en deploy time
 Listing&nbsp;3: Artifacts: empaquetar wheels con versión dinámica
 </figcaption>
 <div aria-describedby="lst-artifacts-whl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-artifacts-whl"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-artifacts-whl-1"><a href="#lst-artifacts-whl-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bundle</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-2"><a href="#lst-artifacts-whl-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> my-etl-pipeline</span></span>
-<span id="lst-artifacts-whl-3"><a href="#lst-artifacts-whl-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-artifacts-whl-4"><a href="#lst-artifacts-whl-4" aria-hidden="true" tabindex="-1"></a><span class="fu">artifacts</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-5"><a href="#lst-artifacts-whl-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">etl_core</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-6"><a href="#lst-artifacts-whl-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> whl</span></span>
-<span id="lst-artifacts-whl-7"><a href="#lst-artifacts-whl-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">build</span><span class="kw">:</span><span class="at"> </span><span class="st">"poetry build"</span></span>
-<span id="lst-artifacts-whl-8"><a href="#lst-artifacts-whl-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">path</span><span class="kw">:</span><span class="at"> ./etl_core</span></span>
-<span id="lst-artifacts-whl-9"><a href="#lst-artifacts-whl-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">dynamic_version</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">  # &lt;-- la versión se genera por timestamp</span></span>
-<span id="lst-artifacts-whl-10"><a href="#lst-artifacts-whl-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-artifacts-whl-11"><a href="#lst-artifacts-whl-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">transformations</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-12"><a href="#lst-artifacts-whl-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> whl</span></span>
-<span id="lst-artifacts-whl-13"><a href="#lst-artifacts-whl-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">build</span><span class="kw">:</span><span class="at"> </span><span class="st">"poetry build"</span></span>
-<span id="lst-artifacts-whl-14"><a href="#lst-artifacts-whl-14" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">path</span><span class="kw">:</span><span class="at"> ./transformations</span></span>
-<span id="lst-artifacts-whl-15"><a href="#lst-artifacts-whl-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">dynamic_version</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="lst-artifacts-whl-16"><a href="#lst-artifacts-whl-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-artifacts-whl-17"><a href="#lst-artifacts-whl-17" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-18"><a href="#lst-artifacts-whl-18" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-19"><a href="#lst-artifacts-whl-19" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">main_pipeline</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-20"><a href="#lst-artifacts-whl-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"Pipeline principal"</span></span>
-<span id="lst-artifacts-whl-21"><a href="#lst-artifacts-whl-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-22"><a href="#lst-artifacts-whl-22" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> run_etl</span></span>
-<span id="lst-artifacts-whl-23"><a href="#lst-artifacts-whl-23" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">spark_python_task</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-24"><a href="#lst-artifacts-whl-24" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">python_file</span><span class="kw">:</span><span class="at"> ./src/main.py</span></span>
-<span id="lst-artifacts-whl-25"><a href="#lst-artifacts-whl-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">libraries</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-26"><a href="#lst-artifacts-whl-26" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> </span><span class="fu">whl</span><span class="kw">:</span><span class="at"> ./etl_core/dist/*.whl</span></span>
-<span id="lst-artifacts-whl-27"><a href="#lst-artifacts-whl-27" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> </span><span class="fu">whl</span><span class="kw">:</span><span class="at"> ./transformations/dist/*.whl</span></span>
-<span id="lst-artifacts-whl-28"><a href="#lst-artifacts-whl-28" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">new_cluster</span><span class="kw">:</span></span>
-<span id="lst-artifacts-whl-29"><a href="#lst-artifacts-whl-29" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">spark_version</span><span class="kw">:</span><span class="at"> </span><span class="st">"14.3.x-scala2.12"</span></span>
-<span id="lst-artifacts-whl-30"><a href="#lst-artifacts-whl-30" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">node_type_id</span><span class="kw">:</span><span class="at"> </span><span class="st">"i3.xlarge"</span></span>
-<span id="lst-artifacts-whl-31"><a href="#lst-artifacts-whl-31" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">num_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bundle</span><span class="kw">:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> my-etl-pipeline</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="fu">artifacts</span><span class="kw">:</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">etl_core</span><span class="kw">:</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> whl</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">build</span><span class="kw">:</span><span class="at"> </span><span class="st">"poetry build"</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">path</span><span class="kw">:</span><span class="at"> ./etl_core</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">dynamic_version</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">  # &lt;-- la versión se genera por timestamp</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">transformations</span><span class="kw">:</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> whl</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">build</span><span class="kw">:</span><span class="at"> </span><span class="st">"poetry build"</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">path</span><span class="kw">:</span><span class="at"> ./transformations</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">dynamic_version</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">main_pipeline</span><span class="kw">:</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"Pipeline principal"</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> run_etl</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">spark_python_task</span><span class="kw">:</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">python_file</span><span class="kw">:</span><span class="at"> ./src/main.py</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">libraries</span><span class="kw">:</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> </span><span class="fu">whl</span><span class="kw">:</span><span class="at"> ./etl_core/dist/*.whl</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> </span><span class="fu">whl</span><span class="kw">:</span><span class="at"> ./transformations/dist/*.whl</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">new_cluster</span><span class="kw">:</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">spark_version</span><span class="kw">:</span><span class="at"> </span><span class="st">"14.3.x-scala2.12"</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">node_type_id</span><span class="kw">:</span><span class="at"> </span><span class="st">"i3.xlarge"</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">num_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -391,7 +396,7 @@ Listing&nbsp;3: Artifacts: empaquetar wheels con versión dinámica
 Listing&nbsp;4: Estructura de monorepo con un bundle por dominio
 </figcaption>
 <div aria-describedby="lst-monorepo-structure-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<pre id="lst-monorepo-structure"><code>project/
+<pre><code>project/
 ├── databricks.yml              # Bundle raíz
 ├── shared/
 │   ├── clusters.yml            # Clusters compartidos
@@ -415,41 +420,41 @@ Listing&nbsp;4: Estructura de monorepo con un bundle por dominio
 Listing&nbsp;5: Bundle raíz: includes, variables y targets por ambiente
 </figcaption>
 <div aria-describedby="lst-bundle-root-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-bundle-root"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-bundle-root-1"><a href="#lst-bundle-root-1" aria-hidden="true" tabindex="-1"></a><span class="co"># databricks.yml</span></span>
-<span id="lst-bundle-root-2"><a href="#lst-bundle-root-2" aria-hidden="true" tabindex="-1"></a><span class="fu">bundle</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-3"><a href="#lst-bundle-root-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> data-platform</span></span>
-<span id="lst-bundle-root-4"><a href="#lst-bundle-root-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-bundle-root-5"><a href="#lst-bundle-root-5" aria-hidden="true" tabindex="-1"></a><span class="fu">include</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-6"><a href="#lst-bundle-root-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> ./shared/*.yml</span></span>
-<span id="lst-bundle-root-7"><a href="#lst-bundle-root-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> ./domains/*/resources.yml</span></span>
-<span id="lst-bundle-root-8"><a href="#lst-bundle-root-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-bundle-root-9"><a href="#lst-bundle-root-9" aria-hidden="true" tabindex="-1"></a><span class="fu">variables</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-10"><a href="#lst-bundle-root-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">environment</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-11"><a href="#lst-bundle-root-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Target environment"</span></span>
-<span id="lst-bundle-root-12"><a href="#lst-bundle-root-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">default</span><span class="kw">:</span><span class="at"> dev</span></span>
-<span id="lst-bundle-root-13"><a href="#lst-bundle-root-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-bundle-root-14"><a href="#lst-bundle-root-14" aria-hidden="true" tabindex="-1"></a><span class="fu">targets</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-15"><a href="#lst-bundle-root-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">dev</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-16"><a href="#lst-bundle-root-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> development</span></span>
-<span id="lst-bundle-root-17"><a href="#lst-bundle-root-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">default</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="lst-bundle-root-18"><a href="#lst-bundle-root-18" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">workspace</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-19"><a href="#lst-bundle-root-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> https://dev.cloud.databricks.com</span></span>
-<span id="lst-bundle-root-20"><a href="#lst-bundle-root-20" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">variables</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-21"><a href="#lst-bundle-root-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> dev</span></span>
-<span id="lst-bundle-root-22"><a href="#lst-bundle-root-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-bundle-root-23"><a href="#lst-bundle-root-23" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">prod</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-24"><a href="#lst-bundle-root-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> production</span></span>
-<span id="lst-bundle-root-25"><a href="#lst-bundle-root-25" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">workspace</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-26"><a href="#lst-bundle-root-26" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> https://prod.cloud.databricks.com</span></span>
-<span id="lst-bundle-root-27"><a href="#lst-bundle-root-27" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">run_as</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-28"><a href="#lst-bundle-root-28" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">service_principal_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-data-platform-prod"</span></span>
-<span id="lst-bundle-root-29"><a href="#lst-bundle-root-29" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">variables</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-30"><a href="#lst-bundle-root-30" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> prod</span></span>
-<span id="lst-bundle-root-31"><a href="#lst-bundle-root-31" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">permissions</span><span class="kw">:</span></span>
-<span id="lst-bundle-root-32"><a href="#lst-bundle-root-32" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">service_principal_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-data-platform-prod"</span></span>
-<span id="lst-bundle-root-33"><a href="#lst-bundle-root-33" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_MANAGE</span></span>
-<span id="lst-bundle-root-34"><a href="#lst-bundle-root-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">group_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"data-engineering"</span></span>
-<span id="lst-bundle-root-35"><a href="#lst-bundle-root-35" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_VIEW</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># databricks.yml</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">bundle</span><span class="kw">:</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> data-platform</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">include</span><span class="kw">:</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> ./shared/*.yml</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> ./domains/*/resources.yml</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="fu">variables</span><span class="kw">:</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">environment</span><span class="kw">:</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Target environment"</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">default</span><span class="kw">:</span><span class="at"> dev</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="fu">targets</span><span class="kw">:</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">dev</span><span class="kw">:</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> development</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">default</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">workspace</span><span class="kw">:</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> https://dev.cloud.databricks.com</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">variables</span><span class="kw">:</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> dev</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">prod</span><span class="kw">:</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> production</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">workspace</span><span class="kw">:</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> https://prod.cloud.databricks.com</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">run_as</span><span class="kw">:</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">service_principal_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-data-platform-prod"</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">variables</span><span class="kw">:</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> prod</span></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">permissions</span><span class="kw">:</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">service_principal_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-data-platform-prod"</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_MANAGE</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">group_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"data-engineering"</span></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_VIEW</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -459,18 +464,18 @@ Listing&nbsp;5: Bundle raíz: includes, variables y targets por ambiente
 Listing&nbsp;6: Cluster compartido con autoscale definido como variable complex
 </figcaption>
 <div aria-describedby="lst-shared-cluster-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-shared-cluster"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-shared-cluster-1"><a href="#lst-shared-cluster-1" aria-hidden="true" tabindex="-1"></a><span class="co"># shared/clusters.yml</span></span>
-<span id="lst-shared-cluster-2"><a href="#lst-shared-cluster-2" aria-hidden="true" tabindex="-1"></a><span class="fu">variables</span><span class="kw">:</span></span>
-<span id="lst-shared-cluster-3"><a href="#lst-shared-cluster-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">shared_cluster</span><span class="kw">:</span></span>
-<span id="lst-shared-cluster-4"><a href="#lst-shared-cluster-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> complex</span></span>
-<span id="lst-shared-cluster-5"><a href="#lst-shared-cluster-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">default</span><span class="kw">:</span></span>
-<span id="lst-shared-cluster-6"><a href="#lst-shared-cluster-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">spark_version</span><span class="kw">:</span><span class="at"> </span><span class="st">"14.3.x-scala2.12"</span></span>
-<span id="lst-shared-cluster-7"><a href="#lst-shared-cluster-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">node_type_id</span><span class="kw">:</span><span class="at"> </span><span class="st">"i3.xlarge"</span></span>
-<span id="lst-shared-cluster-8"><a href="#lst-shared-cluster-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">autoscale</span><span class="kw">:</span></span>
-<span id="lst-shared-cluster-9"><a href="#lst-shared-cluster-9" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">min_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="lst-shared-cluster-10"><a href="#lst-shared-cluster-10" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">max_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">8</span></span>
-<span id="lst-shared-cluster-11"><a href="#lst-shared-cluster-11" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">spark_conf</span><span class="kw">:</span></span>
-<span id="lst-shared-cluster-12"><a href="#lst-shared-cluster-12" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">spark.databricks.delta.optimizeWrite.enabled</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># shared/clusters.yml</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">variables</span><span class="kw">:</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">shared_cluster</span><span class="kw">:</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> complex</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">default</span><span class="kw">:</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">spark_version</span><span class="kw">:</span><span class="at"> </span><span class="st">"14.3.x-scala2.12"</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">node_type_id</span><span class="kw">:</span><span class="at"> </span><span class="st">"i3.xlarge"</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">autoscale</span><span class="kw">:</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">min_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">max_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">8</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">spark_conf</span><span class="kw">:</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">spark.databricks.delta.optimizeWrite.enabled</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -480,19 +485,19 @@ Listing&nbsp;6: Cluster compartido con autoscale definido como variable complex
 Listing&nbsp;7: Recurso de dominio: job de ingesta con schedule y cluster compartido
 </figcaption>
 <div aria-describedby="lst-domain-resource-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-domain-resource"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-domain-resource-1"><a href="#lst-domain-resource-1" aria-hidden="true" tabindex="-1"></a><span class="co"># domains/ingestion/resources.yml</span></span>
-<span id="lst-domain-resource-2"><a href="#lst-domain-resource-2" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
-<span id="lst-domain-resource-3"><a href="#lst-domain-resource-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
-<span id="lst-domain-resource-4"><a href="#lst-domain-resource-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">ingest_customers</span><span class="kw">:</span></span>
-<span id="lst-domain-resource-5"><a href="#lst-domain-resource-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"[${var.environment}] Ingest Customers"</span></span>
-<span id="lst-domain-resource-6"><a href="#lst-domain-resource-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
-<span id="lst-domain-resource-7"><a href="#lst-domain-resource-7" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> cdc_load</span></span>
-<span id="lst-domain-resource-8"><a href="#lst-domain-resource-8" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">notebook_task</span><span class="kw">:</span></span>
-<span id="lst-domain-resource-9"><a href="#lst-domain-resource-9" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">notebook_path</span><span class="kw">:</span><span class="at"> ./domains/ingestion/src/customers.py</span></span>
-<span id="lst-domain-resource-10"><a href="#lst-domain-resource-10" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">new_cluster</span><span class="kw">:</span><span class="at"> ${var.shared_cluster}</span></span>
-<span id="lst-domain-resource-11"><a href="#lst-domain-resource-11" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">schedule</span><span class="kw">:</span></span>
-<span id="lst-domain-resource-12"><a href="#lst-domain-resource-12" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">quartz_cron_expression</span><span class="kw">:</span><span class="at"> </span><span class="st">"0 0 */2 * * ?"</span></span>
-<span id="lst-domain-resource-13"><a href="#lst-domain-resource-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">timezone_id</span><span class="kw">:</span><span class="at"> </span><span class="st">"America/Montevideo"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># domains/ingestion/resources.yml</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">ingest_customers</span><span class="kw">:</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"[${var.environment}] Ingest Customers"</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> cdc_load</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">notebook_task</span><span class="kw">:</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">notebook_path</span><span class="kw">:</span><span class="at"> ./domains/ingestion/src/customers.py</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">new_cluster</span><span class="kw">:</span><span class="at"> ${var.shared_cluster}</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">schedule</span><span class="kw">:</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">quartz_cron_expression</span><span class="kw">:</span><span class="at"> </span><span class="st">"0 0 */2 * * ?"</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">timezone_id</span><span class="kw">:</span><span class="at"> </span><span class="st">"America/Montevideo"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -506,36 +511,36 @@ Listing&nbsp;7: Recurso de dominio: job de ingesta con schedule y cluster compar
 Listing&nbsp;8: Presets: control granular de prefijos, triggers y tags por target
 </figcaption>
 <div aria-describedby="lst-presets-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-presets"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-presets-1"><a href="#lst-presets-1" aria-hidden="true" tabindex="-1"></a><span class="fu">targets</span><span class="kw">:</span></span>
-<span id="lst-presets-2"><a href="#lst-presets-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">dev</span><span class="kw">:</span></span>
-<span id="lst-presets-3"><a href="#lst-presets-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> development</span></span>
-<span id="lst-presets-4"><a href="#lst-presets-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">presets</span><span class="kw">:</span></span>
-<span id="lst-presets-5"><a href="#lst-presets-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name_prefix</span><span class="kw">:</span><span class="at"> </span><span class="st">"dev_mauro_"</span><span class="co">     # Prefijo custom en vez del default [dev]</span></span>
-<span id="lst-presets-6"><a href="#lst-presets-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trigger_pause_status</span><span class="kw">:</span><span class="at"> PAUSED</span><span class="co">  # Pausar todos los triggers</span></span>
-<span id="lst-presets-7"><a href="#lst-presets-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">jobs_max_concurrent_runs</span><span class="kw">:</span><span class="at"> </span><span class="dv">10</span><span class="co">  # Permitir más runs concurrentes</span></span>
-<span id="lst-presets-8"><a href="#lst-presets-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pipelines_development</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">   # Pipelines en modo dev</span></span>
-<span id="lst-presets-9"><a href="#lst-presets-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tags</span><span class="kw">:</span></span>
-<span id="lst-presets-10"><a href="#lst-presets-10" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">owner</span><span class="kw">:</span><span class="at"> mauro</span></span>
-<span id="lst-presets-11"><a href="#lst-presets-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> dev</span></span>
-<span id="lst-presets-12"><a href="#lst-presets-12" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">cost_center</span><span class="kw">:</span><span class="at"> sandbox</span></span>
-<span id="lst-presets-13"><a href="#lst-presets-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-presets-14"><a href="#lst-presets-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">staging</span><span class="kw">:</span></span>
-<span id="lst-presets-15"><a href="#lst-presets-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">presets</span><span class="kw">:</span></span>
-<span id="lst-presets-16"><a href="#lst-presets-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name_prefix</span><span class="kw">:</span><span class="at"> </span><span class="st">"stg_"</span></span>
-<span id="lst-presets-17"><a href="#lst-presets-17" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trigger_pause_status</span><span class="kw">:</span><span class="at"> PAUSED</span></span>
-<span id="lst-presets-18"><a href="#lst-presets-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">jobs_max_concurrent_runs</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
-<span id="lst-presets-19"><a href="#lst-presets-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pipelines_development</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
-<span id="lst-presets-20"><a href="#lst-presets-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tags</span><span class="kw">:</span></span>
-<span id="lst-presets-21"><a href="#lst-presets-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> staging</span></span>
-<span id="lst-presets-22"><a href="#lst-presets-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-presets-23"><a href="#lst-presets-23" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">prod</span><span class="kw">:</span></span>
-<span id="lst-presets-24"><a href="#lst-presets-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> production</span></span>
-<span id="lst-presets-25"><a href="#lst-presets-25" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">presets</span><span class="kw">:</span></span>
-<span id="lst-presets-26"><a href="#lst-presets-26" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name_prefix</span><span class="kw">:</span><span class="at"> </span><span class="st">""</span><span class="co">               # Sin prefijo en prod</span></span>
-<span id="lst-presets-27"><a href="#lst-presets-27" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trigger_pause_status</span><span class="kw">:</span><span class="at"> UNPAUSED</span></span>
-<span id="lst-presets-28"><a href="#lst-presets-28" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">jobs_max_concurrent_runs</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
-<span id="lst-presets-29"><a href="#lst-presets-29" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tags</span><span class="kw">:</span></span>
-<span id="lst-presets-30"><a href="#lst-presets-30" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> production</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">targets</span><span class="kw">:</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">dev</span><span class="kw">:</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> development</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">presets</span><span class="kw">:</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name_prefix</span><span class="kw">:</span><span class="at"> </span><span class="st">"dev_mauro_"</span><span class="co">     # Prefijo custom en vez del default [dev]</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trigger_pause_status</span><span class="kw">:</span><span class="at"> PAUSED</span><span class="co">  # Pausar todos los triggers</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">jobs_max_concurrent_runs</span><span class="kw">:</span><span class="at"> </span><span class="dv">10</span><span class="co">  # Permitir más runs concurrentes</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pipelines_development</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">   # Pipelines en modo dev</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tags</span><span class="kw">:</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">owner</span><span class="kw">:</span><span class="at"> mauro</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> dev</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">cost_center</span><span class="kw">:</span><span class="at"> sandbox</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">staging</span><span class="kw">:</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">presets</span><span class="kw">:</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name_prefix</span><span class="kw">:</span><span class="at"> </span><span class="st">"stg_"</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trigger_pause_status</span><span class="kw">:</span><span class="at"> PAUSED</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">jobs_max_concurrent_runs</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pipelines_development</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tags</span><span class="kw">:</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> staging</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">prod</span><span class="kw">:</span></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> production</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">presets</span><span class="kw">:</span></span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name_prefix</span><span class="kw">:</span><span class="at"> </span><span class="st">""</span><span class="co">               # Sin prefijo en prod</span></span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trigger_pause_status</span><span class="kw">:</span><span class="at"> UNPAUSED</span></span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">jobs_max_concurrent_runs</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tags</span><span class="kw">:</span></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">environment</span><span class="kw">:</span><span class="at"> production</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -550,26 +555,26 @@ Listing&nbsp;8: Presets: control granular de prefijos, triggers y tags por targe
 Listing&nbsp;9: Patrón de producción: run_as con service principal y permisos
 </figcaption>
 <div aria-describedby="lst-run-as-prod-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-run-as-prod"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-run-as-prod-1"><a href="#lst-run-as-prod-1" aria-hidden="true" tabindex="-1"></a><span class="fu">targets</span><span class="kw">:</span></span>
-<span id="lst-run-as-prod-2"><a href="#lst-run-as-prod-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">prod</span><span class="kw">:</span></span>
-<span id="lst-run-as-prod-3"><a href="#lst-run-as-prod-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> production</span></span>
-<span id="lst-run-as-prod-4"><a href="#lst-run-as-prod-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">run_as</span><span class="kw">:</span></span>
-<span id="lst-run-as-prod-5"><a href="#lst-run-as-prod-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">service_principal_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-etl-prod"</span></span>
-<span id="lst-run-as-prod-6"><a href="#lst-run-as-prod-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-run-as-prod-7"><a href="#lst-run-as-prod-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">permissions</span><span class="kw">:</span></span>
-<span id="lst-run-as-prod-8"><a href="#lst-run-as-prod-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">service_principal_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-etl-prod"</span></span>
-<span id="lst-run-as-prod-9"><a href="#lst-run-as-prod-9" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_MANAGE</span></span>
-<span id="lst-run-as-prod-10"><a href="#lst-run-as-prod-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">group_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"data-engineers"</span></span>
-<span id="lst-run-as-prod-11"><a href="#lst-run-as-prod-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_MANAGE_RUN</span></span>
-<span id="lst-run-as-prod-12"><a href="#lst-run-as-prod-12" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">group_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"data-analysts"</span></span>
-<span id="lst-run-as-prod-13"><a href="#lst-run-as-prod-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_VIEW</span></span>
-<span id="lst-run-as-prod-14"><a href="#lst-run-as-prod-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-run-as-prod-15"><a href="#lst-run-as-prod-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">workspace</span><span class="kw">:</span></span>
-<span id="lst-run-as-prod-16"><a href="#lst-run-as-prod-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> ${var.prod_host}</span></span>
-<span id="lst-run-as-prod-17"><a href="#lst-run-as-prod-17" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">root_path</span><span class="kw">:</span><span class="at"> /Workspace/Production/.bundle/${bundle.name}/${bundle.target}</span></span>
-<span id="lst-run-as-prod-18"><a href="#lst-run-as-prod-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-run-as-prod-19"><a href="#lst-run-as-prod-19" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">git</span><span class="kw">:</span></span>
-<span id="lst-run-as-prod-20"><a href="#lst-run-as-prod-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">branch</span><span class="kw">:</span><span class="at"> main</span><span class="co">  # Validación: solo se puede deployar desde main</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">targets</span><span class="kw">:</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">prod</span><span class="kw">:</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> production</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">run_as</span><span class="kw">:</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">service_principal_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-etl-prod"</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">permissions</span><span class="kw">:</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">service_principal_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"sp-etl-prod"</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_MANAGE</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">group_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"data-engineers"</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_MANAGE_RUN</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">group_name</span><span class="kw">:</span><span class="at"> </span><span class="st">"data-analysts"</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">level</span><span class="kw">:</span><span class="at"> CAN_VIEW</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">workspace</span><span class="kw">:</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> ${var.prod_host}</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">root_path</span><span class="kw">:</span><span class="at"> /Workspace/Production/.bundle/${bundle.name}/${bundle.target}</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">git</span><span class="kw">:</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">branch</span><span class="kw">:</span><span class="at"> main</span><span class="co">  # Validación: solo se puede deployar desde main</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -590,47 +595,47 @@ Listing&nbsp;9: Patrón de producción: run_as con service principal y permisos
 Listing&nbsp;10: CI/CD con GitHub Actions: validar y deployar DABs automáticamente
 </figcaption>
 <div aria-describedby="lst-cicd-github-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-cicd-github"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-cicd-github-1"><a href="#lst-cicd-github-1" aria-hidden="true" tabindex="-1"></a><span class="co"># .github/workflows/deploy.yml</span></span>
-<span id="lst-cicd-github-2"><a href="#lst-cicd-github-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> Deploy DAB</span></span>
-<span id="lst-cicd-github-3"><a href="#lst-cicd-github-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-github-4"><a href="#lst-cicd-github-4" aria-hidden="true" tabindex="-1"></a><span class="fu">on</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-5"><a href="#lst-cicd-github-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">push</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-6"><a href="#lst-cicd-github-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">branches</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">main</span><span class="kw">]</span></span>
-<span id="lst-cicd-github-7"><a href="#lst-cicd-github-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">pull_request</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-8"><a href="#lst-cicd-github-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">branches</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">main</span><span class="kw">]</span></span>
-<span id="lst-cicd-github-9"><a href="#lst-cicd-github-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-github-10"><a href="#lst-cicd-github-10" aria-hidden="true" tabindex="-1"></a><span class="fu">permissions</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-11"><a href="#lst-cicd-github-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span>
-<span id="lst-cicd-github-12"><a href="#lst-cicd-github-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">contents</span><span class="kw">:</span><span class="at"> read</span></span>
-<span id="lst-cicd-github-13"><a href="#lst-cicd-github-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-github-14"><a href="#lst-cicd-github-14" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-15"><a href="#lst-cicd-github-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">validate</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-16"><a href="#lst-cicd-github-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">runs-on</span><span class="kw">:</span><span class="at"> ubuntu-latest</span></span>
-<span id="lst-cicd-github-17"><a href="#lst-cicd-github-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-18"><a href="#lst-cicd-github-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
-<span id="lst-cicd-github-19"><a href="#lst-cicd-github-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-github-20"><a href="#lst-cicd-github-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> databricks/setup-cli@main</span></span>
-<span id="lst-cicd-github-21"><a href="#lst-cicd-github-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-github-22"><a href="#lst-cicd-github-22" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Validate bundle</span></span>
-<span id="lst-cicd-github-23"><a href="#lst-cicd-github-23" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">run</span><span class="kw">:</span><span class="at"> databricks bundle validate</span></span>
-<span id="lst-cicd-github-24"><a href="#lst-cicd-github-24" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">env</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-25"><a href="#lst-cicd-github-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_HOST</span><span class="kw">:</span><span class="at"> ${{ secrets.DATABRICKS_HOST }}</span></span>
-<span id="lst-cicd-github-26"><a href="#lst-cicd-github-26" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_TOKEN</span><span class="kw">:</span><span class="at"> ${{ secrets.DATABRICKS_TOKEN }}</span></span>
-<span id="lst-cicd-github-27"><a href="#lst-cicd-github-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-github-28"><a href="#lst-cicd-github-28" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">deploy</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-29"><a href="#lst-cicd-github-29" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">needs</span><span class="kw">:</span><span class="at"> validate</span></span>
-<span id="lst-cicd-github-30"><a href="#lst-cicd-github-30" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">if</span><span class="kw">:</span><span class="at"> github.ref == 'refs/heads/main'</span></span>
-<span id="lst-cicd-github-31"><a href="#lst-cicd-github-31" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">runs-on</span><span class="kw">:</span><span class="at"> ubuntu-latest</span></span>
-<span id="lst-cicd-github-32"><a href="#lst-cicd-github-32" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-33"><a href="#lst-cicd-github-33" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
-<span id="lst-cicd-github-34"><a href="#lst-cicd-github-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-github-35"><a href="#lst-cicd-github-35" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> databricks/setup-cli@main</span></span>
-<span id="lst-cicd-github-36"><a href="#lst-cicd-github-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="lst-cicd-github-37"><a href="#lst-cicd-github-37" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Deploy to production</span></span>
-<span id="lst-cicd-github-38"><a href="#lst-cicd-github-38" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">run</span><span class="kw">:</span><span class="at"> databricks bundle deploy --target prod</span></span>
-<span id="lst-cicd-github-39"><a href="#lst-cicd-github-39" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">env</span><span class="kw">:</span></span>
-<span id="lst-cicd-github-40"><a href="#lst-cicd-github-40" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_HOST</span><span class="kw">:</span><span class="at"> ${{ secrets.DATABRICKS_HOST }}</span></span>
-<span id="lst-cicd-github-41"><a href="#lst-cicd-github-41" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_TOKEN</span><span class="kw">:</span><span class="at"> ${{ secrets.DATABRICKS_TOKEN }}</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># .github/workflows/deploy.yml</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> Deploy DAB</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="fu">on</span><span class="kw">:</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">push</span><span class="kw">:</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">branches</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">main</span><span class="kw">]</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">pull_request</span><span class="kw">:</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">branches</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">main</span><span class="kw">]</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="fu">permissions</span><span class="kw">:</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">contents</span><span class="kw">:</span><span class="at"> read</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">validate</span><span class="kw">:</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">runs-on</span><span class="kw">:</span><span class="at"> ubuntu-latest</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> databricks/setup-cli@main</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Validate bundle</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">run</span><span class="kw">:</span><span class="at"> databricks bundle validate</span></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">env</span><span class="kw">:</span></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_HOST</span><span class="kw">:</span><span class="at"> ${{ secrets.DATABRICKS_HOST }}</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_TOKEN</span><span class="kw">:</span><span class="at"> ${{ secrets.DATABRICKS_TOKEN }}</span></span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">deploy</span><span class="kw">:</span></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">needs</span><span class="kw">:</span><span class="at"> validate</span></span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">if</span><span class="kw">:</span><span class="at"> github.ref == 'refs/heads/main'</span></span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">runs-on</span><span class="kw">:</span><span class="at"> ubuntu-latest</span></span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> databricks/setup-cli@main</span></span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Deploy to production</span></span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">run</span><span class="kw">:</span><span class="at"> databricks bundle deploy --target prod</span></span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">env</span><span class="kw">:</span></span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_HOST</span><span class="kw">:</span><span class="at"> ${{ secrets.DATABRICKS_HOST }}</span></span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">DATABRICKS_TOKEN</span><span class="kw">:</span><span class="at"> ${{ secrets.DATABRICKS_TOKEN }}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -644,19 +649,19 @@ Listing&nbsp;10: CI/CD con GitHub Actions: validar y deployar DABs automáticame
 Listing&nbsp;11: Sync patterns: controlar qué archivos se suben al workspace
 </figcaption>
 <div aria-describedby="lst-sync-patterns-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-sync-patterns"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="lst-sync-patterns-1"><a href="#lst-sync-patterns-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sync</span><span class="kw">:</span></span>
-<span id="lst-sync-patterns-2"><a href="#lst-sync-patterns-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">include</span><span class="kw">:</span></span>
-<span id="lst-sync-patterns-3"><a href="#lst-sync-patterns-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"src/**/*.py"</span></span>
-<span id="lst-sync-patterns-4"><a href="#lst-sync-patterns-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"config/**/*.yml"</span></span>
-<span id="lst-sync-patterns-5"><a href="#lst-sync-patterns-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"requirements.txt"</span></span>
-<span id="lst-sync-patterns-6"><a href="#lst-sync-patterns-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">exclude</span><span class="kw">:</span></span>
-<span id="lst-sync-patterns-7"><a href="#lst-sync-patterns-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"**/__pycache__"</span></span>
-<span id="lst-sync-patterns-8"><a href="#lst-sync-patterns-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"**/.pytest_cache"</span></span>
-<span id="lst-sync-patterns-9"><a href="#lst-sync-patterns-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"**/tests/**"</span></span>
-<span id="lst-sync-patterns-10"><a href="#lst-sync-patterns-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"**/*.egg-info"</span></span>
-<span id="lst-sync-patterns-11"><a href="#lst-sync-patterns-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">".git/**"</span></span>
-<span id="lst-sync-patterns-12"><a href="#lst-sync-patterns-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">".venv/**"</span></span>
-<span id="lst-sync-patterns-13"><a href="#lst-sync-patterns-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"docs/**"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sync</span><span class="kw">:</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">include</span><span class="kw">:</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"src/**/*.py"</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"config/**/*.yml"</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"requirements.txt"</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">exclude</span><span class="kw">:</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"**/__pycache__"</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"**/.pytest_cache"</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"**/tests/**"</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"**/*.egg-info"</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">".git/**"</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">".venv/**"</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="st">"docs/**"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -678,9 +683,9 @@ Listing&nbsp;11: Sync patterns: controlar qué archivos se suben al workspace
 Listing&nbsp;12: Inyectar variables de entorno BUNDLE_VAR en deploy de CI/CD
 </figcaption>
 <div aria-describedby="lst-bundle-var-env-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="sourceCode" id="lst-bundle-var-env"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="lst-bundle-var-env-1"><a href="#lst-bundle-var-env-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">BUNDLE_VAR_cluster_config</span><span class="op">=</span><span class="st">'{"num_workers": 20}'</span></span>
-<span id="lst-bundle-var-env-2"><a href="#lst-bundle-var-env-2" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">BUNDLE_VAR_environment</span><span class="op">=</span>prod</span>
-<span id="lst-bundle-var-env-3"><a href="#lst-bundle-var-env-3" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> bundle deploy <span class="at">--target</span> prod</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">BUNDLE_VAR_cluster_config</span><span class="op">=</span><span class="st">'{"num_workers": 20}'</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">BUNDLE_VAR_environment</span><span class="op">=</span>prod</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> bundle deploy <span class="at">--target</span> prod</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -890,236 +895,243 @@ window.addEventListener("quarto-page-loaded", function() {
 });
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
-    }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
       }
+      return false;
     }
-    return false;
-  }
-  const onCopySuccess = function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
       }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  }
-  const getTextToCopy = function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
         }
       }
       return codeEl.innerText;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
-    text: getTextToCopy
-  });
-  clipboard.on('success', onCopySuccess);
-  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
-    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
-      text: getTextToCopy,
-      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-    clipboardModal.on('success', onCopySuccess);
-  }
-    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
-    var mailtoRegex = new RegExp(/^mailto:/);
-      var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
-    var isInternal = (href) => {
-        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-    // Inspect non-navigation links and adorn them if external
- 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
-    for (var i=0; i<links.length; i++) {
-      const link = links[i];
-      if (!isInternal(link.href)) {
-        // undo the damage that might have been done by quarto-nav.js in the case of
-        // links that we want to consider external
-        if (link.dataset.originalHref !== undefined) {
-          link.href = link.dataset.originalHref;
-        }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
-    }
-  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
-    const config = {
-      allowHTML: true,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start',
-    };
-    if (contentFn) {
-      config.content = contentFn;
-    }
-    if (onTriggerFn) {
-      config.onTrigger = onTriggerFn;
-    }
-    if (onUntriggerFn) {
-      config.onUntrigger = onUntriggerFn;
-    }
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      if (note) {
-        return note.innerHTML;
-      } else {
-        return "";
-      }
-    });
-  }
-  const xrefs = window.document.querySelectorAll('a.quarto-xref');
-  const processXRef = (id, note) => {
-    // Strip column container classes
-    const stripColumnClz = (el) => {
-      el.classList.remove("page-full", "page-columns");
-      if (el.children) {
-        for (const child of el.children) {
-          stripColumnClz(child);
-        }
-      }
-    }
-    stripColumnClz(note)
-    if (id === null || id.startsWith('sec-')) {
-      // Special case sections, only their first couple elements
-      const container = document.createElement("div");
-      if (note.children && note.children.length > 2) {
-        container.appendChild(note.children[0].cloneNode(true));
-        for (let i = 1; i < note.children.length; i++) {
-          const child = note.children[i];
-          if (child.tagName === "P" && child.innerText === "") {
-            continue;
-          } else {
-            container.appendChild(child.cloneNode(true));
-            break;
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
         }
-        if (window.Quarto?.typesetMath) {
-          window.Quarto.typesetMath(container);
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
         }
-        return container.innerHTML
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
       } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
         if (window.Quarto?.typesetMath) {
           window.Quarto.typesetMath(note);
         }
-        return note.innerHTML;
-      }
-    } else {
-      // Remove any anchor links if they are present
-      const anchorLink = note.querySelector('a.anchorjs-link');
-      if (anchorLink) {
-        anchorLink.remove();
-      }
-      if (window.Quarto?.typesetMath) {
-        window.Quarto.typesetMath(note);
-      }
-      if (note.classList.contains("callout")) {
-        return note.outerHTML;
-      } else {
-        return note.innerHTML;
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
       }
     }
-  }
-  for (var i=0; i<xrefs.length; i++) {
-    const xref = xrefs[i];
-    tippyHover(xref, undefined, function(instance) {
-      instance.disable();
-      let url = xref.getAttribute('href');
-      let hash = undefined; 
-      if (url.startsWith('#')) {
-        hash = url;
-      } else {
-        try { hash = new URL(url).hash; } catch {}
-      }
-      if (hash) {
-        const id = hash.replace(/^#\/?/, "");
-        const note = window.document.getElementById(id);
-        if (note !== null) {
-          try {
-            const html = processXRef(id, note.cloneNode(true));
-            instance.setContent(html);
-          } finally {
-            instance.enable();
-            instance.show();
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
           }
         } else {
-          // See if we can fetch this
-          fetch(url.split('#')[0])
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
           .then(res => res.text())
           .then(html => {
             const parser = new DOMParser();
             const htmlDoc = parser.parseFromString(html, "text/html");
-            const note = htmlDoc.getElementById(id);
+            const note = htmlDoc.querySelector('main.content');
             if (note !== null) {
-              const html = processXRef(id, note);
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
               instance.setContent(html);
             } 
           }).finally(() => {
@@ -1127,189 +1139,190 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             instance.show();
           });
         }
-      } else {
-        // See if we can fetch a full url (with no hash to target)
-        // This is a special case and we should probably do some content thinning / targeting
-        fetch(url)
-        .then(res => res.text())
-        .then(html => {
-          const parser = new DOMParser();
-          const htmlDoc = parser.parseFromString(html, "text/html");
-          const note = htmlDoc.querySelector('main.content');
-          if (note !== null) {
-            // This should only happen for chapter cross references
-            // (since there is no id in the URL)
-            // remove the first header
-            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
-              note.children[0].remove();
-            }
-            const html = processXRef(null, note);
-            instance.setContent(html);
-          } 
-        }).finally(() => {
-          instance.enable();
-          instance.show();
-        });
-      }
-    }, function(instance) {
-    });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            div.style.left = 0;
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-        // Handle positioning of the toggle
-    window.addEventListener(
-      "resize",
-      throttle(() => {
-        elRect = undefined;
-        if (selectedAnnoteEl) {
-          selectCodeLines(selectedAnnoteEl);
-        }
-      }, 10)
-    );
-    function throttle(fn, ms) {
-    let throttle = false;
-    let timer;
-      return (...args) => {
-        if(!throttle) { // first call gets through
-            fn.apply(this, args);
-            throttle = true;
-        } else { // all the others get throttled
-            if(timer) clearTimeout(timer); // cancel #2
-            timer = setTimeout(() => {
-              fn.apply(this, args);
-              timer = throttle = false;
-            }, ms);
-        }
-      };
-    }
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
-    }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
-          }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+      }, function(instance) {
       });
     }
-  }
-});
-</script>
-<script src="https://giscus.app/client.js" data-repo="mauroloprete/mauroloprete" data-repo-id="R_kgDORVoiEQ" data-category="Announcements" data-category-id="DIC_kwDORVoiEc4C_LKu" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light_protanopia" data-lang="../../../es" crossorigin="anonymous" data-loading="lazy" async="">
-</script>
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 <input type="hidden" id="giscus-base-theme" value="light_protanopia">
 <input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "../../../es";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
 </div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">
