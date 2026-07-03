@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-06-14">
+<meta name="description" content="Compose, govern and share: Omnigent is the missing layer on top of Claude Code, Codex and Pi. Installation, YAML configuration, policies and a real test.">
+
+<title>Omnigent: the open source meta-harness to orchestrate all your AI agents – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../../">
+<link href="../../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../../../styles.css">
+<meta property="og:title" content="Omnigent: the open source meta-harness to orchestrate all your AI agents – Mauro Loprete">
+<meta property="og:description" content="Compose, govern and share: Omnigent is the missing layer on top of Claude Code, Codex and Pi. Installation, YAML configuration, policies and a real test.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/omnigent-meta-harness/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Omnigent: the open source meta-harness to orchestrate all your AI agents – Mauro Loprete">
+<meta name="twitter:description" content="Compose, govern and share: Omnigent is the missing layer on top of Claude Code, Codex and Pi. Installation, YAML configuration, policies and a real test.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/omnigent-meta-harness/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#installation" id="toc-installation" class="nav-link active" data-scroll-target="#installation">1. Installation</a></li>
+  <li><a href="#first-steps-cli" id="toc-first-steps-cli" class="nav-link" data-scroll-target="#first-steps-cli">2. First steps: CLI</a></li>
+  <li><a href="#anatomy-of-a-yaml-agent" id="toc-anatomy-of-a-yaml-agent" class="nav-link" data-scroll-target="#anatomy-of-a-yaml-agent">3. Anatomy of a YAML agent</a></li>
+  <li><a href="#policies-real-governance-not-prompts" id="toc-policies-real-governance-not-prompts" class="nav-link" data-scroll-target="#policies-real-governance-not-prompts">4. Policies: real governance, not prompts</a></li>
+  <li><a href="#real-time-collaboration" id="toc-real-time-collaboration" class="nav-link" data-scroll-target="#real-time-collaboration">5. Real-time collaboration</a></li>
+  <li><a href="#harnesses-and-gateways-which-models-you-can-use" id="toc-harnesses-and-gateways-which-models-you-can-use" class="nav-link" data-scroll-target="#harnesses-and-gateways-which-models-you-can-use">6. Harnesses and gateways: which models you can use</a></li>
+  <li><a href="#debby-and-debate-two-heads-think-better-than-one" id="toc-debby-and-debate-two-heads-think-better-than-one" class="nav-link" data-scroll-target="#debby-and-debate-two-heads-think-better-than-one">7. Debby and <code>/debate</code>: two heads think better than one</a>
+  <ul class="collapse">
+  <li><a href="#real-test-this-blog-on-trial" id="toc-real-test-this-blog-on-trial" class="nav-link" data-scroll-target="#real-test-this-blog-on-trial">Real test: this blog on trial</a></li>
+  </ul></li>
+  <li><a href="#polly-the-orchestrator-that-doesnt-write-code" id="toc-polly-the-orchestrator-that-doesnt-write-code" class="nav-link" data-scroll-target="#polly-the-orchestrator-that-doesnt-write-code">8. Polly: the orchestrator that doesn’t write code</a></li>
+  <li><a href="#proposed-design-multi-agent-code-review-with-governance" id="toc-proposed-design-multi-agent-code-review-with-governance" class="nav-link" data-scroll-target="#proposed-design-multi-agent-code-review-with-governance">9. Proposed design: multi-agent code review with governance</a></li>
+  <li><a href="#omnigent-vs.-the-alternatives" id="toc-omnigent-vs.-the-alternatives" class="nav-link" data-scroll-target="#omnigent-vs.-the-alternatives">Omnigent vs.&nbsp;the alternatives</a></li>
+  <li><a href="#my-take-and-whats-missing" id="toc-my-take-and-whats-missing" class="nav-link" data-scroll-target="#my-take-and-whats-missing">My take, and what’s missing</a></li>
+  <li><a href="#links" id="toc-links" class="nav-link" data-scroll-target="#links">Links</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Omnigent: the open source meta-harness to orchestrate all your AI agents</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">AI Agents</div>
+    <div class="quarto-category">Developer Tools</div>
+    <div class="quarto-category">Open Source</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Compose, govern and share: Omnigent is the missing layer on top of Claude Code, Codex and Pi. Installation, YAML configuration, policies and a real test.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 14, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>I couldn’t make it to the Databricks AI Summit this year. But within 10 minutes of reading the announcement I already had Omnigent running on my machine. Here’s everything I found.</p>
+<p><strong>Omnigent</strong> is an open source (Apache 2.0) meta-harness that sits <em>on top of</em> the agents you already use — Claude Code, Codex, Pi, or your own agents — and turns them into interchangeable pieces of a larger system. It was built by the Databricks AI team together with Neon.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Meta-harness</strong>: a layer above the harnesses (Claude Code, Codex, Pi) that composes them without rewriting code.</li>
+<li><strong>Policies</strong>: spend caps, rate limiting, shell approval — at the server, agent or session level.</li>
+<li><strong>Collaboration</strong>: share sessions via URL, real-time co-driving, conversation forking.</li>
+<li><strong>YAML-first</strong>: an agent is a YAML file with a prompt, harness, tools and sub-agents.</li>
+<li><strong>Open source</strong>: Apache 2.0 on <a href="https://github.com/omnigent-ai/omnigent">GitHub</a>.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="installation" class="level2">
+<h2 class="anchored" data-anchor-id="installation">1. Installation</h2>
+<p>Prerequisites: Python 3.12+, <code>uv</code>, <code>git</code>, Node.js 22 LTS with npm, and <code>tmux</code>.</p>
+<p>Pick <strong>one</strong> of these methods:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Recommended: official script (installs everything)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-fsSL</span> https://omnigent.ai/install.sh <span class="kw">|</span> <span class="fu">sh</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Alternatives if you’d rather handle it yourself:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> tool install omnigent     <span class="co"># via uv</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="st">"omnigent"</span>        <span class="co"># via pip</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">brew</span> install omnigent-ai/tap/omnigent  <span class="co"># macOS with Homebrew</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If you use <strong>Databricks as a model provider</strong> (served models, DBRX, custom endpoints):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> tool install <span class="st">"omnigent[databricks]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Then configure your credentials with the interactive wizard:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> setup</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>It will ask for API keys or subscriptions depending on which harnesses you want to use. Verify everything is in order with:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> <span class="at">--version</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># omnigent, version 0.1.0</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> config list</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># host.host_id: host_e4dc98fc...</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># host.name: 192.168.x.x</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># providers.claude.cli: claude</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co"># providers.claude.default: true</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># providers.claude.kind: subscription</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co"># providers.codex.cli: codex</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># providers.codex.default: true</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># providers.codex.kind: subscription</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># tui.theme: dark</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If you have Claude and Codex subscriptions, Omnigent detects them automatically. For API keys (OpenAI, Anthropic), you can set them as environment variables or via <code>omnigent setup</code>.</p>
+<hr>
+</section>
+<section id="first-steps-cli" class="level2">
+<h2 class="anchored" data-anchor-id="first-steps-cli">2. First steps: CLI</h2>
+<p>The CLI is simple. <code>omnigent</code> or <code>omni</code> opens an interactive session. These are all the available commands:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> <span class="at">--help</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Usage: omnigent [OPTIONS] COMMAND [ARGS]...</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   Omnigent CLI.</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Commands:</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co">#   attach   Attach the REPL to a LIVE session</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co">#   claude   Launch Claude Code in an Omnigent terminal</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co">#   codex    Launch Codex TUI in an Omnigent terminal</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co">#   config   Get, set, and view Omnigent defaults and credentials</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co">#   debby    Launch debby, the bundled brainstorming agent</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co">#   host     Register this machine as a host with a server</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co">#   login    Authenticate with a remote Omnigent server</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   polly    Launch polly, the bundled multi-agent coding orchestrator</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="co">#   resume   Resume an Omnigent conversation</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co">#   run      Start a session with an Omnigent agent</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co">#   server   Start the Omnigent server or manage the daemon</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="co">#   setup    Launch the first-time setup flow</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="co">#   stop     Stop everything Omnigent is running on this machine</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The most important ones to get started:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 36%">
+<col style="width: 63%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>omnigent</code></td>
+<td>Interactive session with the default harness</td>
+</tr>
+<tr class="even">
+<td><code>omnigent claude</code></td>
+<td>Launch Claude Code</td>
+</tr>
+<tr class="odd">
+<td><code>omnigent codex</code></td>
+<td>Launch Codex</td>
+</tr>
+<tr class="even">
+<td><code>omnigent run agent.yaml</code></td>
+<td>Run a custom agent</td>
+</tr>
+<tr class="odd">
+<td><code>omnigent server start</code></td>
+<td>Web UI at <code>localhost:6767</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="anatomy-of-a-yaml-agent" class="level2">
+<h2 class="anchored" data-anchor-id="anatomy-of-a-yaml-agent">3. Anatomy of a YAML agent</h2>
+<p>Here’s where it gets interesting. An agent in Omnigent is a YAML file declaring what it does, with which harness, which tools it has, and optionally sub-agents it can delegate to:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> data_pipeline_reviewer</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  You are an expert reviewer of data pipelines.</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  You review Spark, dbt and SQL code looking for performance</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  issues, data quality problems and best-practice violations.</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="fu">executor</span><span class="kw">:</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">harness</span><span class="kw">:</span><span class="at"> claude-sdk</span><span class="co">    # also: codex, pi, openai-agents</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="fu">tools</span><span class="kw">:</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">lint_sql</span><span class="kw">:</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> function</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">callable</span><span class="kw">:</span><span class="at"> tools.sql_linter.run_lint</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">check_lineage</span><span class="kw">:</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> agent</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="fu">    prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>      Analyze the pipeline's lineage and report</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>      circular dependencies or orphan tables.</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">tools</span><span class="kw">:</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">lint_sql</span><span class="kw">:</span><span class="at"> inherit</span><span class="co">    # inherits tools from the parent agent</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The key points:</p>
+<ul>
+<li><strong><code>harness</code></strong> defines which model/runtime the agent uses. Switching from Claude to Codex is a one-line change.</li>
+<li><strong><code>tools</code></strong> can be local Python functions or full sub-agents.</li>
+<li><strong><code>inherit</code></strong> lets a sub-agent use the parent’s tools without redefining them.</li>
+</ul>
+<hr>
+</section>
+<section id="policies-real-governance-not-prompts" class="level2">
+<h2 class="anchored" data-anchor-id="policies-real-governance-not-prompts">4. Policies: real governance, not prompts</h2>
+<p>Policies are what set Omnigent apart from simply running <code>claude</code> in the terminal. They operate at three levels: server, agent and session.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">policies</span><span class="kw">:</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co">  # Ask for approval before touching the filesystem or network</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">approve_shell</span><span class="kw">:</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> function</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">handler</span><span class="kw">:</span><span class="at"> omnigent.policies.builtins.safety.ask_on_os_tools</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co">  # Cap the number of tool calls per session</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cap_calls</span><span class="kw">:</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> function</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">handler</span><span class="kw">:</span><span class="at"> omnigent.policies.builtins.safety.max_tool_calls_per_session</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">factory_params</span><span class="kw">:</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">limit</span><span class="kw">:</span><span class="at"> </span><span class="dv">50</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="co">  # Maximum budget per session</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">budget</span><span class="kw">:</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> function</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">handler</span><span class="kw">:</span><span class="at"> omnigent.policies.builtins.cost.cost_budget</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">factory_params</span><span class="kw">:</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">max_cost_usd</span><span class="kw">:</span><span class="at"> </span><span class="fl">5.00</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">ask_thresholds_usd</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="fl">3.00</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This is real governance:</p>
+<ul>
+<li><strong><code>ask_on_os_tools</code></strong>: the agent asks for your permission before running shell commands or touching files. It’s not a prompt — it’s a hook that intercepts execution.</li>
+<li><strong><code>max_tool_calls_per_session</code></strong>: a hard cap on invocations. Useful for avoiding infinite loops.</li>
+<li><strong><code>cost_budget</code></strong>: a spend limit in USD. It warns you when you hit the threshold and stops when you hit the max.</li>
+</ul>
+<p>But this is just the tip of the iceberg. The built-in policy registry has <strong>17+ policies</strong> organized by category:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 36%">
+<col style="width: 33%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Category</th>
+<th>Policies</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Safety</strong></td>
+<td><code>ask_on_os_tools</code>, <code>max_tool_calls_per_session</code>, <code>blast_radius</code></td>
+<td>Limit which files/dirs an agent can touch</td>
+</tr>
+<tr class="even">
+<td><strong>Cost</strong></td>
+<td><code>cost_budget</code>, <code>token_budget</code>, <code>rate_limit</code></td>
+<td>Budget in USD or tokens, per-minute rate limiting</td>
+</tr>
+<tr class="odd">
+<td><strong>Privacy</strong></td>
+<td><code>pii_detection</code>, <code>redact_secrets</code></td>
+<td>Detect and redact PII or secrets before sending them to the model</td>
+</tr>
+<tr class="even">
+<td><strong>Access</strong></td>
+<td><code>github_access_control</code>, <code>file_allowlist</code></td>
+<td>Restrict which repos or paths it can access</td>
+</tr>
+<tr class="odd">
+<td><strong>Logic</strong></td>
+<td><code>cel_expression</code>, <code>risk_scoring</code></td>
+<td>Custom policies with CEL expressions, per-action risk scoring</td>
+</tr>
+</tbody>
+</table>
+<p>And if no built-in covers your case, you can write your own as a Python function that receives the action’s context and returns <code>allow</code>, <code>deny</code> or <code>ask</code>.</p>
+<p>If you think of Unity AI Gateway as governance for LLMs <em>in production</em>, Omnigent is governance for agents <em>in development</em>.</p>
+<hr>
+</section>
+<section id="real-time-collaboration" class="level2">
+<h2 class="anchored" data-anchor-id="real-time-collaboration">5. Real-time collaboration</h2>
+<p>I haven’t tested this in depth yet, but the promise is interesting:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Share a session: generates a link</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> server start</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Another user connects to the same server</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> login http://your-server:6767</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Hook into an active session (co-driving)</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> attach <span class="op">&lt;</span>session_id<span class="op">&gt;</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Fork a conversation to explore another path</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> run <span class="at">--fork</span> <span class="op">&lt;</span>session_id<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Co-driving</strong> = two people controlling the same agent in real time from different machines. <strong>Fork</strong> = cloning a conversation to try an alternative without losing the original context.</p>
+<p>Locally it works without a hitch — I used <code>attach</code> and fork while writing this post. What I still need to test is the real multi-machine scenario (latency, edit conflicts, what happens if both send a message at the same time). That’s for a future post.</p>
+<hr>
+</section>
+<section id="harnesses-and-gateways-which-models-you-can-use" class="level2">
+<h2 class="anchored" data-anchor-id="harnesses-and-gateways-which-models-you-can-use">6. Harnesses and gateways: which models you can use</h2>
+<p>Omnigent supports native harnesses and external gateways. The beauty is that switching between them is a one-line change in the YAML:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 23%">
+<col style="width: 47%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Harness</th>
+<th>CLI</th>
+<th>When to use it</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Claude Code</td>
+<td><code>omnigent claude</code></td>
+<td>Coding, refactoring, code analysis</td>
+</tr>
+<tr class="even">
+<td>Codex</td>
+<td><code>omnigent codex</code></td>
+<td>Code generation, completions</td>
+</tr>
+<tr class="odd">
+<td>Pi</td>
+<td><code>omnigent pi</code></td>
+<td>Conversational, brainstorming</td>
+</tr>
+<tr class="even">
+<td>OpenAI Agents</td>
+<td><code>openai-agents</code> in YAML</td>
+<td>GPT-4o, o-series, custom</td>
+</tr>
+<tr class="odd">
+<td>Databricks</td>
+<td>via gateway</td>
+<td>Models served in your workspace, DBRX</td>
+</tr>
+<tr class="even">
+<td>Custom</td>
+<td><code>omnigent run agent.yaml</code></td>
+<td>Whatever you want</td>
+</tr>
+</tbody>
+</table>
+<p>If you don’t have a direct subscription, you can route through gateways like OpenRouter (<code>https://openrouter.ai/api</code>), local Ollama (<code>http://localhost:11434/v1</code>), LiteLLM, Azure OpenAI or vLLM. And in any session, <strong><code>/model</code></strong> lets you switch models without losing context.</p>
+<hr>
+</section>
+<section id="debby-and-debate-two-heads-think-better-than-one" class="level2">
+<h2 class="anchored" data-anchor-id="debby-and-debate-two-heads-think-better-than-one">7. Debby and <code>/debate</code>: two heads think better than one</h2>
+<p><strong>Debby</strong> is one of the example agents bundled with Omnigent and it’s where the meta-harness idea becomes tangible. It’s a brainstorming partner with <strong>two heads</strong>: one Claude and one GPT. Every question you ask goes to both models and the answers are shown side by side.</p>
+<p>The examples live in the <a href="https://github.com/omnigent-ai/omnigent">official Omnigent repo</a> — clone the repo and they’re ready to use:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/omnigent-ai/omnigent.git</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> omnigent</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Launch Debby</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> run examples/debby/</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Or with a different base harness</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> run examples/debby/ <span class="at">--harness</span> openai-agents</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>But the best part is the <strong><code>/debate</code></strong> command: when you type it, the two heads start <em>critiquing each other</em> for several rounds until they converge on a consolidated answer. It’s not a prompt asking “be critical” — it’s two different models with different biases going head to head.</p>
+<section id="real-test-this-blog-on-trial" class="level3">
+<h3 class="anchored" data-anchor-id="real-test-this-blog-on-trial">Real test: this blog on trial</h3>
+<p>Of course, the first thing I did once I had the sections above was think: <em>what if I ask Omnigent itself to evaluate this post?</em> For that I built a custom agent — a jury with two sub-agents, one that <strong>defends</strong> the post and one that <strong>tears it apart</strong>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> blog_judge</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="fu">prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  You are a judge of technical blog posts for the "Spark de Ideas" blog.</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  Your audience is Data Engineers in LATAM.</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  You evaluate: clarity, technical accuracy, structure, and practical usefulness.</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  Send the post to both heads for debate.</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  The "advocate" head defends the post.</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>  The "critic" head criticizes it harshly.</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  After both have spoken, give a final verdict with a 1-10 score</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  and concrete improvements.</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="fu">executor</span><span class="kw">:</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">harness</span><span class="kw">:</span><span class="at"> claude-sdk</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a><span class="fu">tools</span><span class="kw">:</span></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">advocate</span><span class="kw">:</span></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> agent</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a><span class="fu">    prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>      You are the DEFENDER of this blog post. Argue why it's good,</span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>      what it contributes, why it's publishable. Be specific with examples</span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>      from the text. Highlight what works well. Partial score 1-10.</span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">executor</span><span class="kw">:</span></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">harness</span><span class="kw">:</span><span class="at"> claude-sdk</span></span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">critic</span><span class="kw">:</span></span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> agent</span></span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a><span class="fu">    prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>      You are the RUTHLESS CRITIC of this blog post. Point out everything weak:</span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>      technical inaccuracies, weak structure, unconvincing examples,</span>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>      things that are missing. Be brutal but constructive. Partial score 1-10.</span>
+<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">executor</span><span class="kw">:</span></span>
+<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">harness</span><span class="kw">:</span><span class="at"> claude-sdk</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>I ran it passing this very <code>.qmd</code> as the prompt:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> run blog_judge.yaml <span class="at">-p</span> <span class="st">"Evaluate this technical blog post. </span><span class="dt">\</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="st">  Score 1-10 and concrete improvements. --- </span><span class="dt">\</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="st">  </span><span class="va">$(</span><span class="fu">cat</span> blog/posts/omnigent-meta-harness/index.qmd<span class="va">)</span><span class="st"> ---"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>And this is what came out:</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Advocate — Score: 7.5/10
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-2" class="callout-2-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p><strong>Strengths it defends:</strong></p>
+<ol type="1">
+<li><strong>Perfect timing</strong>: A Spanish-language post on AI agent orchestration when nobody else is covering it in LATAM. The hook “I couldn’t make it to the Summit but within 10 minutes I had it running” creates instant identification.</li>
+<li><strong>Impeccable progressive structure</strong>: Installation → CLI → YAML → Policies → Collaboration → Advanced examples. The reader can stop at any section and walk away with something useful.</li>
+<li><strong>Concrete technical precision</strong>: Real YAMLs, exact prerequisite versions, numeric values in policies ($5, 50 calls). The distinction “hooks that intercept execution, not prompts” is pure gold.</li>
+<li><strong>Brilliant meta-demonstration (§7)</strong>: Using Omnigent to evaluate the post about Omnigent is <em>show don’t tell</em> at its finest. Publishing that your own critic gave you a 5/10 is radical honesty.</li>
+<li><strong>Authentic LATAM voice</strong>: Voseo, direct tone, not a translation — it feels written from within the regional ecosystem.</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Critic — Score: 4.5/10
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p><strong>Problems it tore apart:</strong></p>
+<ol type="1">
+<li><strong>The categories are a lie</strong>: “Databricks Tips” and “MLOps” don’t apply. There isn’t a single Databricks tip or model registry in sight. It’s developer tooling / agentic AI. A DE filtering by those categories feels cheated.</li>
+<li><strong>Factual error about policies</strong>: The post says “small policy ecosystem” but the actual registry has <strong>17+ built-in policies</strong> (PII detection, GitHub access control, CEL expressions, blast radius, risk scoring). The author didn’t explore what was right in front of him.</li>
+<li><strong>Structure = feature dump with no thesis</strong>: There’s no problem → solution → validation. It’s “Omnigent has this, this and this. Seems fine to me. Bye.”</li>
+<li><strong>Section 9 is hypothetical</strong>: The description promises a “real test” but the flagship use case is conceptual. “You didn’t even try it yourself, and you’re recommending it to me?”</li>
+<li><strong>Zero practical usefulness for DEs</strong>: No connection to Airflow/dbt/Spark, no real costs, no latencies, no comparison with LangGraph/CrewAI/AutoGen.</li>
+<li><strong>Polly in one paragraph</strong>: A tool of that complexity described as a marketing bullet. How does it resolve conflicts between worktrees? What heuristic does it use?</li>
+<li><strong>No screenshots or logs of a real run</strong>.</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The jury’s final verdict — Score: 6/10
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Criterion</th>
+<th>Advocate</th>
+<th>Critic</th>
+<th><strong>Final</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Clarity</td>
+<td>8</td>
+<td>6</td>
+<td><strong>7</strong></td>
+</tr>
+<tr class="even">
+<td>Technical accuracy</td>
+<td>7</td>
+<td>5</td>
+<td><strong>6</strong></td>
+</tr>
+<tr class="odd">
+<td>Structure</td>
+<td>8</td>
+<td>4</td>
+<td><strong>6</strong></td>
+</tr>
+<tr class="even">
+<td>Practical usefulness</td>
+<td>7</td>
+<td>3</td>
+<td><strong>5</strong></td>
+</tr>
+<tr class="odd">
+<td>Originality</td>
+<td>8</td>
+<td>6</td>
+<td><strong>7</strong></td>
+</tr>
+<tr class="even">
+<td>Credibility</td>
+<td>—</td>
+<td>4</td>
+<td><strong>5</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>OVERALL</strong></td>
+<td><strong>7.5</strong></td>
+<td><strong>4.5</strong></td>
+<td><strong>6</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The advocate is right that the post fills a real gap in Spanish and has brilliant moments (§4 policies, §7 meta-evaluation). The critic is right that it <strong>promises more than it shows</strong>.</p>
+<p><strong>Top 5 mandatory improvements:</strong></p>
+<ol type="1">
+<li>Recategorize as <code>[AI Agents, Developer Tools, Open Source]</code>.</li>
+<li>Actually run §9 or kill it.</li>
+<li>Explore and document the 17+ policies.</li>
+<li>Add a comparison with LangGraph / CrewAI / AutoGen.</li>
+<li>Add real metrics: cost per session, tokens, latency.</li>
+</ol>
+</div>
+</div>
+<p>It ripped me to shreds. And it was right. The judge basically assumed I hadn’t even installed the CLI —that this was a vaporware post, pure theory without ever touching a terminal. Here’s the screenshot:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="debate_screenshot.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Omnigent debate screenshot"><img src="debate_screenshot.png" class="img-fluid figure-img" alt="Omnigent debate screenshot"></a></p>
+<figcaption>Omnigent debate screenshot</figcaption>
+</figure>
+</div>
+<p><code>/debate</code> forces you to see your own work from an angle you don’t expect. <strong>From here on, everything you read is what I changed after that review</strong>: the corrected categories, the expanded policies section, section 9 rewritten, and the collapsible callouts you just read.</p>
+<hr>
+</section>
+</section>
+<section id="polly-the-orchestrator-that-doesnt-write-code" class="level2">
+<h2 class="anchored" data-anchor-id="polly-the-orchestrator-that-doesnt-write-code">8. Polly: the orchestrator that doesn’t write code</h2>
+<p><strong>Polly</strong> is the other example agent and shows off the most complex multi-agent pattern:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> run examples/polly/</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="ex">omnigent</span> run examples/polly/ <span class="at">--harness</span> pi</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Its workflow:</p>
+<ol type="1">
+<li><strong>Plans</strong> the coding task.</li>
+<li><strong>Delegates</strong> the work to sub-agents (Claude Code, Codex or Pi) in <strong>parallel git worktrees</strong>.</li>
+<li><strong>Routes</strong> each diff to a reviewer from a <em>different vendor</em> than the one that wrote the code.</li>
+<li><strong>Coordinates</strong> until everything is ready for human merge.</li>
+</ol>
+<p>Polly doesn’t write a single line of code. It’s a tech lead that orchestrates. The fact that the reviewers are always from a different vendor than the coder is a brilliant detail: it avoids self-correction bias.</p>
+<hr>
+</section>
+<section id="proposed-design-multi-agent-code-review-with-governance" class="level2">
+<h2 class="anchored" data-anchor-id="proposed-design-multi-agent-code-review-with-governance">9. Proposed design: multi-agent code review with governance</h2>
+<p>I haven’t run it yet (that’s for a future post with a real dbt/Spark repo), but this is the kind of agent Omnigent enables and that I’d want on my team:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> code_review_pipeline</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  You coordinate a code review pipeline for the DE team.</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  First the reviewer analyzes, then the fixer applies corrections.</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="fu">executor</span><span class="kw">:</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">harness</span><span class="kw">:</span><span class="at"> claude-sdk</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="fu">policies</span><span class="kw">:</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">budget</span><span class="kw">:</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> function</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">handler</span><span class="kw">:</span><span class="at"> omnigent.policies.builtins.cost.cost_budget</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">factory_params</span><span class="kw">:</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">max_cost_usd</span><span class="kw">:</span><span class="at"> </span><span class="fl">20.00</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">ask_thresholds_usd</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="fl">10.00</span><span class="kw">,</span><span class="at"> </span><span class="fl">15.00</span><span class="kw">]</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">sandbox</span><span class="kw">:</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> function</span></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">handler</span><span class="kw">:</span><span class="at"> omnigent.policies.builtins.safety.ask_on_os_tools</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="fu">tools</span><span class="kw">:</span></span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">reviewer</span><span class="kw">:</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> agent</span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a><span class="fu">    prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>      Review the code looking for bugs, security issues</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>      and performance problems. List the findings.</span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">executor</span><span class="kw">:</span></span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">harness</span><span class="kw">:</span><span class="at"> claude-sdk</span></span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">fixer</span><span class="kw">:</span></span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">type</span><span class="kw">:</span><span class="at"> agent</span></span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a><span class="fu">    prompt</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>      You receive findings from a code review.</span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>      Apply the minimal fixes required.</span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">executor</span><span class="kw">:</span></span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">harness</span><span class="kw">:</span><span class="at"> codex</span></span>
+<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">tools</span><span class="kw">:</span></span>
+<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">apply_patch</span><span class="kw">:</span><span class="at"> inherit</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The idea: a Claude agent reviews, a Codex agent fixes. Same session, different models. A shared USD 20 budget. Nobody touches the filesystem without approval. Sandboxed <strong>runners</strong> per agent, a <strong>server</strong> with policies and history, and you watching everything from the terminal or the web UI at <code>localhost:6767</code>.</p>
+<p>Why haven’t I run it yet? Because I want to do it against a real PR from a dbt pipeline with tests, lineage and measurable costs — not against a toy repo. When I have it, it’ll get its own post.</p>
+<hr>
+</section>
+<section id="omnigent-vs.-the-alternatives" class="level2">
+<h2 class="anchored" data-anchor-id="omnigent-vs.-the-alternatives">Omnigent vs.&nbsp;the alternatives</h2>
+<p>If you’re already in the agent orchestration world, the obvious question is: why Omnigent and not LangGraph, CrewAI or AutoGen?</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>Omnigent</strong></th>
+<th><strong>LangGraph</strong></th>
+<th><strong>CrewAI</strong></th>
+<th><strong>AutoGen</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Composition model</strong></td>
+<td>Declarative YAML, swappable harnesses</td>
+<td>Graphs in Python (nodes + edges)</td>
+<td>Roles + tasks in Python</td>
+<td>Multi-agent conversation in Python</td>
+</tr>
+<tr class="even">
+<td><strong>Built-in governance</strong></td>
+<td>17+ policies (cost, safety, PII, CEL)</td>
+<td>Not native (DIY)</td>
+<td>Not native</td>
+<td>Not native</td>
+</tr>
+<tr class="odd">
+<td><strong>Multi-vendor</strong></td>
+<td>Claude, GPT, Pi, Databricks in the same session</td>
+<td>LLM-agnostic but single-provider per graph</td>
+<td>LLM-agnostic</td>
+<td>LLM-agnostic</td>
+</tr>
+<tr class="even">
+<td><strong>Collaboration</strong></td>
+<td>Co-driving, fork, shared sessions</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Native CLI</strong></td>
+<td>Yes (<code>omnigent run</code>, <code>attach</code>, <code>server</code>)</td>
+<td>No (SDK only)</td>
+<td>Limited</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>License</strong></td>
+<td>Apache 2.0</td>
+<td>MIT</td>
+<td>MIT</td>
+<td>MIT</td>
+</tr>
+<tr class="odd">
+<td><strong>Maturity</strong></td>
+<td>Alpha (June 2026)</td>
+<td>Production</td>
+<td>Stable beta</td>
+<td>Stable beta</td>
+</tr>
+</tbody>
+</table>
+<p>The key difference: LangGraph, CrewAI and AutoGen are <strong>frameworks for building agents in Python</strong>. Omnigent is a <strong>layer that composes existing agents</strong> without rewriting them. They don’t compete directly — in fact, you could have a LangGraph agent running as a custom harness inside Omnigent.</p>
+<hr>
+</section>
+<section id="my-take-and-whats-missing" class="level2">
+<h2 class="anchored" data-anchor-id="my-take-and-whats-missing">My take, and what’s missing</h2>
+<p><strong>The good:</strong></p>
+<ul>
+<li>The YAML abstraction is clean. Defining a multi-model agent in 20 lines is powerful.</li>
+<li>Policies are first-class citizens, not an afterthought. The registry has 17+ built-ins and is extensible with Python.</li>
+<li>Co-driving and session forking are features no other framework offers today.</li>
+<li>Open source Apache 2.0, no lock-in.</li>
+</ul>
+<p><strong>What tripped me up (it’s alpha, and it shows):</strong></p>
+<ul>
+<li>The server daemon sometimes won’t start after a crash — I had to kill processes manually with <code>kill</code> because <code>omnigent stop</code> didn’t clean everything up. Workaround: <code>ps aux | grep omnigent</code> and kill them by hand.</li>
+<li>The policies documentation exists, but you have to read the source code to understand each one’s <code>factory_params</code>. There’s no <code>omnigent policy list</code> or the like.</li>
+<li>The Databricks integration (<code>omnigent[databricks]</code>) installs the dependencies, but I didn’t test routing to a real serving endpoint. Still pending.</li>
+<li>Polly sometimes hangs waiting for a sub-agent that already finished. Killing the session and doing <code>omnigent resume</code> recovers it, but it’s not ideal.</li>
+</ul>
+<hr>
+</section>
+<section id="links" class="level2">
+<h2 class="anchored" data-anchor-id="links">Links</h2>
+<ul>
+<li><a href="https://github.com/omnigent-ai/omnigent">GitHub: omnigent-ai/omnigent</a></li>
+<li><a href="https://omnigent.ai/">Official site: omnigent.ai</a></li>
+<li><a href="https://www.databricks.com/blog/introducing-omnigent-meta-harness-combine-control-and-share-your-agents">Databricks blog: Introducing Omnigent</a></li>
+<li><a href="https://www.marktechpost.com/2026/06/13/databricks-open-sources-omnigent-a-meta-harness-that-composes-governs-and-shares-ai-agents-across-claude-code-codex-and-pi/">MarkTechPost: Omnigent Open Source</a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

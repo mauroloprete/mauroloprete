@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-02-17">
+<meta name="description" content="Python, SQL, Spark, dbt, Databricks — the order matters. What I learned after years of working with data and what I’d do differently if I had to start over.">
+
+<title>If I were starting from scratch… what I’d prioritize learning in Data Engineering – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../../">
+<link href="../../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../../../site_libs/quarto-contrib/fontawesome6-6.7.2/all.min.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-contrib/fontawesome6-6.7.2/latex-fontsize.css" rel="stylesheet">
+<script src="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../../../styles.css">
+<meta property="og:title" content="If I were starting from scratch… what I’d prioritize learning in Data Engineering – Mauro Loprete">
+<meta property="og:description" content="Python, SQL, Spark, dbt, Databricks — the order matters. What I learned after years of working with data and what I’d do differently if I had to start over.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/si-arrancara-de-cero/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="If I were starting from scratch… what I’d prioritize learning in Data Engineering – Mauro Loprete">
+<meta name="twitter:description" content="Python, SQL, Spark, dbt, Databricks — the order matters. What I learned after years of working with data and what I’d do differently if I had to start over.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/si-arrancara-de-cero/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-pyramid-from-the-bottom-up" id="toc-the-pyramid-from-the-bottom-up" class="nav-link active" data-scroll-target="#the-pyramid-from-the-bottom-up">The pyramid: from the bottom up</a></li>
+  <li><a href="#python-the-foundation-of-everything" id="toc-python-the-foundation-of-everything" class="nav-link" data-scroll-target="#python-the-foundation-of-everything">1. Python: the foundation of everything</a>
+  <ul class="collapse">
+  <li><a href="#classes-why-they-matter-and-when-to-use-each-kind" id="toc-classes-why-they-matter-and-when-to-use-each-kind" class="nav-link" data-scroll-target="#classes-why-they-matter-and-when-to-use-each-kind">Classes: why they matter and when to use each kind</a></li>
+  <li><a href="#resources-i-recommend" id="toc-resources-i-recommend" class="nav-link" data-scroll-target="#resources-i-recommend">Resources I recommend</a></li>
+  </ul></li>
+  <li><a href="#sql-the-language-that-never-dies" id="toc-sql-the-language-that-never-dies" class="nav-link" data-scroll-target="#sql-the-language-that-never-dies">2. SQL: the language that never dies</a></li>
+  <li><a href="#spark-thinking-distributed" id="toc-spark-thinking-distributed" class="nav-link" data-scroll-target="#spark-thinking-distributed">3. Spark: thinking distributed</a>
+  <ul class="collapse">
+  <li><a href="#the-essentials" id="toc-the-essentials" class="nav-link" data-scroll-target="#the-essentials">The essentials</a></li>
+  <li><a href="#the-key-concept-nobody-explains-well" id="toc-the-key-concept-nobody-explains-well" class="nav-link" data-scroll-target="#the-key-concept-nobody-explains-well">The key concept nobody explains well</a></li>
+  <li><a href="#wrapper-functions-vs-udfs-the-most-common-confusion" id="toc-wrapper-functions-vs-udfs-the-most-common-confusion" class="nav-link" data-scroll-target="#wrapper-functions-vs-udfs-the-most-common-confusion">Wrapper functions vs UDFs — the most common confusion</a></li>
+  </ul></li>
+  <li><a href="#dbt-sql-with-software-engineering" id="toc-dbt-sql-with-software-engineering" class="nav-link" data-scroll-target="#dbt-sql-with-software-engineering">4. dbt: SQL with software engineering</a>
+  <ul class="collapse">
+  <li><a href="#why-it-matters" id="toc-why-it-matters" class="nav-link" data-scroll-target="#why-it-matters">Why it matters</a></li>
+  <li><a href="#dbt-on-databricks" id="toc-dbt-on-databricks" class="nav-link" data-scroll-target="#dbt-on-databricks">dbt on Databricks</a></li>
+  <li><a href="#when-dbt-and-when-pyspark" id="toc-when-dbt-and-when-pyspark" class="nav-link" data-scroll-target="#when-dbt-and-when-pyspark">When dbt and when PySpark</a></li>
+  </ul></li>
+  <li><a href="#databricks-the-platform-that-ties-it-all-together" id="toc-databricks-the-platform-that-ties-it-all-together" class="nav-link" data-scroll-target="#databricks-the-platform-that-ties-it-all-together">5. Databricks: the platform that ties it all together</a>
+  <ul class="collapse">
+  <li><a href="#what-id-prioritize-learning" id="toc-what-id-prioritize-learning" class="nav-link" data-scroll-target="#what-id-prioritize-learning">What I’d prioritize learning</a></li>
+  </ul></li>
+  <li><a href="#notebooks-are-not-for-production" id="toc-notebooks-are-not-for-production" class="nav-link" data-scroll-target="#notebooks-are-not-for-production">Notebooks are NOT for production</a>
+  <ul class="collapse">
+  <li><a href="#the-real-problem" id="toc-the-real-problem" class="nav-link" data-scroll-target="#the-real-problem">The real problem</a></li>
+  <li><a href="#how-to-do-it-right" id="toc-how-to-do-it-right" class="nav-link" data-scroll-target="#how-to-do-it-right">How to do it right</a></li>
+  </ul></li>
+  <li><a href="#the-roadmap-in-what-order" id="toc-the-roadmap-in-what-order" class="nav-link" data-scroll-target="#the-roadmap-in-what-order">The roadmap: in what order</a></li>
+  <li><a href="#what-i-would-not-prioritize" id="toc-what-i-would-not-prioritize" class="nav-link" data-scroll-target="#what-i-would-not-prioritize">What I would NOT prioritize</a></li>
+  <li><a href="#links" id="toc-links" class="nav-link" data-scroll-target="#links">Links</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">If I were starting from scratch… what I’d prioritize learning in Data Engineering</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Podcast</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Career</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Python, SQL, Spark, dbt, Databricks — the order matters. What I learned after years of working with data and what I’d do differently if I had to start over.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">February 17, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Episode material
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><i class="fa-solid fa-display" aria-label="display"></i> <a href="../../../../slides/si-arrancara-de-cero/"><strong>Watch the slides for this episode</strong></a></li>
+<li><i class="fa-brands fa-github" aria-label="github"></i> <a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero"><strong>Notebooks to run on Databricks Free Edition</strong></a></li>
+</ul>
+</div>
+</div>
+<p>I’m Mauro Loprete, Data Engineer at F1RST (Santander Group). I hold both Databricks certifications — <a href="https://credentials.databricks.com/64b8ff9e-7ff0-4213-a4af-4612ecf973a7">Data Engineer Professional</a> and <a href="https://credentials.databricks.com/4b91b7aa-d440-441a-8ebf-d933cc10ce48">Associate</a> — and I’m working toward the MVP. I teach Data Science and Machine Learning at <a href="https://www.fcea.edu.uy/">UdelaR</a>, and this podcast is my way of sharing what I’ve learned along the way.</p>
+<p>In this post I share what I’d prioritize today if I had to start over in Data Engineering. The order matters — a lot.</p>
+<section id="the-pyramid-from-the-bottom-up" class="level2">
+<h2 class="anchored" data-anchor-id="the-pyramid-from-the-bottom-up">The pyramid: from the bottom up</h2>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Learning pyramid: Python and SQL as the foundation, with Spark, dbt and Databricks as the upper layers."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="672" alt="Learning pyramid: Python and SQL as the foundation, with Spark, dbt and Databricks as the upper layers."></a></p>
+</figure>
+</div>
+<figcaption>Learning pyramid: Python and SQL as the foundation, with Spark, dbt and Databricks as the upper layers.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>You can’t learn Spark without knowing Python. You can’t understand dbt without mastering SQL. And Databricks without Spark is like driving a race car without knowing how to brake.</p>
+</section>
+<section id="python-the-foundation-of-everything" class="level2">
+<h2 class="anchored" data-anchor-id="python-the-foundation-of-everything">1. Python: the foundation of everything</h2>
+<p>I’m not talking about writing a <code>print("Hello world")</code>. I’m talking about:</p>
+<ul>
+<li><strong>Data structures</strong>: lists, dictionaries, sets, tuples. 80% of what you do in data is manipulating structures.</li>
+<li><strong>Functions and decorators</strong>: when you work with Spark or dbt, you’ll need to understand how functions compose.</li>
+<li><strong>File handling</strong>: JSON, CSV, YAML, Parquet. In data engineering you live reading and writing files.</li>
+<li><strong>Virtual environments and dependencies</strong>: <code>venv</code>, <code>pip</code>, <code>pyproject.toml</code>. If you don’t know how to manage dependencies, your first production project will be a disaster.</li>
+<li><strong>Basic testing</strong>: <code>pytest</code>. You don’t need to be a TDD expert, but you do need to know how to test a function.</li>
+</ul>
+<div id="lst-dataclass-product" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dataclass-product-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Dataclass to model a data product with validation
+</figcaption>
+<div aria-describedby="lst-dataclass-product-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># The bare minimum you need to master in Python</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> List, Optional</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> DataProduct:</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    name: <span class="bu">str</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    owner: <span class="bu">str</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    tables: List[<span class="bu">str</span>]</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    sla_hours: Optional[<span class="bu">int</span>] <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> is_critical(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="bu">bool</span>:</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.sla_hours <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> <span class="va">self</span>.sla_hours <span class="op">&lt;=</span> <span class="dv">4</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Read config, parse, validate — this is 60% of the real job</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">"products.json"</span>) <span class="im">as</span> f:</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    products <span class="op">=</span> [DataProduct(<span class="op">**</span>p) <span class="cf">for</span> p <span class="kw">in</span> json.load(f)]</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>critical <span class="op">=</span> [p <span class="cf">for</span> p <span class="kw">in</span> products <span class="cf">if</span> p.is_critical()]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>Mistake I made</strong>: I started with pandas without mastering pure Python. Later it took me twice as long to understand why things didn’t work. Python first, then the libraries.</p>
+<section id="classes-why-they-matter-and-when-to-use-each-kind" class="level3">
+<h3 class="anchored" data-anchor-id="classes-why-they-matter-and-when-to-use-each-kind">Classes: why they matter and when to use each kind</h3>
+<p>In data engineering you end up modeling things all the time: pipeline configurations, connections, validation results, data contracts. If you do everything with dictionaries, you spend your life writing <code>config["database"]["host"]</code> and praying the key exists.</p>
+<p>Classes solve that: they give you structure, autocomplete in the IDE, and clear errors when something is missing.</p>
+<p>The thing is, Python has several ways to define classes, and each one has its place:</p>
+<p><strong>Traditional class</strong> — full control, but lots of boilerplate:</p>
+<div id="lst-class-tradicional" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-class-tradicional-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Traditional class with <strong>init</strong>, <strong>repr</strong> and <strong>eq</strong> boilerplate
+</figcaption>
+<div aria-describedby="lst-class-tradicional-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Pipeline:</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, name: <span class="bu">str</span>, source: <span class="bu">str</span>, target: <span class="bu">str</span>, schedule: <span class="bu">str</span> <span class="op">=</span> <span class="st">"daily"</span>):</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.name <span class="op">=</span> name</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.source <span class="op">=</span> source</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.target <span class="op">=</span> target</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.schedule <span class="op">=</span> schedule</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>):</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"Pipeline(name=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>name<span class="sc">!r}</span><span class="ss">, source=</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>source<span class="sc">!r}</span><span class="ss">)"</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__eq__</span>(<span class="va">self</span>, other):</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (<span class="va">self</span>.name <span class="op">==</span> other.name <span class="kw">and</span> <span class="va">self</span>.source <span class="op">==</span> other.source</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>                <span class="kw">and</span> <span class="va">self</span>.target <span class="op">==</span> other.target <span class="kw">and</span> <span class="va">self</span>.schedule <span class="op">==</span> other.schedule)</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> Pipeline(<span class="st">"ingest_sales"</span>, <span class="st">"raw.sales"</span>, <span class="st">"silver.sales"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>That’s 12 lines for something that should be simple. And if you forget <code>__eq__</code>, two pipelines with the same data won’t be equal. And if you forget <code>__repr__</code>, debugging is a pain.</p>
+<p><strong><code>@dataclass</code></strong> — the right choice 90% of the time:</p>
+<div id="lst-dataclass-pipeline" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dataclass-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Dataclass: same functionality in 5 lines, with safe defaults
+</figcaption>
+<div aria-describedby="lst-dataclass-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass, field</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Optional</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Pipeline:</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    name: <span class="bu">str</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    source: <span class="bu">str</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    target: <span class="bu">str</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    schedule: <span class="bu">str</span> <span class="op">=</span> <span class="st">"daily"</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    tags: <span class="bu">list</span>[<span class="bu">str</span>] <span class="op">=</span> field(default_factory<span class="op">=</span><span class="bu">list</span>)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> full_target(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"catalog.</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>target<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> Pipeline(<span class="st">"ingest_sales"</span>, <span class="st">"raw.sales"</span>, <span class="st">"silver.sales"</span>)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(p)  <span class="co"># Pipeline(name='ingest_sales', source='raw.sales', ...)</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>p <span class="op">==</span> Pipeline(<span class="st">"ingest_sales"</span>, <span class="st">"raw.sales"</span>, <span class="st">"silver.sales"</span>)  <span class="co"># True</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>5 lines and you get <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code> for free. You can add your own methods. Use <code>field(default_factory=list)</code> for mutable default values (never write <code>tags: list = []</code> — it’s a classic Python bug).</p>
+<p><strong><code>@dataclass(frozen=True)</code></strong> — when the object shouldn’t change:</p>
+<div id="lst-frozen-dataclass" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-frozen-dataclass-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Frozen dataclass: immutable object that fails if you try to mutate it
+</figcaption>
+<div aria-describedby="lst-frozen-dataclass-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(frozen<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ConnectionConfig:</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    host: <span class="bu">str</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    port: <span class="bu">int</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    database: <span class="bu">str</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    ssl: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># This works:</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>config <span class="op">=</span> ConnectionConfig(<span class="st">"db.prod.internal"</span>, <span class="dv">5432</span>, <span class="st">"analytics"</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co"># This fails (and that's what you want):</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>config.host <span class="op">=</span> <span class="st">"other"</span>  <span class="co"># FrozenInstanceError</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>Configurations, credentials, validation results — anything that shouldn’t mutate after being created. Plus, frozen dataclasses are hashable, so you can use them in sets and as dictionary keys.</p>
+<section id="what-is-immutability-and-why-should-you-care" class="level4">
+<h4 class="anchored" data-anchor-id="what-is-immutability-and-why-should-you-care">What is immutability and why should you care?</h4>
+<p>An immutable object is one that can’t be modified after it’s created. And the obvious question is: why would I want that?</p>
+<p><strong>The problem with mutable objects</strong> is that anyone can change them at any time, and in a pipeline with many functions that turns into a disaster:</p>
+<div id="lst-mutable-problem" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-mutable-problem-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: Mutability problem: a function modifies the config without warning
+</figcaption>
+<div aria-describedby="lst-mutable-problem-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MUTABLE object — the problem</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Config:</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    host: <span class="bu">str</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    port: <span class="bu">int</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    timeout: <span class="bu">int</span> <span class="op">=</span> <span class="dv">30</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>config <span class="op">=</span> Config(<span class="st">"db.prod.internal"</span>, <span class="dv">5432</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Function A reads the config</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="ex">connect</span>(config):</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"Connecting to </span><span class="sc">{</span>config<span class="sc">.</span>host<span class="sc">}</span><span class="ss">:</span><span class="sc">{</span>config<span class="sc">.</span>port<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Function B modifies it without you noticing</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> add_debug_settings(config):</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    config.host <span class="op">=</span> <span class="st">"localhost"</span>  <span class="co"># ← changed the production config</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    config.timeout <span class="op">=</span> <span class="dv">999</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="co"># In your pipeline:</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="ex">connect</span>(config)           <span class="co"># → "Connecting to db.prod.internal:5432" ✓</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>add_debug_settings(config)</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="ex">connect</span>(config)           <span class="co"># → "Connecting to localhost:5432" ← </span><span class="al">BUG</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>The same <code>config</code> variable now points to <code>localhost</code> instead of production. These bugs are hard to find because they don’t throw an error — the data is just wrong.</p>
+<p><strong>With immutability this doesn’t happen:</strong></p>
+<div id="lst-immutable-solution" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-immutable-solution-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: Immutable solution: frozen dataclass + replace() to create copies
+</figcaption>
+<div aria-describedby="lst-immutable-solution-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(frozen<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Config:</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    host: <span class="bu">str</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    port: <span class="bu">int</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    timeout: <span class="bu">int</span> <span class="op">=</span> <span class="dv">30</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>config <span class="op">=</span> Config(<span class="st">"db.prod.internal"</span>, <span class="dv">5432</span>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># This throws FrozenInstanceError immediately:</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>config.host <span class="op">=</span> <span class="st">"localhost"</span>  <span class="co"># ← ERROR, won't let you</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co"># If you need a modified version, you create a new one:</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> replace</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>debug_config <span class="op">=</span> replace(config, host<span class="op">=</span><span class="st">"localhost"</span>, timeout<span class="op">=</span><span class="dv">999</span>)</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="co"># config stays intact:</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(config.host)        <span class="co"># → "db.prod.internal"</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(debug_config.host)  <span class="co"># → "localhost"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>Each version is a separate object. The original is never touched. This is called <strong>creating instead of mutating</strong>, and it’s the safest way to work with data that passes through multiple functions.</p>
+<p><strong>In data engineering this comes up all the time:</strong></p>
+<div id="lst-immutable-real-cases" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-immutable-real-cases-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;7: Real immutability use cases: configs, validations and credentials
+</figcaption>
+<div aria-describedby="lst-immutable-real-cases-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pipeline configuration — shouldn't change during execution</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(frozen<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> PipelineConfig:</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    source_table: <span class="bu">str</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    target_table: <span class="bu">str</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    batch_size: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10000</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    mode: <span class="bu">str</span> <span class="op">=</span> <span class="st">"append"</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Result of a validation — it's a fact, it doesn't change</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(frozen<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> QualityCheck:</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    rule_name: <span class="bu">str</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    passed: <span class="bu">bool</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    value: <span class="bu">float</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    threshold: <span class="bu">float</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Credentials — should NEVER be mutated in memory</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span>(frozen<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Credentials:</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    host: <span class="bu">str</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    token: <span class="bu">str</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    workspace_id: <span class="bu">str</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>When to mutate and when not to?</strong></p>
+<ul>
+<li><strong>Immutable</strong> (<code>frozen=True</code>): configurations, credentials, results, metadata — anything that travels between functions and shouldn’t change</li>
+<li><strong>Mutable</strong> (regular dataclass): objects that accumulate state during a process, like a logger or a builder you assemble step by step</li>
+</ul>
+<p>The rule: when in doubt, make it immutable. It’s easier to relax the restriction later than to hunt down a bug caused by an unexpected mutation at 3 AM.</p>
+<p><strong><code>NamedTuple</code></strong> — when you want immutability + unpacking:</p>
+<div id="lst-namedtuple" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-namedtuple-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;8: NamedTuple: immutable and unpackable like a tuple
+</figcaption>
+<div aria-describedby="lst-namedtuple-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> NamedTuple</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ValidationResult(NamedTuple):</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    passed: <span class="bu">bool</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    errors: <span class="bu">list</span>[<span class="bu">str</span>]</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    row_count: <span class="bu">int</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> ValidationResult(<span class="va">False</span>, [<span class="st">"nulls in amount"</span>], <span class="dv">1500</span>)</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Unpacks like a tuple:</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>passed, errors, count <span class="op">=</span> result</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="co"># But you access by name:</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="kw">not</span> result.passed:</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(result.errors)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>The key difference from a frozen dataclass: NamedTuples are real tuples. You can unpack them, iterate over them, and they use less memory. But you can’t add complex methods to them.</p>
+<p><strong>Pydantic <code>BaseModel</code></strong> — when you need validation:</p>
+<div id="lst-pydantic-basemodel" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pydantic-basemodel-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;9: Pydantic BaseModel: automatic validation when creating the object
+</figcaption>
+<div aria-describedby="lst-pydantic-basemodel-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pydantic <span class="im">import</span> BaseModel, field_validator</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> DataContract(BaseModel):</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    name: <span class="bu">str</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    owner: <span class="bu">str</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    sla_hours: <span class="bu">int</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    columns: <span class="bu">list</span>[<span class="bu">str</span>]</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">@field_validator</span>(<span class="st">"sla_hours"</span>)</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">@classmethod</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> sla_must_be_positive(cls, v):</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> v <span class="op">&lt;=</span> <span class="dv">0</span>:</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">ValueError</span>(<span class="st">"SLA must be greater than 0"</span>)</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> v</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Validates automatically on creation:</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>contract <span class="op">=</span> DataContract(</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"transactions"</span>,</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    owner<span class="op">=</span><span class="st">"backend-team"</span>,</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    sla_hours<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>[<span class="st">"id"</span>, <span class="st">"amount"</span>, <span class="st">"date"</span>]</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a><span class="co"># This fails with a clear error:</span></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>bad <span class="op">=</span> DataContract(name<span class="op">=</span><span class="st">"x"</span>, owner<span class="op">=</span><span class="st">"y"</span>, sla_hours<span class="op">=-</span><span class="dv">1</span>, columns<span class="op">=</span>[])</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a><span class="co"># ValidationError: SLA must be greater than 0</span></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Parses from JSON/dict:</span></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>contract <span class="op">=</span> DataContract.model_validate_json(<span class="st">'{"name": "tx", ...}'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>Pydantic is heavy (it’s an external dependency), but when you’re parsing YAML configurations, API responses or data contracts, automatic validation saves you hours of debugging.</p>
+<p><strong>When to use each one?</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 51%">
+<col style="width: 48%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Situation</th>
+<th>Class type</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Simple data model (most cases)</td>
+<td><code>@dataclass</code></td>
+</tr>
+<tr class="even">
+<td>Configuration that must not change</td>
+<td><code>@dataclass(frozen=True)</code></td>
+</tr>
+<tr class="odd">
+<td>Lightweight, unpackable result</td>
+<td><code>NamedTuple</code></td>
+</tr>
+<tr class="even">
+<td>Parsing JSON/YAML with validation</td>
+<td>Pydantic <code>BaseModel</code></td>
+</tr>
+<tr class="odd">
+<td>Complex business logic, inheritance</td>
+<td>Traditional class</td>
+</tr>
+<tr class="even">
+<td>Just grouping data, nothing else</td>
+<td><code>dict</code> (seriously, sometimes it’s enough)</td>
+</tr>
+</tbody>
+</table>
+<p>The general rule: start with <code>@dataclass</code>. If you need immutability, add <code>frozen=True</code>. If you need input validation, use Pydantic. If you need complex inheritance or full control of the lifecycle, a traditional class. And if it’s throwaway data you use once, a <code>dict</code> is fine.</p>
+</section>
+</section>
+<section id="resources-i-recommend" class="level3">
+<h3 class="anchored" data-anchor-id="resources-i-recommend">Resources I recommend</h3>
+<ul>
+<li><a href="https://realpython.com/">Python for Data Engineers</a> — Real Python is excellent for going beyond the basics</li>
+<li><a href="https://automatetheboringstuff.com/">Automate the Boring Stuff</a> — to lose the fear of scripting</li>
+<li>Python’s official documentation is surprisingly good. Read it.</li>
+</ul>
+</section>
+</section>
+<section id="sql-the-language-that-never-dies" class="level2">
+<h2 class="anchored" data-anchor-id="sql-the-language-that-never-dies">2. SQL: the language that never dies</h2>
+<p>SQL is over 50 years old and it’s still the most widely used language in data. It doesn’t matter if you use Spark, dbt, Databricks or BigQuery — everything ends up in SQL.</p>
+<p>What you really need to master:</p>
+<ul>
+<li><strong>Window functions</strong>: <code>ROW_NUMBER()</code>, <code>LAG()</code>, <code>LEAD()</code>, <code>RANK()</code>, <code>SUM() OVER()</code>. This is what separates a junior analyst from a senior one.</li>
+<li><strong>CTEs</strong>: Common Table Expressions. Write readable SQL, not 200-line nested queries.</li>
+<li><strong>JOINs</strong>: not just <code>INNER</code> and <code>LEFT</code>. Understand <code>CROSS</code>, <code>ANTI</code>, <code>SEMI</code>. Know when a JOIN multiplies your rows.</li>
+<li><strong>Aggregations with HAVING and GROUPING SETS</strong>: for real reporting.</li>
+<li><strong>Correlated subqueries</strong>: to understand why they’re slow and when to avoid them.</li>
+</ul>
+<div id="lst-gen-sales-data" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-gen-sales-data-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;10: Generate a sales dataset with PySpark to practice SQL
+</figcaption>
+<div aria-describedby="lst-gen-sales-data-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datetime <span class="im">import</span> date, timedelta</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>random.seed(<span class="dv">42</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Generate sales data</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>customers <span class="op">=</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">10</span>))</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> day_offset <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">30</span>):</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> date(<span class="dv">2026</span>, <span class="dv">1</span>, <span class="dv">1</span>) <span class="op">+</span> timedelta(days<span class="op">=</span>day_offset)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> cust <span class="kw">in</span> random.sample(customers, k<span class="op">=</span>random.randint(<span class="dv">2</span>, <span class="dv">5</span>)):</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>        rows.append((</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>            cust,</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>            <span class="bu">float</span>(random.randint(<span class="dv">10</span>, <span class="dv">500</span>)),</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>            d,</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>            random.choice([<span class="st">"COMPLETED"</span>, <span class="st">"COMPLETED"</span>, <span class="st">"COMPLETED"</span>, <span class="st">"PENDING"</span>, <span class="st">"FAILED"</span>])</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>        ))</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>sales_df <span class="op">=</span> spark.createDataFrame(rows, [<span class="st">"customer_id"</span>, <span class="st">"amount"</span>, <span class="st">"sale_date"</span>, <span class="st">"status"</span>])</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>sales_df.createOrReplaceTempView(<span class="st">"sales"</span>)</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Rows generated: </span><span class="sc">{</span>sales_df<span class="sc">.</span>count()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>sales_df.show(<span class="dv">5</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-window-functions" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-window-functions-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;11: Window functions: ranking and day-over-day change per customer
+</figcaption>
+<div aria-describedby="lst-window-functions-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>%sql</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- Daily sales per customer with ranking and change vs previous day</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> daily_sales <span class="kw">AS</span> (</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">SELECT</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>        customer_id,</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>        sale_date <span class="kw">AS</span> sale_day,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">SUM</span>(amount) <span class="kw">AS</span> daily_total,</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>        <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> txn_count</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">FROM</span> sales</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">WHERE</span> status <span class="op">=</span> <span class="st">'COMPLETED'</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">GROUP</span> <span class="kw">BY</span> <span class="dv">1</span>, <span class="dv">2</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>),</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>ranked <span class="kw">AS</span> (</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">SELECT</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>        <span class="op">*</span>,</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>        <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>            <span class="kw">PARTITION</span> <span class="kw">BY</span> customer_id</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>            <span class="kw">ORDER</span> <span class="kw">BY</span> daily_total <span class="kw">DESC</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>        ) <span class="kw">AS</span> rn,</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>        <span class="fu">LAG</span>(daily_total) <span class="kw">OVER</span> (</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>            <span class="kw">PARTITION</span> <span class="kw">BY</span> customer_id</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>            <span class="kw">ORDER</span> <span class="kw">BY</span> sale_day</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>        ) <span class="kw">AS</span> prev_day_total</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">FROM</span> daily_sales</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>    customer_id,</span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>    sale_day,</span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>    daily_total,</span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>    prev_day_total,</span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ROUND</span>(</span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a>        (daily_total <span class="op">-</span> prev_day_total) <span class="op">/</span> prev_day_total <span class="op">*</span> <span class="dv">100</span>, <span class="dv">2</span></span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a>    ) <span class="kw">AS</span> pct_change</span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> ranked</span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> rn <span class="op">&lt;=</span> <span class="dv">5</span></span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> customer_id, rn</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>Mistake I made</strong>: I underestimated window functions. Once you master them, you solve in one query what used to take you 3 Python scripts.</p>
+</section>
+<section id="spark-thinking-distributed" class="level2">
+<h2 class="anchored" data-anchor-id="spark-thinking-distributed">3. Spark: thinking distributed</h2>
+<p>This is where things get interesting. Spark is not “big pandas” — it’s a different paradigm. If you don’t understand how it works under the hood, you’ll write code that takes 10x longer than it should.</p>
+<section id="the-essentials" class="level3">
+<h3 class="anchored" data-anchor-id="the-essentials">The essentials</h3>
+<ul>
+<li><strong>Lazy evaluation</strong>: Spark doesn’t execute anything until you trigger an action (<code>collect()</code>, <code>count()</code>, <code>write()</code>). Transformations accumulate into a plan.</li>
+<li><strong>Partitions</strong>: your data is distributed across partitions. If you don’t understand this, you’ll run <code>coalesce(1)</code> on a 500GB dataset and kill the cluster.</li>
+<li><strong>Shuffle</strong>: the most expensive operation. Every <code>JOIN</code>, <code>GROUP BY</code>, <code>DISTINCT</code> can trigger a shuffle. Minimize them.</li>
+<li><strong>Broadcast joins</strong>: if a table is small (&lt; 10MB), broadcast it. The difference can be minutes versus seconds.</li>
+<li><strong>Catalyst optimizer</strong>: Spark optimizes your query plan. But if you write UDFs in Python, the optimizer can’t help you.</li>
+</ul>
+<div id="lst-spark-native-vs-udf" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-spark-native-vs-udf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;12: Native Spark vs UDF: native functions allow optimization
+</figcaption>
+<div aria-describedby="lst-spark-native-vs-udf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql.window <span class="im">import</span> Window</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Good: use native Spark functions</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> (</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    spark.read.table(<span class="st">"sales.transactions"</span>)</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">filter</span>(F.col(<span class="st">"status"</span>) <span class="op">==</span> <span class="st">"completed"</span>)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    .withColumn(</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"running_total"</span>,</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>        F.<span class="bu">sum</span>(<span class="st">"amount"</span>).over(</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>            Window.partitionBy(<span class="st">"customer_id"</span>)</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>            .orderBy(<span class="st">"transaction_date"</span>)</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>            .rowsBetween(Window.unboundedPreceding, Window.currentRow)</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Bad: Python UDF (breaks optimization, serializes row by row)</span></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a><span class="co"># @udf(returnType=DoubleType())</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a><span class="co"># def calc_running_total(amounts):</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a><span class="co">#     return sum(amounts)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="the-key-concept-nobody-explains-well" class="level3">
+<h3 class="anchored" data-anchor-id="the-key-concept-nobody-explains-well">The key concept nobody explains well</h3>
+<p>Spark has two APIs: <strong>DataFrame</strong> and <strong>Spark SQL</strong>. Internally they’re the same thing — both generate the same execution plan. Use whichever feels more comfortable, but understand that:</p>
+<div id="lst-df-vs-sql" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-df-vs-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;13: DataFrame API and Spark SQL generate the same execution plan
+</figcaption>
+<div aria-describedby="lst-df-vs-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This:</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>df.<span class="bu">filter</span>(F.col(<span class="st">"amount"</span>) <span class="op">&gt;</span> <span class="dv">100</span>).groupBy(<span class="st">"customer_id"</span>).agg(F.<span class="bu">sum</span>(<span class="st">"amount"</span>))</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="co"># And this:</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>spark.sql(<span class="st">"""</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="st">    SELECT customer_id, SUM(amount)</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="st">    FROM transactions</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="st">    WHERE amount &gt; 100</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="st">    GROUP BY customer_id</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span>)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Generate EXACTLY the same execution plan.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>Mistake I made</strong>: I wrote Python UDFs for everything at first. When I understood the Catalyst optimizer and switched to native functions, jobs went from 45 minutes to 3 minutes. Without changing the cluster.</p>
+</section>
+<section id="wrapper-functions-vs-udfs-the-most-common-confusion" class="level3">
+<h3 class="anchored" data-anchor-id="wrapper-functions-vs-udfs-the-most-common-confusion">Wrapper functions vs UDFs — the most common confusion</h3>
+<p>This causes a lot of confusion. If you have a Python function that takes a DataFrame and calls <code>.withColumn()</code> inside, is that a UDF?</p>
+<p><strong>No.</strong> They’re completely different things.</p>
+<p>A <strong>wrapper function</strong> uses Spark’s native API. Spark sees the operations, understands them and optimizes them:</p>
+<div id="lst-wrapper-function" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-wrapper-function-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;14: Wrapper function: organizes code but uses native Spark inside
+</figcaption>
+<div aria-describedby="lst-wrapper-function-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This is NOT a UDF — it uses the Spark API inside</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> add_revenue_flag(df, threshold<span class="op">=</span><span class="dv">1000</span>):</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> df.withColumn(</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"high_revenue"</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>        F.when(F.col(<span class="st">"amount"</span>) <span class="op">&gt;</span> threshold, <span class="va">True</span>).otherwise(<span class="va">False</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Spark sees F.when and F.col → they're native expressions</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="co"># The Catalyst optimizer can combine, reorder and optimize them</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> add_revenue_flag(sales_df)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>Here Spark knows exactly what you’re doing. Your function is just a way to organize the code — under the hood it’s still all native Spark.</p>
+<p>A <strong>UDF</strong> is when you ask Spark to run pure Python code <strong>row by row</strong>, pulling the data out of the optimized engine and passing it through the Python interpreter:</p>
+<div id="lst-udf-real" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-udf-real-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;15: Real UDF: serializes row by row between the JVM and Python
+</figcaption>
+<div aria-describedby="lst-udf-real-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># This IS a UDF — pure Python, row by row</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="at">@udf</span>(returnType<span class="op">=</span>BooleanType())</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> high_revenue_udf(amount):</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> amount <span class="op">&gt;</span> <span class="dv">1000</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> df.withColumn(<span class="st">"high_revenue"</span>, high_revenue_udf(F.col(<span class="st">"amount"</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>What happens internally with the UDF?</p>
+<ol type="1">
+<li>Spark serializes each row of data (JVM → Python)</li>
+<li>The Python interpreter runs your function</li>
+<li>The result gets serialized back (Python → JVM)</li>
+<li>Repeat that for every row of the DataFrame</li>
+</ol>
+<p>That round-trip serialization is called <strong>serde overhead</strong>, and on a dataset with millions of rows it’s the difference between 3 minutes and 45 minutes.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-2-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Native Spark vs UDF: the native path goes through Catalyst, the UDF serializes row by row between the JVM and Python."><img src="index_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="768" alt="Native Spark vs UDF: the native path goes through Catalyst, the UDF serializes row by row between the JVM and Python."></a></p>
+</figure>
+</div>
+<figcaption>Native Spark vs UDF: the native path goes through Catalyst, the UDF serializes row by row between the JVM and Python.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>When do you actually need a UDF?</strong> Almost never. But there are legitimate cases:</p>
+<ul>
+<li>Logic that has no equivalent among Spark’s functions (very complex custom regex, domain-specific mathematical calculations)</li>
+<li>Calling a Python library that doesn’t exist in Spark (a custom ML model, a geocoding library)</li>
+</ul>
+<p>And if you have no other choice, use <strong>Pandas UDFs</strong> instead of regular UDFs — they process by batch instead of row by row, and they’re much faster:</p>
+<div id="lst-pandas-udf" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pandas-udf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;16: Pandas UDF: vectorized batch processing, much faster
+</figcaption>
+<div aria-describedby="lst-pandas-udf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql.functions <span class="im">import</span> pandas_udf</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="at">@pandas_udf</span>(<span class="st">"boolean"</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> high_revenue_pandas(amount: pd.Series) <span class="op">-&gt;</span> pd.Series:</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> amount <span class="op">&gt;</span> <span class="dv">1000</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Processes by batch (vectorized), not row by row</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> df.withColumn(<span class="st">"high_revenue"</span>, high_revenue_pandas(F.col(<span class="st">"amount"</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+</section>
+</section>
+<section id="dbt-sql-with-software-engineering" class="level2">
+<h2 class="anchored" data-anchor-id="dbt-sql-with-software-engineering">4. dbt: SQL with software engineering</h2>
+<p>dbt (data build tool) changed how data transformations are done. The idea is simple: write your transformations in SQL, but with the software engineering practices that were always missing in data.</p>
+<section id="why-it-matters" class="level3">
+<h3 class="anchored" data-anchor-id="why-it-matters">Why it matters</h3>
+<ul>
+<li><strong>Modularity</strong>: each model is a <code>SELECT</code>. They reference each other with <code>{ ref('model_name') }</code>.</li>
+<li><strong>Testing</strong>: schema tests (<code>not_null</code>, <code>unique</code>, <code>relationships</code>) and custom tests.</li>
+<li><strong>Documentation</strong>: generated automatically from the YAML.</li>
+<li><strong>Lineage</strong>: you know exactly which model depends on which.</li>
+<li><strong>Version control</strong>: everything is code, everything goes to Git.</li>
+</ul>
+<div id="lst-dbt-staging" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dbt-staging-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;17: dbt staging model: cleaning and typing transactions
+</figcaption>
+<div aria-describedby="lst-dbt-staging-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- models/staging/stg_transactions.sql</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> <span class="kw">source</span> <span class="kw">AS</span> (</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> {{ <span class="kw">source</span>(<span class="st">'raw'</span>, <span class="st">'transactions'</span>) }}</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>),</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>cleaned <span class="kw">AS</span> (</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">SELECT</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>        transaction_id,</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>        customer_id,</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>        <span class="fu">CAST</span>(amount <span class="kw">AS</span> <span class="dt">DECIMAL</span>(<span class="dv">18</span>,<span class="dv">2</span>)) <span class="kw">AS</span> amount,</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>        <span class="fu">CAST</span>(transaction_date <span class="kw">AS</span> <span class="dt">DATE</span>) <span class="kw">AS</span> transaction_date,</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>        <span class="fu">UPPER</span>(<span class="fu">TRIM</span>(status)) <span class="kw">AS</span> status</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">FROM</span> <span class="kw">source</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">WHERE</span> transaction_id <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> cleaned</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-dbt-schema-yaml" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dbt-schema-yaml-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;18: dbt schema YAML: not_null, unique and valid range tests
+</figcaption>
+<div aria-describedby="lst-dbt-schema-yaml-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># models/staging/stg_transactions.yml</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">version</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="fu">models</span><span class="kw">:</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> stg_transactions</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">"Clean transactions from the core banking system"</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">columns</span><span class="kw">:</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> transaction_id</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">tests</span><span class="kw">:</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> not_null</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> unique</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> amount</span></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">tests</span><span class="kw">:</span></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> not_null</span></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> </span><span class="fu">dbt_utils.accepted_range</span><span class="kw">:</span></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">min_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">0</span></span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">max_value</span><span class="kw">:</span><span class="at"> </span><span class="dv">1000000</span></span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> status</span></span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">tests</span><span class="kw">:</span></span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> </span><span class="fu">accepted_values</span><span class="kw">:</span></span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">values</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">'COMPLETED'</span><span class="kw">,</span><span class="at"> </span><span class="st">'PENDING'</span><span class="kw">,</span><span class="at"> </span><span class="st">'FAILED'</span><span class="kw">,</span><span class="at"> </span><span class="st">'REVERSED'</span><span class="kw">]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="dbt-on-databricks" class="level3">
+<h3 class="anchored" data-anchor-id="dbt-on-databricks">dbt on Databricks</h3>
+<p>dbt works natively with Databricks via <code>dbt-databricks</code>. Models materialize as Delta tables in Unity Catalog.</p>
+<div id="lst-dbt-profile" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dbt-profile-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;19: dbt-databricks profile: Unity Catalog connection with environment variables
+</figcaption>
+<div aria-describedby="lst-dbt-profile-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># profiles.yml</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="fu">my_project</span><span class="kw">:</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">target</span><span class="kw">:</span><span class="at"> dev</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">outputs</span><span class="kw">:</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">dev</span><span class="kw">:</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">type</span><span class="kw">:</span><span class="at"> databricks</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">catalog</span><span class="kw">:</span><span class="at"> dev</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">schema</span><span class="kw">:</span><span class="at"> analytics</span></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">host</span><span class="kw">:</span><span class="at"> </span><span class="st">"{{ env_var('DBX_HOST') }}"</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">http_path</span><span class="kw">:</span><span class="at"> </span><span class="st">"{{ env_var('DBX_HTTP_PATH') }}"</span></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">token</span><span class="kw">:</span><span class="at"> </span><span class="st">"{{ env_var('DBX_TOKEN') }}"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>Mistake I made</strong>: I tried to do in Python what dbt solves much better in SQL. If your transformation is pure SQL (and most are), use dbt. If you need complex logic with APIs, ML or weird files, then yes, PySpark.</p>
+</section>
+<section id="when-dbt-and-when-pyspark" class="level3">
+<h3 class="anchored" data-anchor-id="when-dbt-and-when-pyspark">When dbt and when PySpark</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 66%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Case</th>
+<th>Tool</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>SQL transformations (cleaning, joins, aggregations)</td>
+<td><strong>dbt</strong></td>
+</tr>
+<tr class="even">
+<td>Complex logic with external APIs</td>
+<td><strong>PySpark</strong></td>
+</tr>
+<tr class="odd">
+<td>Machine Learning pipelines</td>
+<td><strong>PySpark + MLflow</strong></td>
+</tr>
+<tr class="even">
+<td>Processing unstructured files (JSON, XML, images)</td>
+<td><strong>PySpark</strong></td>
+</tr>
+<tr class="odd">
+<td>Dimensional models (Kimball)</td>
+<td><strong>dbt</strong></td>
+</tr>
+<tr class="even">
+<td>Streaming / near-real-time</td>
+<td><strong>PySpark Structured Streaming</strong></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="databricks-the-platform-that-ties-it-all-together" class="level2">
+<h2 class="anchored" data-anchor-id="databricks-the-platform-that-ties-it-all-together">5. Databricks: the platform that ties it all together</h2>
+<p>Databricks isn’t just “Spark in the cloud”. It’s a complete data platform: compute, storage, governance, ML, SQL Analytics, and orchestration.</p>
+<section id="what-id-prioritize-learning" class="level3">
+<h3 class="anchored" data-anchor-id="what-id-prioritize-learning">What I’d prioritize learning</h3>
+<ol type="1">
+<li><p><strong>Unity Catalog</strong>: the 3-level governance model (<code>catalog.schema.table</code>). Permissions, lineage, and auditing. Without this, your lakehouse is a swamp.</p></li>
+<li><p><strong>Lakeflow Declarative Pipelines (formerly DLT)</strong>: declarative pipelines with expectations for quality. It’s the simplest way to build a Bronze → Silver → Gold pipeline.</p></li>
+<li><p><strong>Databricks Asset Bundles</strong>: infrastructure as code. Jobs, pipelines, permissions — everything in YAML, everything in Git, everything deployable with CI/CD.</p></li>
+<li><p><strong>Workflows</strong>: native orchestration. Triggers, task dependencies, retry policies. You don’t need Airflow for 90% of the cases.</p></li>
+<li><p><strong>SQL Warehouses</strong>: for analysts and dashboards. Serverless, scalable, and with smart caching.</p></li>
+</ol>
+<div id="lst-unity-catalog" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-unity-catalog-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;20: Unity Catalog: create a catalog, a table with Liquid Clustering and grants
+</figcaption>
+<div aria-describedby="lst-unity-catalog-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- What you need to know how to do in Databricks from day 1</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- Create a catalog and schema</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> CATALOG <span class="cf">IF</span> <span class="kw">NOT</span> <span class="kw">EXISTS</span> analytics;</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> <span class="cf">IF</span> <span class="kw">NOT</span> <span class="kw">EXISTS</span> analytics.sales;</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="co">-- Create a table with Liquid Clustering</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> analytics.sales.transactions (</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    transaction_id BIGINT,</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    customer_id BIGINT,</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    amount <span class="dt">DECIMAL</span>(<span class="dv">18</span>,<span class="dv">2</span>),</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>    transaction_date <span class="dt">DATE</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (transaction_date, customer_id);</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a><span class="co">-- Grants (basic governance)</span></span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">USE</span> CATALOG <span class="kw">ON</span> CATALOG analytics <span class="kw">TO</span> `analysts`;</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">USE</span> <span class="kw">SCHEMA</span> <span class="kw">ON</span> <span class="kw">SCHEMA</span> analytics.sales <span class="kw">TO</span> `analysts`;</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">SELECT</span> <span class="kw">ON</span> <span class="kw">TABLE</span> analytics.sales.transactions <span class="kw">TO</span> `analysts`;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>Mistake I made</strong>: I started out using Databricks as “Jupyter in the cloud” — loose notebooks, no version control, no tests. When I discovered DABs and Unity Catalog, I realized I was using 10% of the platform.</p>
+</section>
+</section>
+<section id="notebooks-are-not-for-production" class="level2">
+<h2 class="anchored" data-anchor-id="notebooks-are-not-for-production">Notebooks are NOT for production</h2>
+<p>This deserves its own section because it’s the most common mistake I see — and the hardest one to fix later.</p>
+<p>Notebooks are an <strong>exploratory</strong> tool. They’re good for:</p>
+<ul>
+<li>Exploring a new dataset</li>
+<li>Trying out a transformation before productionizing it</li>
+<li>Doing ad-hoc analysis</li>
+<li>Prototyping a quick idea</li>
+</ul>
+<p>Notebooks are <strong>NOT</strong> good for:</p>
+<ul>
+<li>Production pipelines that run every day</li>
+<li>Code that needs testing</li>
+<li>Logic that others will maintain</li>
+<li>Anything that needs code review in a PR</li>
+</ul>
+<section id="the-real-problem" class="level3">
+<h3 class="anchored" data-anchor-id="the-real-problem">The real problem</h3>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-3-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Problems with using notebooks directly in production: no testing, no code review, shared state."><img src="index_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="576" alt="Problems with using notebooks directly in production: no testing, no code review, shared state."></a></p>
+</figure>
+</div>
+<figcaption>Problems with using notebooks directly in production: no testing, no code review, shared state.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="how-to-do-it-right" class="level3">
+<h3 class="anchored" data-anchor-id="how-to-do-it-right">How to do it right</h3>
+<p>Use the notebook to <strong>explore and prototype</strong>. Once the logic works, move it into a Python module or a dbt model:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-4-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="The right workflow: explore in a notebook, extract to a .py module, test, deploy with DABs and archive the notebook."><img src="index_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="768" alt="The right workflow: explore in a notebook, extract to a .py module, test, deploy with DABs and archive the notebook."></a></p>
+</figure>
+</div>
+<figcaption>The right workflow: explore in a notebook, extract to a .py module, test, deploy with DABs and archive the notebook.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="lst-module-test" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-module-test-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;21: Python module + test: logic extracted from the notebook into production
+</figcaption>
+<div aria-describedby="lst-module-test-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># src/transformations/clean_sales.py  ← THIS goes to production</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> clean_transactions(df):</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Cleans and validates transactions from the core system."""</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>        df</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">filter</span>(F.col(<span class="st">"transaction_id"</span>).isNotNull())</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"amount"</span>, F.col(<span class="st">"amount"</span>).cast(<span class="st">"decimal(18,2)"</span>))</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"status"</span>, F.upper(F.trim(F.col(<span class="st">"status"</span>))))</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">filter</span>(F.col(<span class="st">"amount"</span>) <span class="op">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a><span class="co"># tests/test_clean_sales.py  ← THIS guarantees it doesn't break</span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_clean_removes_nulls(spark):</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>    input_df <span class="op">=</span> spark.createDataFrame([</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>        (<span class="dv">1</span>, <span class="fl">100.0</span>, <span class="st">"completed"</span>),</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>        (<span class="va">None</span>, <span class="fl">200.0</span>, <span class="st">"pending"</span>),</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>    ], [<span class="st">"transaction_id"</span>, <span class="st">"amount"</span>, <span class="st">"status"</span>])</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> clean_transactions(input_df)</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> result.count() <span class="op">==</span> <span class="dv">1</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-dab-deploy" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dab-deploy-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;22: Databricks Asset Bundle: deploying the job with CI/CD
+</figcaption>
+<div aria-describedby="lst-dab-deploy-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># databricks.yml  ← THIS deploys it</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">clean_sales</span><span class="kw">:</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="st">"[${var.env}] Clean Sales"</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tasks</span><span class="kw">:</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">task_key</span><span class="kw">:</span><span class="at"> run</span></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">python_wheel_task</span><span class="kw">:</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">package_name</span><span class="kw">:</span><span class="at"> my_project</span></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">entry_point</span><span class="kw">:</span><span class="at"> clean_sales</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>The rule is simple</strong>: if something runs more than once, it shouldn’t live in a notebook. The notebook is the draft, not the final document.</p>
+<p><strong>Mistake I made</strong>: I had 800-line notebooks running in production for months. When something failed at 3 AM, debugging it was a nightmare. The day I migrated everything to Python modules + DABs + tests, I stopped getting alerts on weekends.</p>
+</section>
+</section>
+<section id="the-roadmap-in-what-order" class="level2">
+<h2 class="anchored" data-anchor-id="the-roadmap-in-what-order">The roadmap: in what order</h2>
+<p>If I had to start from scratch today, I’d do this:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-5-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5" title="Learning roadmap: Python and SQL first, then Spark, dbt, Databricks and specialization."><img src="index_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="768" alt="Learning roadmap: Python and SQL first, then Spark, dbt, Databricks and specialization."></a></p>
+</figure>
+</div>
+<figcaption>Learning roadmap: Python and SQL first, then Spark, dbt, Databricks and specialization.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>And most importantly: <strong>build something</strong>. Don’t just take courses. Grab a public dataset, build an end-to-end pipeline, deploy it, break it, fix it. That’s worth more than 10 courses.</p>
+</section>
+<section id="what-i-would-not-prioritize" class="level2">
+<h2 class="anchored" data-anchor-id="what-i-would-not-prioritize">What I would NOT prioritize</h2>
+<ul>
+<li><strong>Airflow</strong>: Databricks Workflows covers 90% of the cases. Airflow is an amazing tool but it has a steep learning curve and a big operational overhead. Learn it later, if you need it.</li>
+<li><strong>Kafka</strong>: unless your company does real streaming (not micro-batch), you don’t need it at the start. Auto Loader + Structured Streaming solves most cases.</li>
+<li><strong>Kubernetes</strong>: as a DE, you don’t need to be a K8s expert. Know the basics, but don’t go down that rabbit hole.</li>
+<li><strong>All the clouds at once</strong>: pick one (AWS, Azure, GCP) and master it. The concepts transfer, but trying to learn all 3 at once is counterproductive.</li>
+</ul>
+</section>
+<section id="links" class="level2">
+<h2 class="anchored" data-anchor-id="links">Links</h2>
+<ul>
+<li><a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero">Episode notebooks</a> — Python, SQL and Spark to run on Databricks Free Edition</li>
+<li><a href="https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/">Fundamentals of Data Engineering (Reis &amp; Housley)</a> — the best book to get started</li>
+<li><a href="https://courses.getdbt.com/">dbt Learn</a> — free official dbt course</li>
+<li><a href="https://www.databricks.com/learn">Databricks Academy</a> — official courses, some free</li>
+</ul>
+<hr>
+<p><em>Next week on Databricks Tips: Delta Lake — 7 things I wish someone had told me sooner.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

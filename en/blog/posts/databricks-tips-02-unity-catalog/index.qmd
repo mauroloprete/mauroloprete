@@ -1,0 +1,172 @@
+---
+title: "Databricks Tips #3: Unity Catalog — the governance model nobody implements well"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-03-10"
+draft: false
+categories: [Databricks Tips, Data Engineering, Unity Catalog]
+description: "Three-level namespace, inherited GRANTS, automatic lineage, row/column security and common governance mistakes."
+image: cover.png
+---
+
+Third installment of **Databricks Tips**. Unity Catalog looks simple (catalog.schema.table), but most of the implementations I've seen have governance problems from day one.
+
+## The 3-level model: more than a namespace
+
+```{#lst-namespace-3lvl lst-cap="Three-level namespace in Unity Catalog"}
+metastore
+  └── catalog          (env or domain)
+       └── schema      (functional area)
+            └── table  (data)
+```
+
+The first critical decision: **how to organize your catalogs**. There are two schools of thought:
+
+### Option A: catalogs per environment
+
+```{#lst-catalogs-by-env .sql lst-cap="Option A: catalogs organized by environment (dev, staging, prod)"}
+CREATE CATALOG dev;
+CREATE CATALOG staging;
+CREATE CATALOG prod;
+
+-- Same schemas in each catalog
+CREATE SCHEMA dev.sales;
+CREATE SCHEMA staging.sales;
+CREATE SCHEMA prod.sales;
+```
+
+**Advantage**: your code only swaps the catalog (`${environment}.sales.orders`); schemas and tables are identical.
+
+**Drawback**: you need 3x the permissions. Easy to make mistakes across environments.
+
+### Option B: catalogs per domain
+
+```{#lst-catalogs-by-domain .sql lst-cap="Option B: catalogs organized by business domain"}
+CREATE CATALOG sales;
+CREATE CATALOG finance;
+CREATE CATALOG marketing;
+
+-- Schemas per stage
+CREATE SCHEMA sales.bronze;
+CREATE SCHEMA sales.silver;
+CREATE SCHEMA sales.gold;
+```
+
+**Advantage**: aligned with Data Mesh. Each domain has clear ownership.
+
+**Drawback**: deployment is more complex (you can't just swap a prefix).
+
+**My recommendation**: start with Option A if you have a small team. Migrate to Option B once you have clear ownership per domain.
+
+## Inherited GRANTS: the most common mistake
+
+Permissions in Unity Catalog are **inherited downward**. This is powerful but dangerous:
+
+```{#lst-grants-schema .sql lst-cap="Inherited GRANTS: common mistake vs. correct schema-level pattern"}
+-- This GRANT gives access to ALL current and FUTURE tables in the catalog
+GRANT USE CATALOG ON CATALOG prod TO `data-analysts`;
+GRANT USE SCHEMA ON CATALOG prod TO `data-analysts`;
+GRANT SELECT ON CATALOG prod TO `data-analysts`;
+
+-- Better: grant access only to the gold schema
+GRANT USE CATALOG ON CATALOG prod TO `data-analysts`;
+GRANT USE SCHEMA ON SCHEMA prod.gold TO `data-analysts`;
+GRANT SELECT ON SCHEMA prod.gold TO `data-analysts`;
+```
+
+**Golden rule**: never grant `SELECT ON CATALOG`. Always go down to the schema or table level.
+
+## Row & Column Level Security
+
+Almost nobody uses this, but it's very powerful for meeting regulations (GDPR, PCI):
+
+```{#lst-row-col-security .sql lst-cap="Row and column level security: PII masking and region-based filters"}
+-- Column masking: hide PII
+CREATE FUNCTION prod.security.mask_email(email STRING)
+RETURNS STRING
+RETURN CASE
+  WHEN is_member('pii-authorized') THEN email
+  ELSE regexp_replace(email, '(.).*@', '$1***@')
+END;
+
+ALTER TABLE prod.gold.customers
+ALTER COLUMN email SET MASK prod.security.mask_email;
+
+-- Row filtering: each team only sees its own data
+CREATE FUNCTION prod.security.region_filter(region STRING)
+RETURNS BOOLEAN
+RETURN CASE
+  WHEN is_member('global-access') THEN true
+  WHEN is_member('latam-team') THEN region IN ('LATAM', 'BR', 'UY', 'AR')
+  WHEN is_member('eu-team') THEN region IN ('EU', 'UK', 'DE', 'FR')
+  ELSE false
+END;
+
+ALTER TABLE prod.gold.customers
+SET ROW FILTER prod.security.region_filter ON (region);
+```
+
+Now a LATAM analyst runs `SELECT * FROM prod.gold.customers` and only sees customers in their region, with masked emails. Without changing a single line of code.
+
+## Automatic lineage
+
+Unity Catalog tracks lineage automatically for any operation that goes through Spark. To take advantage of it:
+
+```{#lst-lineage .sql lst-cap="Automatic lineage: best practices for full traceability"}
+-- See a table's lineage (which tables feed it)
+-- Visible in the UI, but also via API:
+-- GET /api/2.1/unity-catalog/lineage/table-lineage
+
+-- For lineage to be complete:
+-- 1. Use Unity Catalog tables (not direct paths)
+-- 2. Avoid df.write.parquet() - use df.write.saveAsTable()
+-- 3. In DLT, lineage is 100% automatic
+```
+
+**Tip**: if you have a pipeline that reads from a direct S3 path, Unity Catalog can't track its lineage. Register the path as an External Location and External Table:
+
+```{#lst-external-location .sql lst-cap="External Location and external table to enable lineage on S3"}
+CREATE EXTERNAL LOCATION raw_s3
+URL 's3://my-bucket/raw/'
+WITH (STORAGE CREDENTIAL my_credential);
+
+CREATE TABLE prod.bronze.events
+USING DELTA
+LOCATION 's3://my-bucket/raw/events/';
+```
+
+## Volumes: non-tabular files
+
+Since DBR 13.3, Unity Catalog also governs files (CSV, JSON, models, artifacts):
+
+```{#lst-volumes .sql lst-cap="Volumes: managing non-tabular files with UC governance"}
+-- Managed volume: Databricks manages the storage
+CREATE VOLUME prod.ml.model_artifacts;
+
+-- External volume: you control the storage
+CREATE EXTERNAL VOLUME prod.raw.landing_zone
+LOCATION 's3://my-bucket/landing/';
+
+-- Upload files
+-- PUT /api/2.0/fs/files/Volumes/prod/ml/model_artifacts/model.pkl
+
+-- Use in code
+df = spark.read.csv("/Volumes/prod/raw/landing_zone/customers.csv")
+```
+
+Volumes have the same GRANTS as tables (`READ VOLUME`, `WRITE VOLUME`), so you get uniform governance.
+
+## Governance checklist
+
+- [ ] Catalogs organized by environment OR domain (not mixed)
+- [ ] `SELECT ON CATALOG` never granted to broad groups
+- [ ] Column masking on every PII column
+- [ ] Row filters for multi-tenant data
+- [ ] External Locations registered (no hardcoded paths)
+- [ ] Volumes for non-tabular files
+- [ ] Service Principals for production jobs (not personal users)
+
+---
+
+*Next week: Structured Streaming — watermarks, triggers and how not to lose data in micro-batch.*

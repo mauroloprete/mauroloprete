@@ -1,0 +1,188 @@
+---
+title: "Data Engineering Design Patterns: 8 ingestion patterns you need to know"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2025-09-15"
+categories: [Podcast, Data Engineering, Book Review]
+description: "The 8 ingestion patterns from Bartosz Konieczny's book. Examples in PySpark/SQL and how they map to the Medallion architecture."
+image: cover.png
+---
+
+In this episode I go through chapters 1 and 2 of *Data Engineering Design Patterns* by **Bartosz Konieczny**, covering the fundamentals of design patterns applied to data engineering and the 8 data ingestion patterns the author presents.
+
+The book is a read I highly recommend if you already have experience building pipelines and want to put names to the things you've been doing (or should be doing). It's not an introductory book: it assumes you know what a pipeline is and that you've already wrestled with real-world problems.
+
+## {{< fa lightbulb >}} Why patterns matter
+
+When you work on a data team, one of the most frequent problems isn't technical but communicative. Someone says "we reload everything" and someone else understands something different. Design patterns solve that: they give you a **shared vocabulary** for discussing solutions.
+
+It's not about memorizing names. It's about everyone at the table understanding exactly the same thing when someone says "let's use CDC for this source" or "we need a Compactor after the streaming job". It's the same logic as design patterns in software (Factory, Observer, etc.), but applied to data flows.
+
+Konieczny organizes the patterns into categories. In this post I focus on the **8 ingestion patterns**, which are the ones with the biggest day-to-day impact.
+
+## {{< fa database >}} The 8 ingestion patterns
+
+### 1. Full Loader
+
+Full load of the source on every run. You delete (or overwrite) everything that was there and bring in the entire dataset again. It's the simplest pattern and the least likely to fail, but the most expensive in time and resources as the table grows.
+
+**When to use it**: small reference tables (countries, currencies, configurations), sources without a modification date column, or when you need to guarantee total consistency without overcomplicating things.
+
+```{#lst-full-loader .python lst-cap="Full Loader: full overwrite of a dimension table"}
+# Full Loader in PySpark — overwrite a dimension table
+df_source = (spark.read.format("jdbc")
+    .option("url", jdbc_url)
+    .option("dbtable", "erp.dim_currency")
+    .option("user", user)
+    .option("password", password)
+    .load())
+
+(df_source.write
+    .format("delta")
+    .mode("overwrite")
+    .option("overwriteSchema", "true")
+    .saveAsTable("bronze.dim_currency"))
+```
+
+### 2. Incremental Loader
+
+Only brings in the records that are new or modified since the last run. It requires a reliable **control column**: a modification timestamp, an auto-incrementing ID, or something equivalent. It's the most common pattern in production because it balances efficiency with simplicity.
+
+**When to use it**: transactional tables that grow constantly and have an `updated_at` column or similar. It's the workhorse of most batch pipelines.
+
+```{#lst-incremental-loader .python lst-cap="Incremental Loader: high-watermark ingestion with PySpark"}
+# Incremental Loader — fetch only new records
+from pyspark.sql import functions as F
+
+# Get the latest high watermark
+max_timestamp = (spark.table("bronze.orders")
+    .agg(F.max("updated_at"))
+    .collect()[0][0])
+
+# Read only what's new from the source
+df_incremental = (spark.read.format("jdbc")
+    .option("url", jdbc_url)
+    .option("dbtable", "erp.orders")
+    .option("user", user)
+    .option("password", password)
+    .load()
+    .filter(F.col("updated_at") > max_timestamp))
+
+# Append or merge into the target
+(df_incremental.write
+    .format("delta")
+    .mode("append")
+    .saveAsTable("bronze.orders"))
+```
+
+### 3. CDC (Change Data Capture)
+
+Captures changes directly from the source database's **transaction log**. It's the most efficient pattern for transactional sources because you don't need to scan the source table: you read the changes from the WAL (Write-Ahead Log) or the engine's equivalent. Tools like Debezium, Fivetran, or the Databricks CDC connector do the heavy lifting.
+
+**When to use it**: when the source is a relational database with a high volume of changes, when you need to capture deletes (which the Incremental Loader can't see), or when you want low latency without impacting the source.
+
+```{#lst-cdc-merge .sql lst-cap="CDC with MERGE in Delta Lake: inserts, updates, and deletes"}
+-- CDC with MERGE in Delta Lake
+-- CDC events arrive with an _operation column: INSERT, UPDATE, DELETE
+
+MERGE INTO silver.customers AS target
+USING (
+    SELECT * FROM bronze.customers_cdc
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY customer_id ORDER BY _event_timestamp DESC
+    ) = 1
+) AS source
+ON target.customer_id = source.customer_id
+WHEN MATCHED AND source._operation = 'DELETE' THEN DELETE
+WHEN MATCHED AND source._operation = 'UPDATE' THEN UPDATE SET *
+WHEN NOT MATCHED AND source._operation != 'DELETE' THEN INSERT *;
+```
+
+### 4. Passthrough Replicator
+
+Replicates data exactly as it comes from the source, with no transformation whatsoever. It's like a mirror: whatever is in the source, you have identically in the target. It sounds trivial, but it's a deliberate pattern: separating extraction from transformation gives you a clean recovery point.
+
+**When to use it**: staging or Bronze layers where you want to keep a faithful copy of the source. If something goes wrong in a downstream transformation, you can always go back to the original data without hitting the source system again.
+
+### 5. Transformation Replicator
+
+Replicates and transforms in the same step. Unlike the Passthrough, here you apply business logic, cleaning, or restructuring during the ingestion itself. It reduces the number of jobs but couples extraction and transformation.
+
+**When to use it**: when volume is low and an intermediate layer isn't justified, or when the transformation is very simple (renaming columns, casting types). In practice, I rarely use it because I prefer separating responsibilities.
+
+### 6. Compactor
+
+Consolidates small files into larger ones. If you have a streaming or micro-batch pipeline generating thousands of small files per hour, read performance degrades because the engine has to open thousands of files. The Compactor merges them periodically.
+
+**When to use it**: whenever you have streaming or micro-batch pipelines writing to Delta, Parquet, or Iceberg. It's practically mandatory in production.
+
+```{#lst-compactor .sql lst-cap="Compactor: OPTIMIZE to consolidate small files in Delta"}
+-- Compactor in Databricks — OPTIMIZE is the native implementation
+-- Compact the entire table
+OPTIMIZE bronze.events;
+
+-- Compact only yesterday's partition (much more efficient)
+OPTIMIZE bronze.events
+WHERE event_date = current_date() - INTERVAL 1 DAY;
+
+-- If you use Liquid Clustering, OPTIMIZE is incremental
+-- and also reorders the data for faster queries
+```
+
+### 7. Readiness Marker
+
+Signals when a dataset is ready for downstream consumption. It seems like a minor detail, but in complex pipelines with many dependencies it's essential. Without a readiness marker, your downstream jobs don't know whether the data is complete or the ingestion is still running.
+
+**When to use it**: pipeline orchestration with complex dependencies. It can be implemented with `_SUCCESS` files, records in a metadata table, or signals in the orchestrator (Airflow sensors, Databricks task dependencies).
+
+### 8. External Trigger
+
+Ingestion doesn't run on a fixed schedule: it's fired by an **external event**. A file lands in S3, a webhook fires, a message shows up in a queue. It's the pattern for event-driven architectures.
+
+**When to use it**: when the source doesn't have a predictable schedule or when you need to react in real time. Examples: files a vendor uploads to a bucket, API webhooks, messages in Kafka/EventHub.
+
+## {{< fa layer-group >}} Mapping to the Medallion architecture
+
+One of the most useful exercises you can do is map these patterns to the layers of a **Medallion** architecture (Bronze / Silver / Gold). It's not a one-to-one relationship, but there are clear affinities:
+
+| Layer | Typical patterns | Role |
+|---|---|---|
+| **Bronze** | Full Loader, Incremental Loader, CDC, Passthrough Replicator, External Trigger | Raw ingestion. The goal is a faithful copy of the sources with minimal transformation. |
+| **Silver** | Transformation Replicator, CDC (MERGE), Compactor, Readiness Marker | Cleaning and conforming. Here you apply deduplication, typing, joins, and light business logic. |
+| **Gold** | Compactor, Readiness Marker | Aggregations and consumption models. Tables optimized for dashboards and ML. |
+
+The **Compactor** and the **Readiness Marker** are cross-cutting: you need them in any layer with frequent writes or downstream dependencies.
+
+## {{< fa table >}} Quick comparison
+
+| Pattern | Complexity | Latency | When to use it |
+|---|---|---|---|
+| Full Loader | Low | High | Small tables, no control column |
+| Incremental Loader | Medium | Medium | Tables with `updated_at`, daily/hourly batch |
+| CDC | High | Low | Transactional sources, capturing deletes |
+| Passthrough Replicator | Low | Variable | Staging layers, raw Bronze |
+| Transformation Replicator | Medium | Variable | Simple transformations at ingestion |
+| Compactor | Low | N/A (maintenance) | Post-streaming, micro-batches |
+| Readiness Marker | Low | N/A (signaling) | Orchestration with dependencies |
+| External Trigger | Medium-High | Low | Event-driven architectures |
+
+## {{< fa user >}} Personal take: what I use most in production
+
+Of these 8 patterns, the ones I use in **90% of my Databricks projects** are:
+
+- **Incremental Loader** for everything batch. It's the default pattern. If the source has `updated_at`, there's no reason to do a Full Load.
+- **CDC with MERGE** for transactional sources where I need to capture updates and deletes. In Databricks, Delta Lake's `MERGE INTO` makes implementing this almost trivial.
+- **Compactor** (via `OPTIMIZE`) after any streaming or micro-batch pipeline. Without it, read performance degrades fast.
+- **Readiness Marker** implemented as task dependencies in Databricks Workflows. Simple but effective.
+
+I reserve the **Full Loader** for small dimension tables where it's not worth the complexity. I use the **External Trigger** when working with files that land in S3/ADLS at unpredictable times (Databricks Auto Loader is ideal for this).
+
+The patterns I use the least are **Passthrough Replicator** and **Transformation Replicator** as standalone patterns, because in practice my Bronze layer already plays the role of the Passthrough and Silver plays the Transformation Replicator's. But having the pattern's name helps me explain what each layer does when talking with the team.
+
+## {{< fa link >}} Links
+
+- {{< fa podcast >}} [Listen to the episode on Spotify](https://open.spotify.com/episode/6GM0HWX7vdE6SmURAWTcCG)
+- {{< fa book >}} *Data Engineering Design Patterns* — Bartosz Konieczny
+- {{< fa file-alt >}} [MERGE documentation in Delta Lake](https://docs.delta.io/latest/delta-update.html)
+- {{< fa file-alt >}} [Auto Loader in Databricks](https://docs.databricks.com/ingestion/auto-loader/index.html)

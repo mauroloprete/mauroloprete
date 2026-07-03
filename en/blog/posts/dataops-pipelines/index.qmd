@@ -1,0 +1,209 @@
+---
+title: "DataOps: how to take your pipelines to the next level"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2025-09-01"
+categories: [Podcast, Data Engineering, DataOps]
+description: "What DataOps really is, how it differs from DevOps, the three pillars (automation, observability, collaboration), and common mistakes in production."
+image: cover.png
+---
+
+In this podcast episode I talk about DataOps: what it is, why it's not simply "DevOps for data", and how it can transform the way we build and maintain pipelines. Here's an expanded version with concrete examples and opinions based on what I've seen working (and failing) in production.
+
+{{< fa podcast >}} [Listen to the episode on Spotify](https://open.spotify.com/episode/7wyLHHZroEG7JZ8YH2K9h0)
+
+## What DataOps really is
+
+DataOps is the application of software engineering principles --- automation, testing, CI/CD, monitoring --- to the data lifecycle. But careful: it's not about buying a tool or installing Airflow and declaring victory.
+
+A practical definition: **DataOps is a set of practices aimed at reducing the time between when a pipeline change is written and when it reaches production in a reliable, tested, and observable way.**
+
+If your process for deploying a pipeline is "open a notebook in production and run it by hand", you're not doing DataOps. If the only way you find out a pipeline failed is someone pinging you on Slack, you're not either.
+
+## DataOps vs DevOps: cousins, not twins
+
+DevOps and DataOps share principles (automation, fast feedback, collaboration between teams). But data has problems that traditional software doesn't:
+
+| Dimension | DevOps | DataOps |
+|---|---|---|
+| What gets versioned | Source code | Code + data + schemas + configs |
+| State | Stateless (ideally) | Always stateful --- data persists |
+| Testing | Unit tests, integration tests | All of the above + data quality, freshness, volume |
+| Typical failure | "It doesn't compile" | "It compiles perfectly, but the data is wrong" |
+| Schema | Fixed API contracts | Constant schema drift --- sources change without warning |
+| Dependencies | Between services | Between datasets, with temporality and execution order |
+
+The key difference: **in software, if the test passes, the code works. In data, the test can pass and the data can still be wrong.** An ingestion pipeline can run without errors and bring in duplicate rows, empty fields, or data from three days ago because the source hung.
+
+## The three pillars of DataOps
+
+### 1. Automation
+
+If you do something by hand more than twice, automate it. This includes:
+
+**CI/CD for pipelines.** Every pipeline change should go through an automated process before reaching production. Example with GitHub Actions and Databricks Asset Bundles:
+
+```{#lst-cicd-gha .yaml lst-cap="CI/CD for pipelines with GitHub Actions and Databricks Asset Bundles"}
+# .github/workflows/deploy-pipeline.yml
+name: Deploy Pipeline
+on:
+  push:
+    branches: [main]
+    paths: ['pipelines/**']
+
+jobs:
+  validate-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Validate bundle
+        run: databricks bundle validate
+        env:
+          DATABRICKS_HOST: ${{ secrets.DBX_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DBX_TOKEN }}
+
+      - name: Run tests
+        run: databricks bundle run test_pipeline --no-wait
+
+      - name: Deploy to production
+        if: success()
+        run: databricks bundle deploy --target prod
+```
+
+**Automated data quality tests.** Testing that the pipeline doesn't throw an exception is not enough. You have to test the data. Example with a PySpark test:
+
+```{#lst-tests-quality .python lst-cap="Automated duplicate and freshness tests in PySpark"}
+from pyspark.sql import functions as F
+
+def test_no_duplicates(df, key_columns):
+    """Validates there are no duplicates by primary key."""
+    total = df.count()
+    distinct = df.select(key_columns).distinct().count()
+    assert total == distinct, (
+        f"Duplicates detected: {total} rows, "
+        f"{distinct} distinct by {key_columns}"
+    )
+
+def test_freshness(df, date_col, max_hours=24):
+    """Validates that data is no more than N hours behind."""
+    latest = df.agg(F.max(date_col)).collect()[0][0]
+    from datetime import datetime, timedelta
+    threshold = datetime.now() - timedelta(hours=max_hours)
+    assert latest >= threshold, (
+        f"Stale data: latest record {latest}, "
+        f"threshold {threshold}"
+    )
+```
+
+**Schema validation.** If you use dbt, this is native:
+
+```{#lst-dbt-tests .yaml lst-cap="Schema and quality validation with dbt tests"}
+# models/staging/stg_transactions.yml
+models:
+  - name: stg_transactions
+    columns:
+      - name: transaction_id
+        tests:
+          - not_null
+          - unique
+      - name: amount
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000000
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['completed', 'pending', 'failed']
+```
+
+### 2. Monitoring and observability
+
+Automating without monitoring is like driving with your eyes closed. The four types of monitoring you need:
+
+- **Data quality**: unexpected nulls, duplicates, out-of-range values, schema drift
+- **Freshness / SLAs**: is the data arriving on time? did the Silver table update before 8 AM?
+- **Performance**: pipeline latency, execution time, volume processed per batch
+- **Cost**: how many DBUs you consumed, how much compute you're burning on unnecessary OPTIMIZE runs
+
+You don't need an expensive tool to get started. A basic check in your pipeline already counts as monitoring:
+
+```{#lst-monitoring .python lst-cap="Basic post-run monitoring: volume and null rate per column"}
+import logging
+
+logger = logging.getLogger("pipeline_monitor")
+
+def monitor_pipeline_run(df, table_name, expected_min_rows=1000):
+    """Basic post-run monitoring."""
+    row_count = df.count()
+    null_pct = (
+        df.select(
+            [F.sum(F.col(c).isNull().cast("int")).alias(c)
+             for c in df.columns]
+        ).collect()[0]
+    )
+
+    logger.info(f"[{table_name}] Rows processed: {row_count}")
+
+    if row_count < expected_min_rows:
+        logger.warning(
+            f"[{table_name}] Low volume: {row_count} rows "
+            f"(expected >= {expected_min_rows})"
+        )
+
+    for col_name, null_count in zip(df.columns, null_pct):
+        pct = (null_count / row_count * 100) if row_count > 0 else 0
+        if pct > 10:
+            logger.warning(
+                f"[{table_name}] High null rate in {col_name}: {pct:.1f}%"
+            )
+```
+
+### 3. Collaboration
+
+This is the most ignored pillar. DataOps is not just tooling --- it's how teams work together.
+
+**Data Contracts between teams.** The backend team can't change a column's type without telling you. You need a formal contract. I wrote a whole post about this (see links below).
+
+**Documentation as code.** If the documentation lives in a Confluence nobody updates, it's useless. Documentation should live next to the code (like dbt's `.yml` files or comments in the models).
+
+**Shared lineage.** Every team should be able to see where the data comes from, where it flows through, and who consumes it. Unity Catalog in Databricks gives you this for free if you set it up properly.
+
+## DataOps maturity levels
+
+| Level | Name | Characteristics |
+|---|---|---|
+| 0 | Manual | Pipelines are run by hand, no tests, no CI/CD. "Works in my notebook." |
+| 1 | Basic CI | Code is in Git, there's some deploy process, but tests are manual or nonexistent. |
+| 2 | Automated testing | Data quality tests in the pipeline, schema validation, full CI/CD. Errors are caught before production. |
+| 3 | Full observability | Freshness monitoring, SLAs, cost tracking, data contracts between teams, automatic alerts, end-to-end lineage. |
+
+Most teams I know sit between level 0 and level 1. Getting to level 2 is already a huge leap. Level 3 is where you want to be, but it requires not just tools but a cultural shift.
+
+## Common mistakes
+
+**"We do DataOps because we use Airflow."** No. Airflow is an orchestrator, not a practice. You can have Airflow and still deploy by hand, with no tests, no monitoring. The tool is not the practice.
+
+**Confusing CI/CD with DataOps.** CI/CD is one part of DataOps (automation), but if you have no monitoring and no collaboration, you have a third of the puzzle.
+
+**Automating without testing.** The worst-case scenario: a pipeline that deploys automatically to production, with no quality tests, silently breaking data. You automated the disaster.
+
+**Ignoring cost.** DataOps is also about efficiency. If your pipeline runs a full `OPTIMIZE` on a 10 TB table every day with no predicate, you're burning money. Cost monitoring is part of observability.
+
+## Links
+
+- {{< fa podcast >}} [Episode on Spotify](https://open.spotify.com/show/20WqZma0iLDYbg9wAEfv0w)
+- {{< fa book >}} [Fundamentals of Data Engineering (Reis & Housley)](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/) --- covers DataOps as a discipline
+- {{< fa book >}} [Data Pipelines Pocket Reference (Densmore)](https://www.oreilly.com/library/view/data-pipelines-pocket/9781492087823/) --- practical CI/CD patterns for data
+- {{< fa link >}} [DataOps Manifesto](https://dataopsmanifesto.org/) --- the original 18 principles
+- {{< fa code-branch >}} [Databricks Asset Bundles docs](https://docs.databricks.com/en/dev-tools/bundles/index.html) --- native CI/CD for Databricks
+
+---
+
+*Next episode: Data Contracts --- how to design a framework from scratch.*

@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-06-09">
+<meta name="description" content="Rate limiting, guardrails, usage tracking, cost attribution, fallbacks and traffic splitting. Everything you need to govern LLMs across your organization.">
+
+<title>Databricks Tips #10: Unity AI Gateway — centralized governance for LLMs in production – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../../">
+<link href="../../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../../../styles.css">
+<meta property="og:title" content="Databricks Tips #10: Unity AI Gateway — centralized governance for LLMs in production – Mauro Loprete">
+<meta property="og:description" content="Rate limiting, guardrails, usage tracking, cost attribution, fallbacks and traffic splitting. Everything you need to govern LLMs across your organization.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-10-ai-gateway/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #10: Unity AI Gateway — centralized governance for LLMs in production – Mauro Loprete">
+<meta name="twitter:description" content="Rate limiting, guardrails, usage tracking, cost attribution, fallbacks and traffic splitting. Everything you need to govern LLMs across your organization.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-10-ai-gateway/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#what-ai-gateway-is" id="toc-what-ai-gateway-is" class="nav-link active" data-scroll-target="#what-ai-gateway-is">0. What AI Gateway is</a></li>
+  <li><a href="#openai-compatible-api" id="toc-openai-compatible-api" class="nav-link" data-scroll-target="#openai-compatible-api">1. OpenAI-compatible API</a>
+  <ul class="collapse">
+  <li><a href="#supported-providers" id="toc-supported-providers" class="nav-link" data-scroll-target="#supported-providers">Supported providers</a></li>
+  </ul></li>
+  <li><a href="#rate-limiting" id="toc-rate-limiting" class="nav-link" data-scroll-target="#rate-limiting">2. Rate Limiting</a>
+  <ul class="collapse">
+  <li><a href="#limit-types" id="toc-limit-types" class="nav-link" data-scroll-target="#limit-types">Limit types</a></li>
+  <li><a href="#levels" id="toc-levels" class="nav-link" data-scroll-target="#levels">Levels</a></li>
+  <li><a href="#key-rules" id="toc-key-rules" class="nav-link" data-scroll-target="#key-rules">Key rules</a></li>
+  </ul></li>
+  <li><a href="#guardrails-smart-content-filtering" id="toc-guardrails-smart-content-filtering" class="nav-link" data-scroll-target="#guardrails-smart-content-filtering">3. Guardrails: smart content filtering</a>
+  <ul class="collapse">
+  <li><a href="#available-types" id="toc-available-types" class="nav-link" data-scroll-target="#available-types">Available types</a></li>
+  <li><a href="#custom-guardrail-example" id="toc-custom-guardrail-example" class="nav-link" data-scroll-target="#custom-guardrail-example">Custom guardrail example</a></li>
+  <li><a href="#behavior" id="toc-behavior" class="nav-link" data-scroll-target="#behavior">Behavior</a></li>
+  </ul></li>
+  <li><a href="#usage-tracking" id="toc-usage-tracking" class="nav-link" data-scroll-target="#usage-tracking">4. Usage Tracking</a>
+  <ul class="collapse">
+  <li><a href="#key-fields" id="toc-key-fields" class="nav-link" data-scroll-target="#key-fields">Key fields</a></li>
+  <li><a href="#request-tags-for-cost-attribution" id="toc-request-tags-for-cost-attribution" class="nav-link" data-scroll-target="#request-tags-for-cost-attribution">Request tags for cost attribution</a></li>
+  <li><a href="#analysis-queries" id="toc-analysis-queries" class="nav-link" data-scroll-target="#analysis-queries">Analysis queries</a></li>
+  </ul></li>
+  <li><a href="#cost-attribution" id="toc-cost-attribution" class="nav-link" data-scroll-target="#cost-attribution">5. Cost Attribution</a>
+  <ul class="collapse">
+  <li><a href="#cost-queries" id="toc-cost-queries" class="nav-link" data-scroll-target="#cost-queries">Cost queries</a></li>
+  </ul></li>
+  <li><a href="#fallbacks-and-traffic-splitting" id="toc-fallbacks-and-traffic-splitting" class="nav-link" data-scroll-target="#fallbacks-and-traffic-splitting">6. Fallbacks and Traffic Splitting</a>
+  <ul class="collapse">
+  <li><a href="#fallbacks" id="toc-fallbacks" class="nav-link" data-scroll-target="#fallbacks">Fallbacks</a></li>
+  <li><a href="#traffic-splitting" id="toc-traffic-splitting" class="nav-link" data-scroll-target="#traffic-splitting">Traffic Splitting</a></li>
+  </ul></li>
+  <li><a href="#inference-tables-payload-logging" id="toc-inference-tables-payload-logging" class="nav-link" data-scroll-target="#inference-tables-payload-logging">7. Inference Tables (Payload Logging)</a>
+  <ul class="collapse">
+  <li><a href="#key-fields-1" id="toc-key-fields-1" class="nav-link" data-scroll-target="#key-fields-1">Key fields</a></li>
+  <li><a href="#limitations" id="toc-limitations" class="nav-link" data-scroll-target="#limitations">Limitations</a></li>
+  </ul></li>
+  <li><a href="#external-models-bring-your-own-api-key" id="toc-external-models-bring-your-own-api-key" class="nav-link" data-scroll-target="#external-models-bring-your-own-api-key">8. External Models: bring your own API key</a></li>
+  <li><a href="#ai-functions-from-sql" id="toc-ai-functions-from-sql" class="nav-link" data-scroll-target="#ai-functions-from-sql">9. AI Functions from SQL</a></li>
+  <li><a href="#permissions-and-authentication" id="toc-permissions-and-authentication" class="nav-link" data-scroll-target="#permissions-and-authentication">10. Permissions and authentication</a>
+  <ul class="collapse">
+  <li><a href="#endpoint-permissions" id="toc-endpoint-permissions" class="nav-link" data-scroll-target="#endpoint-permissions">Endpoint permissions</a></li>
+  <li><a href="#client-authentication" id="toc-client-authentication" class="nav-link" data-scroll-target="#client-authentication">Client authentication</a></li>
+  <li><a href="#external-model-credentials" id="toc-external-model-credentials" class="nav-link" data-scroll-target="#external-model-credentials">External model credentials</a></li>
+  </ul></li>
+  <li><a href="#gotchas" id="toc-gotchas" class="nav-link" data-scroll-target="#gotchas">11. Gotchas</a></li>
+  <li><a href="#ucode-coding-agents-through-ai-gateway" id="toc-ucode-coding-agents-through-ai-gateway" class="nav-link" data-scroll-target="#ucode-coding-agents-through-ai-gateway">12. <code>ucode</code>: coding agents through AI Gateway</a>
+  <ul class="collapse">
+  <li><a href="#supported-agents" id="toc-supported-agents" class="nav-link" data-scroll-target="#supported-agents">Supported agents</a></li>
+  <li><a href="#installation" id="toc-installation" class="nav-link" data-scroll-target="#installation">Installation</a></li>
+  <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup">Setup</a></li>
+  <li><a href="#usage" id="toc-usage" class="nav-link" data-scroll-target="#usage">Usage</a></li>
+  <li><a href="#how-it-works" id="toc-how-it-works" class="nav-link" data-scroll-target="#how-it-works">How it works</a></li>
+  </ul></li>
+  <li><a href="#when-not-to-use-ai-gateway" id="toc-when-not-to-use-ai-gateway" class="nav-link" data-scroll-target="#when-not-to-use-ai-gateway">13. When NOT to use AI Gateway</a></li>
+  <li><a href="#whats-free-and-whats-not" id="toc-whats-free-and-whats-not" class="nav-link" data-scroll-target="#whats-free-and-whats-not">What’s free and what’s not</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#other-posts-in-the-series" id="toc-other-posts-in-the-series" class="nav-link" data-scroll-target="#other-posts-in-the-series">Other posts in the series</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #10: Unity AI Gateway — centralized governance for LLMs in production</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">MLOps</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Rate limiting, guardrails, usage tracking, cost attribution, fallbacks and traffic splitting. Everything you need to govern LLMs across your organization.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 9, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Your team has 5 LLM endpoints in production. Marketing uses GPT to classify tickets, the legal team uses Claude to summarize contracts, data science has a fine-tuned model for NER. Nobody knows how much each one is spending, there are no usage limits, and if an external model goes down… well, it goes down.</p>
+<p><strong>Unity AI Gateway</strong> is the missing governance layer: a central point to control access, costs, quality and resilience for <em>all</em> the LLM traffic in your organization.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>One endpoint, multiple models</strong>: transparent routing, fallbacks and traffic splitting.</li>
+<li><strong>Rate limiting</strong> per endpoint, user or group — free.</li>
+<li><strong>Guardrails</strong> with LLMs as evaluators: PII, unsafe content, jailbreak, hallucinations and custom.</li>
+<li><strong>Usage tracking</strong> in <code>system.ai_gateway.usage</code> with tokens, latency and cost tags.</li>
+<li><strong>Cost attribution</strong> per team, project and model via <code>system.billing.usage</code>.</li>
+<li><strong>OpenAI-compatible API</strong>: change the <code>base_url</code> and you’re done.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="what-ai-gateway-is" class="level2">
+<h2 class="anchored" data-anchor-id="what-ai-gateway-is">0. What AI Gateway is</h2>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Unity AI Gateway: governance layer between consumers and the LLM models."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Unity AI Gateway: governance layer between consumers and the LLM models."></a></p>
+</figure>
+</div>
+<figcaption>Unity AI Gateway: governance layer between consumers and the LLM models.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>AI Gateway is a proxy layer between your consumers (agents, notebooks, apps, SQL) and the LLM models (OpenAI, Anthropic, Google, custom models). All the traffic goes through the gateway, which enforces governance rules and logs everything to Delta Tables inside Unity Catalog.</p>
+<p><strong>What it controls:</strong></p>
+<ul>
+<li><strong>Who</strong> can use which model (Unity Catalog permissions)</li>
+<li><strong>How much</strong> each user/group can use (rate limits)</li>
+<li><strong>Which content</strong> goes through and which gets blocked (guardrails)</li>
+<li><strong>How much</strong> each team/project costs (cost attribution)</li>
+<li><strong>What happens if</strong> the primary model fails (fallbacks)</li>
+</ul>
+<hr>
+</section>
+<section id="openai-compatible-api" class="level2">
+<h2 class="anchored" data-anchor-id="openai-compatible-api">1. OpenAI-compatible API</h2>
+<p>The key to AI Gateway is that it exposes an OpenAI-compatible API. Any SDK that supports OpenAI works by just changing the <code>base_url</code>:</p>
+<div id="lst-openai-sdk" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-openai-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: Using AI Gateway with the OpenAI SDK: only base_url and api_key change
+</figcaption>
+<div aria-describedby="lst-openai-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> openai <span class="im">import</span> OpenAI</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> OpenAI(</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    api_key<span class="op">=</span>DATABRICKS_TOKEN,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    base_url<span class="op">=</span><span class="st">"https://&lt;workspace&gt;.azuredatabricks.net/ai-gateway/mlflow/v1"</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"databricks-claude-sonnet-4"</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is Delta Lake?"</span>}],</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">256</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.choices[<span class="dv">0</span>].message.content)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>It also supports each provider’s native API:</p>
+<div id="lst-anthropic-sdk" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-anthropic-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: Anthropic’s native API through AI Gateway
+</figcaption>
+<div aria-describedby="lst-anthropic-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> anthropic</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> anthropic.Anthropic(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    api_key<span class="op">=</span><span class="st">"unused"</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    base_url<span class="op">=</span><span class="st">"https://&lt;workspace&gt;.azuredatabricks.net/ai-gateway/anthropic"</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    default_headers<span class="op">=</span>{</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Authorization"</span>: <span class="ss">f"Bearer </span><span class="sc">{</span>DATABRICKS_TOKEN<span class="sc">}</span><span class="ss">"</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>message <span class="op">=</span> client.messages.create(</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"&lt;ai-gateway-endpoint&gt;"</span>,</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">256</span>,</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is Delta Lake?"</span>}],</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<section id="supported-providers" class="level3">
+<h3 class="anchored" data-anchor-id="supported-providers">Supported providers</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Provider</th>
+<th>Models</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>OpenAI</strong></td>
+<td>GPT-4o, GPT-5, o-series</td>
+<td>API key</td>
+</tr>
+<tr class="even">
+<td><strong>Anthropic</strong></td>
+<td>Claude Opus, Sonnet, Haiku</td>
+<td>API key</td>
+</tr>
+<tr class="odd">
+<td><strong>Google</strong></td>
+<td>Gemini Pro, Flash</td>
+<td>Service account</td>
+</tr>
+<tr class="even">
+<td><strong>Meta</strong></td>
+<td>Llama 4, Llama 3.x</td>
+<td>Hosted by Databricks</td>
+</tr>
+<tr class="odd">
+<td><strong>Amazon Bedrock</strong></td>
+<td>Claude, Cohere, AI21 via AWS</td>
+<td>AWS access key</td>
+</tr>
+<tr class="even">
+<td><strong>Azure OpenAI</strong></td>
+<td>GPT via Azure</td>
+<td>API key or Entra ID</td>
+</tr>
+<tr class="odd">
+<td><strong>Custom</strong></td>
+<td>Any OpenAI-compatible proxy</td>
+<td>Bearer token</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="rate-limiting" class="level2">
+<h2 class="anchored" data-anchor-id="rate-limiting">2. Rate Limiting</h2>
+<p>Rate limiting controls how many requests or tokens each user or group can consume.</p>
+<section id="limit-types" class="level3">
+<h3 class="anchored" data-anchor-id="limit-types">Limit types</h3>
+<ul>
+<li><strong>QPM</strong> (Queries Per Minute): requests per minute</li>
+<li><strong>TPM</strong> (Tokens Per Minute): tokens consumed per minute</li>
+</ul>
+</section>
+<section id="levels" class="level3">
+<h3 class="anchored" data-anchor-id="levels">Levels</h3>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-2-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Rate limiting levels: endpoint (global), default (all users) and custom (per user/group)."><img src="index_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Rate limiting levels: endpoint (global), default (all users) and custom (per user/group)."></a></p>
+</figure>
+</div>
+<figcaption>Rate limiting levels: endpoint (global), default (all users) and custom (per user/group).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Level</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Endpoint</strong></td>
+<td>Global limit. If exceeded, <strong>all</strong> requests get blocked</td>
+</tr>
+<tr class="even">
+<td><strong>Default (user)</strong></td>
+<td>Applies to every user, unless overridden</td>
+</tr>
+<tr class="odd">
+<td><strong>Custom</strong></td>
+<td>Override for individual users, service principals or groups</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-rules" class="level3">
+<h3 class="anchored" data-anchor-id="key-rules">Key rules</h3>
+<ul>
+<li>If a user has both QPM <strong>and</strong> TPM configured, the <strong>most restrictive</strong> one applies</li>
+<li>User limits override group limits</li>
+<li>Maximum of <strong>20 rate limits</strong> and <strong>5 group-specific limits</strong> per endpoint</li>
+<li>Requests exceeding the limit get <strong>HTTP 429</strong> (Too Many Requests)</li>
+<li>Rate limiting is <strong>free</strong></li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Tip: short bursts can slip through
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The implementation may allow short bursts because concurrent requests are processed before the usage counter gets updated. Don’t design assuming millisecond-exact enforcement.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="guardrails-smart-content-filtering" class="level2">
+<h2 class="anchored" data-anchor-id="guardrails-smart-content-filtering">3. Guardrails: smart content filtering</h2>
+<p>Guardrails use an LLM as an evaluator to filter content on input and/or output. Two endpoints are involved: the inference one (your model) and the evaluator (the one enforcing the guardrail).</p>
+<section id="available-types" class="level3">
+<h3 class="anchored" data-anchor-id="available-types">Available types</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Guardrail</th>
+<th>Action</th>
+<th>Phase</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>PII redaction</strong></td>
+<td>Sanitize</td>
+<td>Input/Output</td>
+<td>Replaces PII with <code>[NAME]</code>, <code>[EMAIL]</code>, etc.</td>
+</tr>
+<tr class="even">
+<td><strong>PII blocking</strong></td>
+<td>Block</td>
+<td>Input/Output</td>
+<td>Blocks if PII is detected</td>
+</tr>
+<tr class="odd">
+<td><strong>Unsafe content</strong></td>
+<td>Block</td>
+<td>Input/Output</td>
+<td>Hate speech, violence, self-harm, sexual content</td>
+</tr>
+<tr class="even">
+<td><strong>Jailbreak</strong></td>
+<td>Block</td>
+<td>Input</td>
+<td>Detects prompt injection, Base64 obfuscation, role-playing</td>
+</tr>
+<tr class="odd">
+<td><strong>Hallucination</strong></td>
+<td>Block</td>
+<td>Output</td>
+<td>Fabricated facts, made-up statistics</td>
+</tr>
+<tr class="even">
+<td><strong>Custom</strong></td>
+<td>Block/Sanitize</td>
+<td>Input/Output</td>
+<td>Your own evaluator prompt (up to 5,000 chars)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="custom-guardrail-example" class="level3">
+<h3 class="anchored" data-anchor-id="custom-guardrail-example">Custom guardrail example</h3>
+<div id="lst-custom-guardrail" class="text listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-custom-guardrail-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Custom guardrail prompt: block off-topic questions for a support bot
+</figcaption>
+<div aria-describedby="lst-custom-guardrail-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<pre class="text"><code>You are evaluating whether a user message is off-topic for a
+customer support assistant for Databricks.
+
+A message is on-topic if it is about:
+- Databricks features, pricing, or documentation
+- Account, billing, or support issues
+- Data engineering or analytics questions
+
+Flag off-topic messages.
+
+Examples:
+- "How do I configure Unity Catalog?" -&gt; on-topic, do not flag
+- "What's a good recipe for lasagna?" -&gt; off-topic, flag</code></pre>
+</div>
+</figure>
+</div>
+</section>
+<section id="behavior" class="level3">
+<h3 class="anchored" data-anchor-id="behavior">Behavior</h3>
+<ul>
+<li><strong>Fail-closed</strong>: if the evaluator fails, the request gets blocked (it can’t be bypassed through transient failures)</li>
+<li><strong>Dry-run mode</strong>: evaluate without blocking — useful for testing</li>
+<li>Blocked requests return <strong>HTTP 400</strong></li>
+<li>Maximum of <strong>3 blocking + 1 sanitizing</strong> guardrails per phase (input/output)</li>
+<li>Timeout: <strong>30 seconds</strong> per guardrail</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Guardrail limitations
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>They don’t see the <strong>system prompt</strong>, previous conversation turns, tool-call payloads or images</li>
+<li><strong>Single-message</strong> evaluation — they don’t detect multi-turn patterns</li>
+<li>Not supported with custom model endpoints</li>
+<li>Each guardrail call is billed as a regular call to the evaluator endpoint</li>
+</ul>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="usage-tracking" class="level2">
+<h2 class="anchored" data-anchor-id="usage-tracking">4. Usage Tracking</h2>
+<p>Every request that goes through AI Gateway gets logged in the <code>system.ai_gateway.usage</code> system table.</p>
+<section id="key-fields" class="level3">
+<h3 class="anchored" data-anchor-id="key-fields">Key fields</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>endpoint_name</code></td>
+<td>STRING</td>
+<td>Endpoint name</td>
+</tr>
+<tr class="even">
+<td><code>requester</code></td>
+<td>STRING</td>
+<td>User or service principal</td>
+</tr>
+<tr class="odd">
+<td><code>destination_model</code></td>
+<td>STRING</td>
+<td>Model that processed the request</td>
+</tr>
+<tr class="even">
+<td><code>input_tokens</code></td>
+<td>LONG</td>
+<td>Input tokens</td>
+</tr>
+<tr class="odd">
+<td><code>output_tokens</code></td>
+<td>LONG</td>
+<td>Output tokens</td>
+</tr>
+<tr class="even">
+<td><code>total_tokens</code></td>
+<td>LONG</td>
+<td>Total tokens</td>
+</tr>
+<tr class="odd">
+<td><code>latency_ms</code></td>
+<td>LONG</td>
+<td>Total latency</td>
+</tr>
+<tr class="even">
+<td><code>status_code</code></td>
+<td>INT</td>
+<td>HTTP status</td>
+</tr>
+<tr class="odd">
+<td><code>endpoint_tags</code></td>
+<td>MAP</td>
+<td>Endpoint tags (team, project)</td>
+</tr>
+<tr class="even">
+<td><code>request_tags</code></td>
+<td>MAP</td>
+<td>Individual request tags</td>
+</tr>
+<tr class="odd">
+<td><code>routing_information</code></td>
+<td>STRUCT</td>
+<td>Fallback attempt details</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="request-tags-for-cost-attribution" class="level3">
+<h3 class="anchored" data-anchor-id="request-tags-for-cost-attribution">Request tags for cost attribution</h3>
+<p>You can tag each individual request for granular tracking:</p>
+<div id="lst-request-tags" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-request-tags-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Request tags for cost attribution per project and team
+</figcaption>
+<div aria-describedby="lst-request-tags-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"databricks-claude-sonnet-4"</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Summarize this contract"</span>}],</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    extra_headers<span class="op">=</span>{</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Databricks-Ai-Gateway-Request-Tags"</span>: json.dumps({</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>            <span class="st">"project"</span>: <span class="st">"legal-assistant"</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>            <span class="st">"team"</span>: <span class="st">"legal-ops"</span>,</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cost_center"</span>: <span class="st">"CC-420"</span>,</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>        })</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="analysis-queries" class="level3">
+<h3 class="anchored" data-anchor-id="analysis-queries">Analysis queries</h3>
+<div id="lst-usage-by-user" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-usage-by-user-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: Usage tracking: tokens consumed per user over the last 30 days
+</figcaption>
+<div aria-describedby="lst-usage-by-user-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  requester,</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  destination_model,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> requests,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(total_tokens) <span class="kw">AS</span> total_tokens</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.ai_gateway.<span class="kw">usage</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> event_time <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> requester, destination_model</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-usage-by-tag" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-usage-by-tag-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: Consumption per project using request tags
+</figcaption>
+<div aria-describedby="lst-usage-by-tag-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  request_tags[<span class="st">'project'</span>] <span class="kw">AS</span> project,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> requests,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(total_tokens) <span class="kw">AS</span> total_tokens</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.ai_gateway.<span class="kw">usage</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> request_tags[<span class="st">'project'</span>] <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> request_tags[<span class="st">'project'</span>]</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<hr>
+</section>
+</section>
+<section id="cost-attribution" class="level2">
+<h2 class="anchored" data-anchor-id="cost-attribution">5. Cost Attribution</h2>
+<p>AI Gateway enriches <code>system.billing.usage</code> with dedicated fields to track how much each team spends:</p>
+<section id="cost-queries" class="level3">
+<h3 class="anchored" data-anchor-id="cost-queries">Cost queries</h3>
+<div id="lst-cost-endpoint" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cost-endpoint-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;7: Cost in DBUs per endpoint over the last 30 days
+</figcaption>
+<div aria-describedby="lst-cost-endpoint-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  usage_metadata.ai_gateway_endpoint_name <span class="kw">AS</span> endpoint,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_metadata.ai_gateway_endpoint_name <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> endpoint</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-cost-model" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cost-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;8: Cost in DBUs per destination model
+</figcaption>
+<div aria-describedby="lst-cost-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  usage_metadata.ai_gateway_destination_model <span class="kw">AS</span> model,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_metadata.ai_gateway_endpoint_name <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> model</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-cost-team" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cost-team-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;9: Cost in DBUs per team using endpoint tags
+</figcaption>
+<div aria-describedby="lst-cost-team-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  custom_tags[<span class="st">'team'</span>] <span class="kw">AS</span> team,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(usage_quantity) <span class="kw">AS</span> dbus</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> billing_origin_product <span class="op">=</span> <span class="st">'MODEL_SERVING'</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> custom_tags[<span class="st">'team'</span>] <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> team</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>External model costs
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Requests to external models (direct OpenAI, Anthropic with your API key) are billed by the provider and <strong>don’t show up</strong> in <code>system.billing.usage</code>. Only Databricks DBU costs appear there. For complete tracking of external models, use inference tables.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="fallbacks-and-traffic-splitting" class="level2">
+<h2 class="anchored" data-anchor-id="fallbacks-and-traffic-splitting">6. Fallbacks and Traffic Splitting</h2>
+<section id="fallbacks" class="level3">
+<h3 class="anchored" data-anchor-id="fallbacks">Fallbacks</h3>
+<p>If the primary model fails (429 or 5XX), AI Gateway automatically routes to the next model in the chain:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-3-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Fallback chain: if the primary model fails with 429/5XX, the next one is tried."><img src="index_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Fallback chain: if the primary model fails with 429/5XX, the next one is tried."></a></p>
+</figure>
+</div>
+<figcaption>Fallback chain: if the primary model fails with 429/5XX, the next one is tried.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<ul>
+<li>Triggered by <strong>429</strong> errors (rate limit) or <strong>5XX</strong> (server error)</li>
+<li>Each fallback is tried <strong>once</strong>, in sequential order</li>
+<li>If they all fail, the request fails and the last error gets logged</li>
+<li>Attempts are recorded in <code>routing_information</code> in the usage table</li>
+</ul>
+</section>
+<section id="traffic-splitting" class="level3">
+<h3 class="anchored" data-anchor-id="traffic-splitting">Traffic Splitting</h3>
+<p>Distributes requests across multiple models by percentage:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Percentage</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GPT-4o</td>
+<td>80%</td>
+<td>Main model</td>
+</tr>
+<tr class="even">
+<td>Claude Sonnet</td>
+<td>20%</td>
+<td>A/B testing</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Percentages must add up to <strong>100</strong></li>
+<li>Maximum of <strong>5 destinations</strong> per traffic split</li>
+<li>Use cases: A/B testing, gradual rollout, load balancing across providers</li>
+</ul>
+<p>Traffic splitting and fallbacks are independent: the split determines the primary model, fallbacks apply if that model fails.</p>
+<hr>
+</section>
+</section>
+<section id="inference-tables-payload-logging" class="level2">
+<h2 class="anchored" data-anchor-id="inference-tables-payload-logging">7. Inference Tables (Payload Logging)</h2>
+<p>Inference tables store the full request and response of every call. Useful for auditing, debugging and fine-tuning.</p>
+<section id="key-fields-1" class="level3">
+<h3 class="anchored" data-anchor-id="key-fields-1">Key fields</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>request</code></td>
+<td>STRING</td>
+<td>Raw JSON of the request</td>
+</tr>
+<tr class="even">
+<td><code>response</code></td>
+<td>STRING</td>
+<td>Raw JSON of the response</td>
+</tr>
+<tr class="odd">
+<td><code>latency_ms</code></td>
+<td>LONG</td>
+<td>Total latency</td>
+</tr>
+<tr class="even">
+<td><code>status_code</code></td>
+<td>INT</td>
+<td>HTTP status</td>
+</tr>
+<tr class="odd">
+<td><code>requester</code></td>
+<td>STRING</td>
+<td>Who made the request</td>
+</tr>
+<tr class="even">
+<td><code>sampling_fraction</code></td>
+<td>DOUBLE</td>
+<td>Sampling fraction (1 = everything)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="limitations" class="level3">
+<h3 class="anchored" data-anchor-id="limitations">Limitations</h3>
+<ul>
+<li>Only in <strong>external storage catalogs</strong> (no default storage)</li>
+<li>Maximum payload: <strong>10 MiB</strong></li>
+<li><strong>Best effort</strong> delivery: logs are usually available within minutes, not guaranteed</li>
+<li>May not log requests with 401, 403, 429, 500 errors</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="external-models-bring-your-own-api-key" class="level2">
+<h2 class="anchored" data-anchor-id="external-models-bring-your-own-api-key">8. External Models: bring your own API key</h2>
+<p>To use models from external providers with your own API key, you create an “external model” endpoint:</p>
+<div id="lst-external-model" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-external-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;10: Create an external model endpoint with an Anthropic API key
+</figcaption>
+<div aria-describedby="lst-external-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> mlflow.deployments</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> mlflow.deployments.get_deploy_client(<span class="st">"databricks"</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>client.create_endpoint(</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"claude-via-gateway"</span>,</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"served_entities"</span>: [{</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>            <span class="st">"external_model"</span>: {</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>                <span class="st">"name"</span>: <span class="st">"claude-sonnet-4-20250514"</span>,</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>                <span class="st">"provider"</span>: <span class="st">"anthropic"</span>,</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>                <span class="st">"task"</span>: <span class="st">"llm/v1/chat"</span>,</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>                <span class="st">"anthropic_config"</span>: {</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"anthropic_api_key"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/ai/anthropic_key</span><span class="sc">}}</span><span class="st">"</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>                },</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>            }</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>        }]</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-external-bedrock" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-external-bedrock-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;11: External model with Amazon Bedrock
+</figcaption>
+<div aria-describedby="lst-external-bedrock-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>client.create_endpoint(</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"bedrock-claude"</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"served_entities"</span>: [{</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">"external_model"</span>: {</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>                <span class="st">"name"</span>: <span class="st">"claude-v2"</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>                <span class="st">"provider"</span>: <span class="st">"amazon-bedrock"</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>                <span class="st">"task"</span>: <span class="st">"llm/v1/chat"</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>                <span class="st">"amazon_bedrock_config"</span>: {</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_region"</span>: <span class="st">"us-east-1"</span>,</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_access_key_id"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/aws/access_key</span><span class="sc">}}</span><span class="st">"</span>,</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"aws_secret_access_key"</span>: <span class="st">"</span><span class="sc">{{</span><span class="st">secrets/aws/secret_key</span><span class="sc">}}</span><span class="st">"</span>,</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"bedrock_provider"</span>: <span class="st">"anthropic"</span>,</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>                },</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>            }</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>        }]</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>Credentials always go through <strong>Databricks Secrets</strong> — never in plaintext.</p>
+<hr>
+</section>
+<section id="ai-functions-from-sql" class="level2">
+<h2 class="anchored" data-anchor-id="ai-functions-from-sql">9. AI Functions from SQL</h2>
+<p>AI Gateway powers the AI Functions we saw in <a href="../databricks-tips-09-sql-warehouses/">Tips #9</a>. From pure SQL:</p>
+<div id="lst-ai-classify" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ai-classify-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;12: ai_classify: classify text using an LLM from SQL
+</figcaption>
+<div aria-describedby="lst-ai-classify-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  ticket_id,</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  ai_classify(</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    descripcion,</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">ARRAY</span>(<span class="st">'bug'</span>, <span class="st">'feature_request'</span>, <span class="st">'billing'</span>, <span class="st">'question'</span>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  ) <span class="kw">AS</span> categoria</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> soporte.tickets</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> fecha <span class="op">&gt;=</span> <span class="st">'2026-01-01'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-ai-extract" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ai-extract-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;13: ai_extract: extract structured entities from free text
+</figcaption>
+<div aria-describedby="lst-ai-extract-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> ai_extract(</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  comentario,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">'producto STRING, sentimiento STRING, urgencia STRING'</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>) <span class="kw">AS</span> entidades</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> feedback.comentarios</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-ai-summarize" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ai-summarize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;14: ai_summarize: summarize text at scale with batch inference
+</figcaption>
+<div aria-describedby="lst-ai-summarize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  contrato_id,</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  ai_summarize(texto_contrato) <span class="kw">AS</span> resumen</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> legal.contratos</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Automatic batching
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>AI Functions handle parallelization, retries and scaling internally. Send the entire dataset in <strong>a single query</strong> — Databricks optimizes the execution.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="permissions-and-authentication" class="level2">
+<h2 class="anchored" data-anchor-id="permissions-and-authentication">10. Permissions and authentication</h2>
+<section id="endpoint-permissions" class="level3">
+<h3 class="anchored" data-anchor-id="endpoint-permissions">Endpoint permissions</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Permission</th>
+<th>Can do</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>CAN MANAGE</code></td>
+<td>Create, modify the endpoint and configure AI Gateway</td>
+</tr>
+<tr class="even">
+<td><code>CAN QUERY</code></td>
+<td>Query the endpoint (this is what end users need)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="client-authentication" class="level3">
+<h3 class="anchored" data-anchor-id="client-authentication">Client authentication</h3>
+<ul>
+<li>Databricks <strong>Personal Access Token</strong> (PAT) as the <code>api_key</code></li>
+<li>The token is passed as <code>Authorization: Bearer &lt;token&gt;</code></li>
+</ul>
+</section>
+<section id="external-model-credentials" class="level3">
+<h3 class="anchored" data-anchor-id="external-model-credentials">External model credentials</h3>
+<ul>
+<li>Stored via <strong>Databricks Secrets</strong> (referenced as <code>{secrets/scope/key}</code>)</li>
+<li>Automatically deleted when the endpoint is removed</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">11. Gotchas</h2>
+<p><strong>1. Guardrails don’t see the system prompt.</strong> If you set up a jailbreak guardrail, it can’t evaluate the full conversation context — it only sees the user message. Attacks that exploit the system prompt go undetected.</p>
+<p><strong>2. One request can generate multiple billing events.</strong> Gateway routing + guardrail call + log ingestion = 3 DBU events for a single user request. Keep this in mind when estimating costs.</p>
+<p><strong>3. Config updates take 20-40 seconds.</strong> Rate limit updates up to 60 seconds. Don’t expect instant enforcement after a change.</p>
+<p><strong>4. External model costs don’t show up in system.billing.usage.</strong> Direct OpenAI/Anthropic costs are billed by the provider. Only Databricks DBUs appear in billing. For complete tracking, use inference tables + request tags.</p>
+<p><strong>5. <code>ai_query</code> with AI Gateway Beta has limitations.</strong> It only captures usage tracking. It does <strong>not</strong> enforce rate limits, guardrails, inference tables or fallbacks. For full governance, use the API directly.</p>
+<p><strong>6. Maximum of 3 blocking + 1 sanitizing guardrail per phase.</strong> If you need more, combine the logic into a custom guardrail with a more complex prompt.</p>
+<p><strong>7. Guardrails are single-message.</strong> They don’t detect patterns across a multi-turn conversation. A sophisticated attacker can spread a jailbreak over multiple messages.</p>
+<p><strong>8. If the evaluator endpoint loses access to the model, it fails closed.</strong> The guardrail blocks all traffic. Choose reliable evaluators and monitor their availability.</p>
+<p><strong>9. Inference tables only work in external storage catalogs.</strong> You can’t use the workspace’s default storage. Set up an external location first.</p>
+<p><strong>10. Not available in AWS GovCloud or Azure Government.</strong> Regional availability varies — not every model is in every region.</p>
+<hr>
+</section>
+<section id="ucode-coding-agents-through-ai-gateway" class="level2">
+<h2 class="anchored" data-anchor-id="ucode-coding-agents-through-ai-gateway">12. <code>ucode</code>: coding agents through AI Gateway</h2>
+<p><a href="https://github.com/databricks/ucode"><code>ucode</code></a> is the Databricks CLI that connects coding agents with AI Gateway. Instead of configuring separate API keys for each tool, all the agents route through your workspace — with the same governance rules, rate limits and tracking.</p>
+<section id="supported-agents" class="level3">
+<h3 class="anchored" data-anchor-id="supported-agents">Supported agents</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Agent</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Claude Code</strong></td>
+<td><code>ucode claude</code></td>
+</tr>
+<tr class="even">
+<td><strong>Codex</strong> (OpenAI)</td>
+<td><code>ucode codex</code></td>
+</tr>
+<tr class="odd">
+<td><strong>Gemini CLI</strong></td>
+<td><code>ucode gemini</code></td>
+</tr>
+<tr class="even">
+<td><strong>GitHub Copilot CLI</strong></td>
+<td><code>ucode copilot</code></td>
+</tr>
+<tr class="odd">
+<td><strong>OpenCode</strong></td>
+<td><code>ucode opencode</code></td>
+</tr>
+<tr class="even">
+<td><strong>Pi</strong></td>
+<td><code>ucode pi</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="installation" class="level3">
+<h3 class="anchored" data-anchor-id="installation">Installation</h3>
+<div id="lst-ucode-install" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ucode-install-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;15: Install ucode with uv (requires Python 3.12+)
+</figcaption>
+<div aria-describedby="lst-ucode-install-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> tool install git+https://github.com/databricks/ucode</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="setup" class="level3">
+<h3 class="anchored" data-anchor-id="setup">Setup</h3>
+<div id="lst-ucode-configure" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ucode-configure-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;16: Configure ucode: workspace, agents and MCP servers
+</figcaption>
+<div aria-describedby="lst-ucode-configure-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Interactive setup (asks for workspace and authenticates)</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Configure specific agents</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--agents</span> claude,codex</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Multi-workspace</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--workspaces</span> https://first.databricks.com,https://second.databricks.com</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Add Databricks MCP servers (SQL, Vector Search, UC Functions)</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure mcp</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Preview without applying changes</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--dry-run</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="usage" class="level3">
+<h3 class="anchored" data-anchor-id="usage">Usage</h3>
+<div id="lst-ucode-usage" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ucode-usage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;17: Use coding agents through AI Gateway with ucode
+</figcaption>
+<div aria-describedby="lst-ucode-usage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Launch Claude Code</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> claude</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Resume previous session</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> claude <span class="at">-r</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Check status and configured models</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> status</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Check usage statistics</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> usage</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Restore original configs</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> revert</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+</section>
+<section id="how-it-works" class="level3">
+<h3 class="anchored" data-anchor-id="how-it-works">How it works</h3>
+<ol type="1">
+<li><code>ucode configure</code> asks for your workspace URL and authenticates with your Databricks credentials</li>
+<li>It modifies each agent’s configuration files (<code>~/.claude/settings.json</code>, <code>~/.codex/config.toml</code>, etc.) to route through AI Gateway</li>
+<li>It backs up the existing configs before modifying them</li>
+<li>All the coding agents’ traffic goes through AI Gateway — with rate limits, usage tracking, cost attribution and guardrails</li>
+</ol>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>No separate API keys
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>With <code>ucode</code>, you don’t need OpenAI, Anthropic or Google API keys for your coding agents. Everything authenticates with your Databricks credentials and is governed from AI Gateway.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="when-not-to-use-ai-gateway" class="level2">
+<h2 class="anchored" data-anchor-id="when-not-to-use-ai-gateway">13. When NOT to use AI Gateway</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Need</th>
+<th>Alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Ultra-low latency</strong> (&lt; 50ms overhead)</td>
+<td>Direct call to the provider</td>
+</tr>
+<tr class="even">
+<td><strong>On-premise models</strong> without internet access</td>
+<td>Serving endpoint with a custom model</td>
+</tr>
+<tr class="odd">
+<td><strong>Massive batch inference</strong> over tables</td>
+<td><code>ai_query()</code> directly from SQL</td>
+</tr>
+<tr class="even">
+<td><strong>Fine-tuning / training</strong></td>
+<td>Foundation Model Training APIs</td>
+</tr>
+<tr class="odd">
+<td><strong>Workloads without Unity Catalog</strong></td>
+<td>AI Gateway can’t be used</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="whats-free-and-whats-not" class="level2">
+<h2 class="anchored" data-anchor-id="whats-free-and-whats-not">What’s free and what’s not</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Permissions + Rate limiting</strong></td>
+<td>Free</td>
+</tr>
+<tr class="even">
+<td><strong>Fallbacks</strong></td>
+<td>Free</td>
+</tr>
+<tr class="odd">
+<td><strong>Traffic splitting</strong></td>
+<td>Free</td>
+</tr>
+<tr class="even">
+<td><strong>Usage tracking</strong></td>
+<td>Included (enabled by default)</td>
+</tr>
+<tr class="odd">
+<td><strong>Guardrails</strong></td>
+<td>Billed as calls to the evaluator endpoint</td>
+</tr>
+<tr class="even">
+<td><strong>Inference tables</strong></td>
+<td>Billed for storage + ingestion</td>
+</tr>
+<tr class="odd">
+<td><strong>Hosted models (Foundation Model APIs)</strong></td>
+<td>DBUs per token</td>
+</tr>
+<tr class="even">
+<td><strong>External models</strong></td>
+<td>Billed by the provider + Databricks DBUs</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/">Unity AI Gateway overview — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/configure-endpoints-beta">Configure AI Gateway endpoints</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/rate-limits-beta">Rate limits</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/guardrails">Guardrails</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/usage-tracking-beta">Usage tracking</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/cost-observability-beta">Cost observability</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ai-gateway/inference-tables-beta">Inference tables</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/generative-ai/external-models/">External models</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/large-language-models/ai-functions">AI Functions</a></li>
+</ul>
+</section>
+<section id="other-posts-in-the-series" class="level2">
+<h2 class="anchored" data-anchor-id="other-posts-in-the-series">Other posts in the series</h2>
+<p>If this post was useful, check out the previous <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC for Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — the 7 things you wish you’d known</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — the governance nobody implements well</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers and micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — from experiment to model</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features that survive production</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker on Databricks</a> — custom containers</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming and event-driven triggers</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — the compute that turns itself on</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — declarative pipelines with built-in quality</li>
+</ul>
+<hr>
+<p><em>Next week: Secrets &amp; Security — credential management, RBAC and security best practices.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

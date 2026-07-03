@@ -1,0 +1,182 @@
+---
+title: "Databricks Tips #4: Structured Streaming — watermarks, triggers, and the micro-batch traps"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-03-17"
+draft: false
+categories: [Databricks Tips, Data Engineering, Streaming]
+description: "Trigger modes, watermarks, foreachBatch, Auto Loader, and the traps that make you lose data or money."
+image: cover.png
+---
+
+Fourth installment of **Databricks Tips**. Structured Streaming in Databricks looks simple until you lose data in production or get a compute bill you weren't expecting.
+
+## Trigger modes: the most important decision
+
+The trigger defines **when** each micro-batch runs. Choosing poorly gets expensive:
+
+```{#lst-trigger-modes .python lst-cap="Trigger modes: processingTime vs availableNow depending on latency"}
+# BAD in production: processes continuously, burns cluster 24/7
+df.writeStream \
+  .trigger(processingTime="0 seconds") \
+  .start()
+
+# BETTER for most cases: every 5 minutes
+df.writeStream \
+  .trigger(processingTime="5 minutes") \
+  .start()
+
+# IDEAL for pipelines that don't need low latency:
+# Process everything pending and stop
+df.writeStream \
+  .trigger(availableNow=True) \
+  .start()
+
+# For event-driven pipelines (e.g. every time a file arrives)
+df.writeStream \
+  .trigger(availableNow=True) \
+  .start()
+# Combined with a job triggered on file arrival
+```
+
+**The trap**: `processingTime="0 seconds"` is the default and most people never touch it. A cluster running 24/7 processing zero data most of the time.
+
+**Rule of thumb**:
+
+| Required latency | Trigger |
+|---|---|
+| < 1 minute | `processingTime="10 seconds"` |
+| 1-15 minutes | `processingTime="5 minutes"` |
+| > 15 minutes | `availableNow=True` + job schedule |
+| Daily batch | `availableNow=True` + daily cron |
+
+## Watermarks: how not to lose late data
+
+Without a watermark, Spark keeps **all** the state in memory for joins and aggregations. With large tables, this blows up:
+
+```{#lst-watermark .python lst-cap="Watermark: bounding in-memory state for aggregations"}
+from pyspark.sql.functions import window, col
+
+# Without watermark: state grows forever
+events \
+  .groupBy(window("event_time", "1 hour")) \
+  .count()
+
+# With watermark: Spark discards state older than 2 hours
+events \
+  .withWatermark("event_time", "2 hours") \
+  .groupBy(window("event_time", "1 hour")) \
+  .count()
+```
+
+**What happens to data arriving after the watermark?** It gets discarded silently. No error, no log. It just disappears.
+
+**How to choose the watermark**:
+
+1. Measure your data's real maximum delay (99th percentile)
+2. Add a safety margin (2x)
+3. Monitor it: if you see missing data, increase the watermark
+
+## Auto Loader: the right way to ingest files
+
+`spark.readStream.format("cloudFiles")` is the Auto Loader. It's superior to `spark.readStream.format("parquet")` for several reasons:
+
+```{#lst-auto-loader .python lst-cap="Auto Loader vs file source: schema evolution and exactly-once"}
+# BAD: basic file source
+df = (spark.readStream
+  .format("parquet")
+  .schema(my_schema)
+  .load("s3://bucket/landing/"))
+
+# GOOD: Auto Loader
+df = (spark.readStream
+  .format("cloudFiles")
+  .option("cloudFiles.format", "parquet")
+  .option("cloudFiles.schemaLocation", "/checkpoints/schema/")
+  .option("cloudFiles.inferColumnTypes", "true")
+  .option("cloudFiles.schemaEvolutionMode", "addNewColumns")
+  .load("s3://bucket/landing/"))
+
+# Write with merge schema
+df.writeStream \
+  .format("delta") \
+  .option("checkpointLocation", "/checkpoints/events/") \
+  .option("mergeSchema", "true") \
+  .trigger(availableNow=True) \
+  .toTable("catalog.bronze.events")
+```
+
+**Auto Loader advantages**:
+
+- **Notification vs listing**: it uses SNS/SQS (AWS) or Event Grid (Azure) to detect new files. In directories with millions of files, listing takes minutes; notification is instant.
+- **Schema evolution**: detects new columns automatically.
+- **Rescue column**: columns that don't match the schema go to `_rescued_data` instead of failing.
+- **Exactly-once**: the checkpoint guarantees you never process a file twice.
+
+```{#lst-rescue-column .python lst-cap="Rescue column: capturing data that doesn't match the schema"}
+# Enable rescue column for dirty data
+df = (spark.readStream
+  .format("cloudFiles")
+  .option("cloudFiles.format", "json")
+  .option("cloudFiles.schemaLocation", "/checkpoints/schema/")
+  .option("rescuedDataColumn", "_rescued_data")
+  .load("s3://bucket/raw/"))
+```
+
+## foreachBatch: the escape hatch
+
+When you need logic that can't be expressed in pure streaming (upserts, API calls, multi-table writes):
+
+```{#lst-foreach-batch .python lst-cap="foreachBatch with MERGE: idempotent upsert in streaming"}
+def upsert_to_delta(batch_df, batch_id):
+    from delta.tables import DeltaTable
+
+    target = DeltaTable.forName(spark, "catalog.silver.customers")
+
+    (target.alias("t")
+     .merge(batch_df.alias("s"), "t.customer_id = s.customer_id")
+     .whenMatchedUpdateAll()
+     .whenNotMatchedInsertAll()
+     .execute())
+
+# Stream with upsert
+(spark.readStream
+  .table("catalog.bronze.customers")
+  .writeStream
+  .foreachBatch(upsert_to_delta)
+  .option("checkpointLocation", "/checkpoints/customers_upsert/")
+  .trigger(availableNow=True)
+  .start())
+```
+
+**Watch out with foreachBatch**: if your function fails halfway through, the whole batch gets retried. Make sure the operation is **idempotent** (MERGE is, INSERT isn't).
+
+## Monitoring: what to watch in production
+
+```{#lst-stream-monitor .python lst-cap="StreamingQueryListener: monitoring batches and detecting lag"}
+# Query listener for metrics
+from pyspark.sql.streaming import StreamingQueryListener
+
+class StreamMonitor(StreamingQueryListener):
+    def onQueryProgress(self, event):
+        progress = event.progress
+        print(f"""
+        Batch: {progress.batchId}
+        Input rows: {progress.numInputRows}
+        Processing time: {progress.batchDuration}ms
+        Watermark: {progress.eventTime.get('watermark', 'N/A')}
+        """)
+
+spark.streams.addListener(StreamMonitor())
+```
+
+**Key metrics**:
+
+- `numInputRows = 0` for a long time → the trigger is running with no data (money down the drain)
+- `batchDuration` growing batch after batch → state is growing, you need a watermark
+- `inputRowsPerSecond` vs `processedRowsPerSecond` → if input > processed, you're accumulating lag
+
+---
+
+*Next week: MLflow in Unity Catalog — model registry, experiment lineage, and serving.*

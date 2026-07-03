@@ -1,0 +1,328 @@
+---
+title: "Data Contracts: how to design a framework from scratch"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-04-14"
+categories: [Data Architecture, Data Engineering, Podcast]
+description: "What Data Contracts are, why you need them, and how I implemented a framework in production with Databricks and PySpark."
+draft: false
+image: cover.png
+---
+
+If a pipeline ever broke on you because someone changed a column at the source without telling you, this post is for you.
+
+Data Contracts are the answer to a problem every data engineer faces: **sources change without warning and pipelines break silently**.
+
+## The real problem
+
+A typical situation at any company:
+
+1.  The backend team adds a column to the API
+2.  Another team changes a field's type from `INT` to `STRING`
+3.  An external vendor changes the format of the CSV they send you
+4.  Your Silver pipeline fails at 3 AM
+5.  You find out when the CEO's dashboard shows empty data
+
+**Without Data Contracts**: you find out when something breaks. **With Data Contracts**: you find out before it reaches production.
+
+## What is a Data Contract
+
+A Data Contract is a formal agreement between the data **producer** (whoever generates or sends the data) and the **consumer** (whoever processes it). It defines:
+
+-   **Schema**: which columns, which types, what's nullable
+-   **SLAs**: when the data arrives, and how often
+-   **Quality**: validation rules (no nulls, ranges, uniqueness)
+-   **Ownership**: who is responsible when something fails
+-   **Versioning**: how changes are handled
+
+## Anatomy of a Data Contract
+
+``` {#lst-contract-yaml .yaml lst-cap="YAML definition of a Data Contract with schema, SLAs and quality rules"}
+# contracts/transactions.yml
+contract:
+  name: transactions
+  version: "2.1"
+  owner: backend-team
+  description: "Payment transactions from the core banking system"
+
+  sla:
+    freshness: "1 hour"
+    availability: "99.9%"
+
+  schema:
+    - name: transaction_id
+      type: BIGINT
+      nullable: false
+      unique: true
+      description: "Unique transaction ID"
+
+    - name: customer_id
+      type: BIGINT
+      nullable: false
+      description: "FK to the customer"
+
+    - name: amount
+      type: DECIMAL(18,2)
+      nullable: false
+      checks:
+        - "amount > 0"
+        - "amount < 1000000"
+
+    - name: transaction_date
+      type: DATE
+      nullable: false
+      checks:
+        - "transaction_date >= '2020-01-01'"
+        - "transaction_date <= current_date()"
+
+    - name: status
+      type: STRING
+      nullable: false
+      allowed_values: ["completed", "pending", "failed", "reversed"]
+
+    - name: currency
+      type: STRING
+      nullable: false
+      pattern: "^[A-Z]{3}$"
+
+  quality_rules:
+    - name: no_duplicates
+      sql: "SELECT COUNT(*) - COUNT(DISTINCT transaction_id) FROM {table}"
+      threshold: 0
+
+    - name: completeness
+      sql: "SELECT COUNT(*) FILTER(WHERE amount IS NULL) / COUNT(*) FROM {table}"
+      threshold: 0.01  # at most 1% nulls
+
+    - name: freshness
+      sql: "SELECT DATEDIFF(hour, MAX(transaction_date), current_date()) FROM {table}"
+      threshold: 26  # at most 26 hours of delay
+```
+
+## PySpark implementation
+
+### 1. Contract parser
+
+``` {#lst-parser .python lst-cap="Parser from YAML contracts to Python dataclasses"}
+import yaml
+from dataclasses import dataclass
+from typing import List, Optional
+
+@dataclass
+class ColumnContract:
+    name: str
+    type: str
+    nullable: bool = True
+    unique: bool = False
+    checks: Optional[List[str]] = None
+    allowed_values: Optional[List[str]] = None
+    pattern: Optional[str] = None
+
+@dataclass
+class QualityRule:
+    name: str
+    sql: str
+    threshold: float
+
+@dataclass
+class DataContract:
+    name: str
+    version: str
+    owner: str
+    columns: List[ColumnContract]
+    quality_rules: List[QualityRule]
+
+    @classmethod
+    def from_yaml(cls, path: str) -> "DataContract":
+        with open(path) as f:
+            raw = yaml.safe_load(f)["contract"]
+
+        columns = [
+            ColumnContract(**col)
+            for col in raw["schema"]
+        ]
+        rules = [
+            QualityRule(**rule)
+            for rule in raw.get("quality_rules", [])
+        ]
+        return cls(
+            name=raw["name"],
+            version=raw["version"],
+            owner=raw["owner"],
+            columns=columns,
+            quality_rules=rules
+        )
+```
+
+### 2. Schema validator
+
+``` {#lst-schema-validator .python lst-cap="Schema validator: compares a DataFrame against the contract"}
+from pyspark.sql import DataFrame
+from pyspark.sql.types import *
+
+TYPE_MAP = {
+    "BIGINT": LongType(),
+    "STRING": StringType(),
+    "DATE": DateType(),
+    "DECIMAL(18,2)": DecimalType(18, 2),
+    "BOOLEAN": BooleanType(),
+    "TIMESTAMP": TimestampType(),
+}
+
+def validate_schema(df: DataFrame, contract: DataContract) -> List[str]:
+    """Validates that the DataFrame complies with the contract schema."""
+    errors = []
+    df_fields = {f.name: f for f in df.schema.fields}
+
+    for col in contract.columns:
+        if col.name not in df_fields:
+            errors.append(f"Missing column: {col.name}")
+            continue
+
+        field = df_fields[col.name]
+        expected_type = TYPE_MAP.get(col.type)
+
+        if expected_type and field.dataType != expected_type:
+            errors.append(
+                f"Wrong type in {col.name}: "
+                f"expected {col.type}, found {field.dataType}"
+            )
+
+        if not col.nullable and field.nullable:
+            errors.append(
+                f"{col.name} should be NOT NULL"
+            )
+
+    # Extra columns (warning, not an error)
+    contract_cols = {c.name for c in contract.columns}
+    extra = set(df_fields.keys()) - contract_cols
+    if extra:
+        errors.append(f"Unexpected columns: {extra}")
+
+    return errors
+```
+
+### 3. Quality validator
+
+``` {#lst-quality-validator .python lst-cap="Quality validator: runs SQL rules and reports violations"}
+def validate_quality(
+    spark,
+    table_name: str,
+    contract: DataContract
+) -> List[dict]:
+    """Runs the quality rules and reports violations."""
+    results = []
+
+    for rule in contract.quality_rules:
+        query = rule.sql.format(table=table_name)
+        value = spark.sql(query).collect()[0][0]
+
+        passed = value <= rule.threshold
+        results.append({
+            "rule": rule.name,
+            "value": value,
+            "threshold": rule.threshold,
+            "passed": passed
+        })
+
+        if not passed:
+            print(f"FAIL: {rule.name} = {value} "
+                  f"(threshold: {rule.threshold})")
+
+    return results
+```
+
+### 4. Wiring it into the pipeline
+
+``` {#lst-ingest-pipeline .python lst-cap="Ingestion pipeline with contract validation built in"}
+class ContractViolation(Exception):
+    """Exception for Data Contract violations."""
+    pass
+
+def alert_team(owner: str, failures: list):
+    """Notifies the contract's owning team about quality failures."""
+    # Implement according to your stack: Slack webhook, email, PagerDuty, etc.
+    for f in failures:
+        print(f"[ALERT → {owner}] {f['rule']}: value={f['value']}, "
+              f"threshold={f['threshold']}")
+
+def ingest_with_contract(
+    spark,
+    source_df: DataFrame,
+    contract_path: str,
+    target_table: str
+):
+    """Ingestion pipeline with contract validation."""
+    contract = DataContract.from_yaml(contract_path)
+
+    # 1. Validate schema
+    schema_errors = validate_schema(source_df, contract)
+    if schema_errors:
+        raise ContractViolation(
+            f"Schema violation in {contract.name}: "
+            f"{schema_errors}"
+        )
+
+    # 2. Write to table
+    source_df.write.mode("append").saveAsTable(target_table)
+
+    # 3. Validate quality post-write
+    quality = validate_quality(spark, target_table, contract)
+    failures = [r for r in quality if not r["passed"]]
+
+    if failures:
+        # Alert but don't fail (soft contract)
+        alert_team(contract.owner, failures)
+
+    return quality
+```
+
+## Hard Contracts vs Soft Contracts
+
+| Type | What happens on failure | When to use it |
+|------------------------|------------------------|------------------------|
+| **Hard** | Pipeline stops, data doesn't get in | Critical sources (core banking, payments) |
+| **Soft** | A warning is logged, data gets in anyway | External sources, non-critical data |
+
+``` {#lst-hard-vs-soft .python lst-cap="Hard contract vs Soft contract: fail or send to quarantine"}
+# Hard contract: fail and stop
+if schema_errors:
+    raise ContractViolation(...)
+
+# Soft contract: log and keep going
+if schema_errors:
+    log_violation(contract, schema_errors)
+    # data still lands in a quarantine table
+    source_df.write.saveAsTable(f"{target_table}_quarantine")
+```
+
+## With Databricks Expectations (DLT)
+
+If you use DLT / Lakeflow Declarative Pipelines, you can express your contracts as expectations:
+
+``` {#lst-dlt-expectations .python lst-cap="Data Contracts as DLT Expectations in Databricks"}
+import dlt
+
+@dlt.table(name="silver_transactions")
+@dlt.expect_all_or_drop({
+    "valid_amount": "amount > 0 AND amount < 1000000",
+    "valid_status": "status IN ('completed','pending','failed','reversed')",
+    "not_null_id": "transaction_id IS NOT NULL",
+    "valid_date": "transaction_date >= '2020-01-01'"
+})
+def clean_transactions():
+    return dlt.read("bronze_transactions")
+```
+
+`expect_all_or_drop` is a hard contract: rows that don't comply get dropped. `expect_all_or_fail` stops the entire pipeline. `expect_all` only logs.
+
+## Links
+
+-   [Data Contracts (Andrew Jones)](https://datacontract.com/) — the community reference
+
+-
+
+    ## [DLT Expectations (Databricks)](https://docs.databricks.com/en/delta-live-tables/expectations.html) — official documentation
+
+*Next week: Data Mesh in practice — what works and what doesn't.*

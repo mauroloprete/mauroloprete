@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-06-11">
 <meta name="description" content="Streaming tables, materialized views, expectations, AUTO CDC con SCD Type 1/2, modos triggered vs continuous, serverless y los gotchas que no están en el tutorial.">
 
 <title>Databricks Tips #11: Lakeflow Declarative Pipelines (ex DLT) — pipelines declarativos con calidad built-in – Mauro Loprete</title>
@@ -99,17 +98,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -151,8 +150,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -198,7 +197,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#el-rename-dlt-lakeflow-declarative-pipelines" id="toc-el-rename-dlt-lakeflow-declarative-pipelines" class="nav-link active" data-scroll-target="#el-rename-dlt-lakeflow-declarative-pipelines">0. El rename: DLT → Lakeflow Declarative Pipelines</a></li>
@@ -295,7 +294,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">June 11, 2026</p>
+      <p class="date">11 de junio de 2026</p>
     </div>
   </div>
   
@@ -315,7 +314,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>TL;DR
+<span class="screen-reader-only">Nota</span>TL;DR
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -358,21 +357,21 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-st-sql" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-st-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Streaming table en SQL: ingesta incremental con Auto Loader
+Listado&nbsp;1: Streaming table en SQL: ingesta incremental con Auto Loader
 </figcaption>
 <div aria-describedby="lst-st-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REFRESH</span> STREAMING <span class="kw">TABLE</span> raw_transactions</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> STREAM read_files(</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">'/Volumes/catalog/schema/volume/transactions/'</span>,</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  format <span class="op">=&gt;</span> <span class="st">'json'</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-st-python" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-st-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Streaming table en Python: decorador <span class="citation" data-cites="dp.table">@dp.table</span> con readStream
+Listado&nbsp;2: Streaming table en Python: decorador <span class="citation" data-cites="dp.table">@dp.table</span> con readStream
 </figcaption>
 <div aria-describedby="lst-st-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark <span class="im">import</span> pipelines <span class="im">as</span> dp</span>
@@ -384,7 +383,7 @@ Listing&nbsp;2: Streaming table en Python: decorador <span class="citation" data
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">format</span>(<span class="st">"cloudFiles"</span>)</span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>        .option(<span class="st">"cloudFiles.format"</span>, <span class="st">"json"</span>)</span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        .load(<span class="st">"/Volumes/catalog/schema/volume/transactions/"</span>)</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -395,7 +394,7 @@ Listing&nbsp;2: Streaming table en Python: decorador <span class="citation" data
 <div id="lst-mv-sql" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-mv-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Materialized view en SQL: aggregación incremental para Gold
+Listado&nbsp;3: Materialized view en SQL: aggregación incremental para Gold
 </figcaption>
 <div aria-describedby="lst-mv-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REFRESH</span> <span class="kw">MATERIALIZED</span> <span class="kw">VIEW</span> daily_revenue</span>
@@ -405,14 +404,14 @@ Listing&nbsp;3: Materialized view en SQL: aggregación incremental para Gold
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(amount) <span class="kw">AS</span> total_revenue,</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">AS</span> transaction_count</span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> silver_transactions</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> transaction_date, <span class="kw">segment</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> transaction_date, <span class="kw">segment</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-mv-python" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-mv-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Materialized view en Python: decorador <span class="citation" data-cites="dp.materialized_view">@dp.materialized_view</span>
+Listado&nbsp;4: Materialized view en Python: decorador <span class="citation" data-cites="dp.materialized_view">@dp.materialized_view</span>
 </figcaption>
 <div aria-describedby="lst-mv-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.materialized_view</span></span>
@@ -424,7 +423,7 @@ Listing&nbsp;4: Materialized view en Python: decorador <span class="citation" da
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>            F.<span class="bu">sum</span>(<span class="st">"amount"</span>).alias(<span class="st">"total_revenue"</span>),</span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>            F.count(<span class="st">"*"</span>).alias(<span class="st">"transaction_count"</span>),</span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -435,13 +434,13 @@ Listing&nbsp;4: Materialized view en Python: decorador <span class="citation" da
 <div id="lst-view-sql" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-view-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: View temporal en SQL: lógica intermedia sin costo de storage
+Listado&nbsp;5: View temporal en SQL: lógica intermedia sin costo de storage
 </figcaption>
 <div aria-describedby="lst-view-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TEMPORARY</span> <span class="kw">VIEW</span> valid_transactions</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> STREAM(raw_transactions)</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> amount <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">AND</span> customer_id <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> amount <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">AND</span> customer_id <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -569,7 +568,7 @@ Listing&nbsp;5: View temporal en SQL: lógica intermedia sin costo de storage
 <div id="lst-expect-sql" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-expect-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Expectations en SQL: warn, drop y fail en una misma tabla
+Listado&nbsp;6: Expectations en SQL: warn, drop y fail en una misma tabla
 </figcaption>
 <div aria-describedby="lst-expect-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REFRESH</span> STREAMING <span class="kw">TABLE</span> silver_transactions (</span>
@@ -595,7 +594,7 @@ Listing&nbsp;6: Expectations en SQL: warn, drop y fail en una misma tabla
 <span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  currency,</span>
 <span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>  transaction_date,</span>
 <span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">current_timestamp</span>() <span class="kw">AS</span> _silver_timestamp</span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> STREAM(raw_transactions)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> STREAM(raw_transactions)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -605,7 +604,7 @@ Listing&nbsp;6: Expectations en SQL: warn, drop y fail en una misma tabla
 <div id="lst-expect-python" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-expect-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: expect_all en Python: agrupar reglas de calidad reutilizables
+Listado&nbsp;7: expect_all en Python: agrupar reglas de calidad reutilizables
 </figcaption>
 <div aria-describedby="lst-expect-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>quality_rules <span class="op">=</span> {</span>
@@ -620,7 +619,7 @@ Listing&nbsp;7: expect_all en Python: agrupar reglas de calidad reutilizables
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (</span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>        spark.readStream.table(<span class="st">"raw_transactions"</span>)</span>
 <span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"_silver_timestamp"</span>, F.current_timestamp())</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -631,7 +630,7 @@ Listing&nbsp;7: expect_all en Python: agrupar reglas de calidad reutilizables
 <div id="lst-quarantine-python" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-quarantine-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;8: Patrón quarantine: registros válidos a Silver, inválidos a cuarentena
+Listado&nbsp;8: Patrón quarantine: registros válidos a Silver, inválidos a cuarentena
 </figcaption>
 <div aria-describedby="lst-quarantine-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.table</span></span>
@@ -644,7 +643,7 @@ Listing&nbsp;8: Patrón quarantine: registros válidos a Silver, inválidos a cu
 <span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (</span>
 <span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        spark.readStream.table(<span class="st">"raw_transactions"</span>)</span>
 <span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">filter</span>(<span class="st">"customer_id IS NULL OR amount &lt;= 0"</span>)</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -654,7 +653,7 @@ Listing&nbsp;8: Patrón quarantine: registros válidos a Silver, inválidos a cu
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Important</span>Limitaciones de expectations
+<span class="screen-reader-only">Importante</span>Limitaciones de expectations
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -677,7 +676,7 @@ Listing&nbsp;8: Patrón quarantine: registros válidos a Silver, inválidos a cu
 <div id="lst-cdc-scd1-sql" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cdc-scd1-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;9: AUTO CDC con SCD Type 1 en SQL: solo mantiene la versión actual
+Listado&nbsp;9: AUTO CDC con SCD Type 1 en SQL: solo mantiene la versión actual
 </figcaption>
 <div aria-describedby="lst-cdc-scd1-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REFRESH</span> STREAMING <span class="kw">TABLE</span> customers_current;</span>
@@ -689,14 +688,14 @@ Listing&nbsp;9: AUTO CDC con SCD Type 1 en SQL: solo mantiene la versión actual
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>APPLY <span class="kw">AS</span> <span class="kw">DELETE</span> <span class="cf">WHEN</span> operation <span class="op">=</span> <span class="st">'DELETE'</span></span>
 <span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="kw">SEQUENCE</span> <span class="kw">BY</span> updated_at</span>
 <span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="kw">COLUMNS</span> <span class="op">*</span> <span class="kw">EXCEPT</span> (operation, updated_at)</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>STORED <span class="kw">AS</span> SCD <span class="kw">TYPE</span> <span class="dv">1</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>STORED <span class="kw">AS</span> SCD <span class="kw">TYPE</span> <span class="dv">1</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-cdc-scd1-python" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cdc-scd1-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;10: AUTO CDC con SCD Type 1 en Python: create_auto_cdc_flow
+Listado&nbsp;10: AUTO CDC con SCD Type 1 en Python: create_auto_cdc_flow
 </figcaption>
 <div aria-describedby="lst-cdc-scd1-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>dp.create_streaming_table(<span class="st">"customers_current"</span>)</span>
@@ -709,7 +708,7 @@ Listing&nbsp;10: AUTO CDC con SCD Type 1 en Python: create_auto_cdc_flow
 <span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    apply_as_deletes<span class="op">=</span>expr(<span class="st">"operation = 'DELETE'"</span>),</span>
 <span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    except_column_list<span class="op">=</span>[<span class="st">"operation"</span>, <span class="st">"updated_at"</span>],</span>
 <span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    stored_as_scd_type<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -720,7 +719,7 @@ Listing&nbsp;10: AUTO CDC con SCD Type 1 en Python: create_auto_cdc_flow
 <div id="lst-cdc-scd2-sql" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cdc-scd2-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;11: AUTO CDC con SCD Type 2 en SQL: historial completo de cambios
+Listado&nbsp;11: AUTO CDC con SCD Type 2 en SQL: historial completo de cambios
 </figcaption>
 <div aria-describedby="lst-cdc-scd2-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REFRESH</span> STREAMING <span class="kw">TABLE</span> customers_history;</span>
@@ -732,7 +731,7 @@ Listing&nbsp;11: AUTO CDC con SCD Type 2 en SQL: historial completo de cambios
 <span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>APPLY <span class="kw">AS</span> <span class="kw">DELETE</span> <span class="cf">WHEN</span> operation <span class="op">=</span> <span class="st">'DELETE'</span></span>
 <span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="kw">SEQUENCE</span> <span class="kw">BY</span> updated_at</span>
 <span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="kw">COLUMNS</span> <span class="op">*</span> <span class="kw">EXCEPT</span> (operation, updated_at)</span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>STORED <span class="kw">AS</span> SCD <span class="kw">TYPE</span> <span class="dv">2</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>STORED <span class="kw">AS</span> SCD <span class="kw">TYPE</span> <span class="dv">2</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -778,11 +777,11 @@ Listing&nbsp;11: AUTO CDC con SCD Type 2 en SQL: historial completo de cambios
 <div id="lst-cdc-track" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cdc-track-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;12: TRACK HISTORY: solo crear versiones cuando cambian columnas específicas
+Listado&nbsp;12: TRACK HISTORY: solo crear versiones cuando cambian columnas específicas
 </figcaption>
 <div aria-describedby="lst-cdc-track-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>STORED <span class="kw">AS</span> SCD <span class="kw">TYPE</span> <span class="dv">2</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>TRACK HISTORY <span class="kw">ON</span> <span class="op">*</span> <span class="kw">EXCEPT</span> (last_login, session_count)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>TRACK HISTORY <span class="kw">ON</span> <span class="op">*</span> <span class="kw">EXCEPT</span> (last_login, session_count)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -798,7 +797,7 @@ Listing&nbsp;12: TRACK HISTORY: solo crear versiones cuando cambian columnas esp
 </div>
 <div class="callout-body-container callout-body">
 <p>Si tu fuente no tiene un timestamp único, podés usar un struct:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SEQUENCE</span> <span class="kw">BY</span> STRUCT(timestamp_col, id_col)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SEQUENCE</span> <span class="kw">BY</span> STRUCT(timestamp_col, id_col)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </div>
 <hr>
@@ -867,12 +866,12 @@ Listing&nbsp;12: TRACK HISTORY: solo crear versiones cuando cambian columnas esp
 <div id="lst-trigger-interval" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-trigger-interval-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;13: Configurar trigger interval de 10 segundos en continuous mode
+Listado&nbsp;13: Configurar trigger interval de 10 segundos en continuous mode
 </figcaption>
 <div aria-describedby="lst-trigger-interval-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.table</span>(spark_conf<span class="op">=</span>{<span class="st">"pipelines.trigger.interval"</span>: <span class="st">"10 seconds"</span>})</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> streaming_silver():</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> spark.readStream.table(<span class="st">"raw_transactions"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> spark.readStream.table(<span class="st">"raw_transactions"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -921,7 +920,7 @@ Listing&nbsp;13: Configurar trigger interval de 10 segundos en continuous mode
 <div id="lst-medallion-sql" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-medallion-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;14: Pipeline Medallion completo en SQL: Bronze (ingesta), Silver (limpieza) y Gold (aggregación)
+Listado&nbsp;14: Pipeline Medallion completo en SQL: Bronze (ingesta), Silver (limpieza) y Gold (aggregación)
 </figcaption>
 <div aria-describedby="lst-medallion-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- ========== BRONZE: ingesta raw ==========</span></span>
@@ -963,7 +962,7 @@ Listing&nbsp;14: Pipeline Medallion completo en SQL: Bronze (ingesta), Silver (l
 <span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">AVG</span>(amount) <span class="kw">AS</span> avg_ticket,</span>
 <span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">COUNT</span>(<span class="kw">DISTINCT</span> customer_id) <span class="kw">AS</span> unique_customers</span>
 <span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> silver_transactions</span>
-<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> transaction_date, currency;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> transaction_date, currency;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -973,7 +972,7 @@ Listing&nbsp;14: Pipeline Medallion completo en SQL: Bronze (ingesta), Silver (l
 <div id="lst-medallion-python" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-medallion-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;15: Pipeline Medallion completo en Python con decoradores y expectations
+Listado&nbsp;15: Pipeline Medallion completo en Python con decoradores y expectations
 </figcaption>
 <div aria-describedby="lst-medallion-python-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark <span class="im">import</span> pipelines <span class="im">as</span> dp</span>
@@ -1018,7 +1017,7 @@ Listing&nbsp;15: Pipeline Medallion completo en Python con decoradores y expecta
 <span id="cb16-40"><a href="#cb16-40" aria-hidden="true" tabindex="-1"></a>            F.avg(<span class="st">"amount"</span>).alias(<span class="st">"avg_ticket"</span>),</span>
 <span id="cb16-41"><a href="#cb16-41" aria-hidden="true" tabindex="-1"></a>            F.countDistinct(<span class="st">"customer_id"</span>).alias(<span class="st">"unique_customers"</span>),</span>
 <span id="cb16-42"><a href="#cb16-42" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1046,7 +1045,7 @@ Listing&nbsp;15: Pipeline Medallion completo en Python con decoradores y expecta
 <div id="lst-event-quality" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-event-quality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;16: Query sobre el event log: métricas de expectations por dataset
+Listado&nbsp;16: Query sobre el event log: métricas de expectations por dataset
 </figcaption>
 <div aria-describedby="lst-event-quality-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -1064,7 +1063,7 @@ Listing&nbsp;16: Query sobre el event log: métricas de expectations por dataset
 <span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>  <span class="kw">FROM</span> event_log(<span class="st">'&lt;pipeline_id&gt;'</span>)</span>
 <span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">WHERE</span> event_type <span class="op">=</span> <span class="st">'flow_progress'</span></span>
 <span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> row_exp.dataset, row_exp.name</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> row_exp.dataset, row_exp.name</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1074,7 +1073,7 @@ Listing&nbsp;16: Query sobre el event log: métricas de expectations por dataset
 <div id="lst-event-lineage" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-event-lineage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;17: Query de linaje: inputs y outputs de cada flow en el pipeline
+Listado&nbsp;17: Query de linaje: inputs y outputs de cada flow en el pipeline
 </figcaption>
 <div aria-describedby="lst-event-lineage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -1082,7 +1081,7 @@ Listing&nbsp;17: Query de linaje: inputs y outputs de cada flow en el pipeline
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  details<span class="ch">:flow_definition</span>.input_datasets <span class="kw">AS</span> inputs,</span>
 <span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  details<span class="ch">:flow_definition</span>.flow_type <span class="kw">AS</span> <span class="kw">type</span></span>
 <span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> event_log(<span class="st">'&lt;pipeline_id&gt;'</span>)</span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> details<span class="ch">:flow_definition</span> <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> details<span class="ch">:flow_definition</span> <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1092,7 +1091,7 @@ Listing&nbsp;17: Query de linaje: inputs y outputs de cada flow en el pipeline
 <div id="lst-event-cost" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-event-cost-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;18: Consumo de DBUs del pipeline desde system tables de billing
+Listado&nbsp;18: Consumo de DBUs del pipeline desde system tables de billing
 </figcaption>
 <div aria-describedby="lst-event-cost-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -1102,7 +1101,7 @@ Listing&nbsp;18: Consumo de DBUs del pipeline desde system tables de billing
 <span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.billing.<span class="kw">usage</span></span>
 <span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> usage_metadata.dlt_pipeline_id <span class="op">=</span> <span class="st">'&lt;pipeline_id&gt;'</span></span>
 <span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> sku_name, usage_date</span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> usage_date <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> usage_date <span class="kw">DESC</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1113,7 +1112,7 @@ Listing&nbsp;18: Consumo de DBUs del pipeline desde system tables de billing
 <div id="lst-event-publish" class="json listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-event-publish-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;19: Configuración JSON del pipeline para publicar el event log como tabla
+Listado&nbsp;19: Configuración JSON del pipeline para publicar el event log como tabla
 </figcaption>
 <div aria-describedby="lst-event-publish-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
@@ -1122,7 +1121,7 @@ Listing&nbsp;19: Configuración JSON del pipeline para publicar el event log com
 <span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"schema"</span><span class="fu">:</span> <span class="st">"monitoring"</span><span class="fu">,</span></span>
 <span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"name"</span><span class="fu">:</span> <span class="st">"dlt_event_log"</span></span>
 <span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1223,7 +1222,7 @@ Listing&nbsp;19: Configuración JSON del pipeline para publicar el event log com
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>Requisitos para serverless
+<span class="screen-reader-only">Nota</span>Requisitos para serverless
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -1259,7 +1258,7 @@ Listing&nbsp;19: Configuración JSON del pipeline para publicar el event log com
 <div id="lst-autoscale-config" class="json listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-autoscale-config-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;20: Configuración de enhanced autoscaling con min/max workers
+Listado&nbsp;20: Configuración de enhanced autoscaling con min/max workers
 </figcaption>
 <div aria-describedby="lst-autoscale-config-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
@@ -1270,7 +1269,7 @@ Listing&nbsp;20: Configuración de enhanced autoscaling con min/max workers
 <span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"mode"</span><span class="fu">:</span> <span class="st">"ENHANCED"</span></span>
 <span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
 <span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span><span class="ot">]</span></span>
-<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1298,12 +1297,12 @@ Listing&nbsp;20: Configuración de enhanced autoscaling con min/max workers
 <div id="lst-private-sql" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-private-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;21: Tabla privada: visible solo dentro del pipeline, no publicada al schema
+Listado&nbsp;21: Tabla privada: visible solo dentro del pipeline, no publicada al schema
 </figcaption>
 <div aria-describedby="lst-private-sql-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">PRIVATE</span> STREAMING <span class="kw">TABLE</span> internal_staging</span>
 <span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> STREAM(raw_data)</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> valid <span class="op">=</span> <span class="kw">true</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> valid <span class="op">=</span> <span class="kw">true</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1314,14 +1313,14 @@ Listing&nbsp;21: Tabla privada: visible solo dentro del pipeline, no publicada a
 <div id="lst-row-filter" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-row-filter-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;22: Row filter en streaming table para seguridad a nivel de fila
+Listado&nbsp;22: Row filter en streaming table para seguridad a nivel de fila
 </figcaption>
 <div aria-describedby="lst-row-filter-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REFRESH</span> STREAMING <span class="kw">TABLE</span> orders (</span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">CONSTRAINT</span> valid_id EXPECT (<span class="kw">id</span> <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span>)</span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> <span class="kw">ROW</span> <span class="kw">FILTER</span> region_filter <span class="kw">ON</span> (region)</span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> STREAM(raw_orders)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> STREAM(raw_orders)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1331,7 +1330,7 @@ Listing&nbsp;22: Row filter en streaming table para seguridad a nivel de fila
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Warning</span>Cuidado con row filters + MVs
+<span class="screen-reader-only">Advertencia</span>Cuidado con row filters + MVs
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -1421,7 +1420,7 @@ Listing&nbsp;22: Row filter en streaming table para seguridad a nivel de fila
 <div id="lst-gotcha-loop" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-gotcha-loop-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;23: Gotcha: capturar variables de loop con default argument para evitar closures
+Listado&nbsp;23: Gotcha: capturar variables de loop con default argument para evitar closures
 </figcaption>
 <div aria-describedby="lst-gotcha-loop-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MAL: todas las tablas leen la última tabla del loop</span></span>
@@ -1434,7 +1433,7 @@ Listing&nbsp;23: Gotcha: capturar variables de loop con default argument para ev
 <span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name <span class="kw">in</span> table_names:</span>
 <span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">@dp.table</span>(name<span class="op">=</span>name)</span>
 <span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> create_table(t<span class="op">=</span>name):</span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> spark.read.table(t)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> spark.read.table(t)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1442,12 +1441,12 @@ Listing&nbsp;23: Gotcha: capturar variables de loop con default argument para ev
 <div id="lst-gotcha-reset" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-gotcha-reset-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;24: Proteger tabla contra full refresh con pipelines.reset.allowed
+Listado&nbsp;24: Proteger tabla contra full refresh con pipelines.reset.allowed
 </figcaption>
 <div aria-describedby="lst-gotcha-reset-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REFRESH</span> STREAMING <span class="kw">TABLE</span> protected_table</span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>TBLPROPERTIES(pipelines.<span class="kw">reset</span>.allowed <span class="op">=</span> <span class="kw">false</span>)</span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> STREAM read_files(<span class="st">'...'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> STREAM read_files(<span class="st">'...'</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1656,6 +1655,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -1681,12 +1740,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -2078,7 +2137,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

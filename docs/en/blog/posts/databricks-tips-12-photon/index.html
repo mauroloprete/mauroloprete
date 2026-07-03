@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-07-02">
+<meta name="description" content="What Databricks’ vectorized engine is, where it runs, what it speeds up and what it doesn’t, how to measure how much Photon your query uses, a with/without Photon benchmark, and the math on when the extra DBU pays for itself.">
+
+<title>Databricks Tips #12: Photon — the C++ engine that speeds up your queries without changing code – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../../">
+<link href="../../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../../../styles.css">
+<meta property="og:title" content="Databricks Tips #12: Photon — the C++ engine that speeds up your queries without changing code – Mauro Loprete">
+<meta property="og:description" content="What Databricks’ vectorized engine is, where it runs, what it speeds up and what it doesn’t, how to measure how much Photon your query uses, a with/without Photon benchmark, and the math on when the extra DBU pays for itself.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-12-photon/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #12: Photon — the C++ engine that speeds up your queries without changing code – Mauro Loprete">
+<meta name="twitter:description" content="What Databricks’ vectorized engine is, where it runs, what it speeds up and what it doesn’t, how to measure how much Photon your query uses, a with/without Photon benchmark, and the math on when the extra DBU pays for itself.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-12-photon/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#what-photon-is-and-why-it-exists" id="toc-what-photon-is-and-why-it-exists" class="nav-link active" data-scroll-target="#what-photon-is-and-why-it-exists">1. What Photon is and why it exists</a></li>
+  <li><a href="#where-it-runs-and-where-youre-already-using-it-without-knowing" id="toc-where-it-runs-and-where-youre-already-using-it-without-knowing" class="nav-link" data-scroll-target="#where-it-runs-and-where-youre-already-using-it-without-knowing">2. Where it runs (and where you’re already using it without knowing)</a></li>
+  <li><a href="#what-it-accelerates-covered-operators-and-expressions" id="toc-what-it-accelerates-covered-operators-and-expressions" class="nav-link" data-scroll-target="#what-it-accelerates-covered-operators-and-expressions">3. What it accelerates: covered operators and expressions</a></li>
+  <li><a href="#the-transparent-fallback-your-query-never-fails-because-of-photon" id="toc-the-transparent-fallback-your-query-never-fails-because-of-photon" class="nav-link" data-scroll-target="#the-transparent-fallback-your-query-never-fails-because-of-photon">4. The transparent fallback: your query never fails because of Photon</a></li>
+  <li><a href="#how-to-measure-how-much-photon-your-query-uses" id="toc-how-to-measure-how-much-photon-your-query-uses" class="nav-link" data-scroll-target="#how-to-measure-how-much-photon-your-query-uses">5. How to measure how much Photon your query uses</a></li>
+  <li><a href="#how-to-read-a-spark-query-plan-without-crying" id="toc-how-to-read-a-spark-query-plan-without-crying" class="nav-link" data-scroll-target="#how-to-read-a-spark-query-plan-without-crying">6. How to read a Spark query plan (without crying)</a></li>
+  <li><a href="#lab-benchmark-withwithout-photon" id="toc-lab-benchmark-withwithout-photon" class="nav-link" data-scroll-target="#lab-benchmark-withwithout-photon">7. Lab: benchmark with/without Photon</a>
+  <ul class="collapse">
+  <li><a href="#the-real-results" id="toc-the-real-results" class="nav-link" data-scroll-target="#the-real-results">The real results</a></li>
+  <li><a href="#the-visual-evidence-each-runs-spark-ui" id="toc-the-visual-evidence-each-runs-spark-ui" class="nav-link" data-scroll-target="#the-visual-evidence-each-runs-spark-ui">The visual evidence: each run’s Spark UI</a></li>
+  </ul></li>
+  <li><a href="#writes-where-photon-surprises" id="toc-writes-where-photon-surprises" class="nav-link" data-scroll-target="#writes-where-photon-surprises">8. Writes: where Photon surprises</a></li>
+  <li><a href="#the-features-that-simply-do-not-exist-without-photon" id="toc-the-features-that-simply-do-not-exist-without-photon" class="nav-link" data-scroll-target="#the-features-that-simply-do-not-exist-without-photon">9. The features that simply do NOT exist without Photon</a></li>
+  <li><a href="#what-photon-doesnt-do-and-wont-do-for-now" id="toc-what-photon-doesnt-do-and-wont-do-for-now" class="nav-link" data-scroll-target="#what-photon-doesnt-do-and-wont-do-for-now">10. What Photon doesn’t do (and won’t do for now)</a></li>
+  <li><a href="#the-math-when-the-extra-dbu-pays-for-itself" id="toc-the-math-when-the-extra-dbu-pays-for-itself" class="nav-link" data-scroll-target="#the-math-when-the-extra-dbu-pays-for-itself">11. The math: when the extra DBU pays for itself</a></li>
+  <li><a href="#gotchas" id="toc-gotchas" class="nav-link" data-scroll-target="#gotchas">12. Gotchas</a></li>
+  <li><a href="#when-not-to-use-photon" id="toc-when-not-to-use-photon" class="nav-link" data-scroll-target="#when-not-to-use-photon">13. When NOT to use Photon</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#other-posts-in-the-series" id="toc-other-posts-in-the-series" class="nav-link" data-scroll-target="#other-posts-in-the-series">Other posts in the series</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #12: Photon — the C++ engine that speeds up your queries without changing code</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Data Engineering</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    What Databricks’ vectorized engine is, where it runs, what it speeds up and what it doesn’t, how to measure how much Photon your query uses, a with/without Photon benchmark, and the math on when the extra DBU pays for itself.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">July 2, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Your pipeline takes 40 minutes. You’ve already tuned the partitions, cached everything worth caching, gone over the shuffle. And one day someone ticks a checkbox in the cluster configuration and the same job drops to 15 minutes. Without touching a single line of code.</p>
+<p>That checkbox is <strong>Photon</strong>: Databricks’ vectorized execution engine, written in C++, which replaces Spark’s JVM execution for the operations it supports. In this post we’ll look at what it does under the hood, where it pays off, where it does nothing, and how to measure whether it’s actually helping you.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Photon replaces Spark’s JVM execution engine with a <strong>native C++ runtime</strong> that processes data in columnar batches using SIMD instructions.</li>
+<li><strong>You don’t change any code</strong>: Catalyst still plans the query; Photon takes over the execution layer and <em>falls back</em> transparently to Spark when it hits something it doesn’t support.</li>
+<li>It comes <strong>enabled on SQL Warehouses, serverless, and serverless declarative pipelines</strong>; on classic jobs and all-purpose compute it’s a checkbox (or <code>runtime_engine: PHOTON</code> via API).</li>
+<li>It accelerates scans, hash joins, aggregations, window functions, and <strong>writes</strong> (MERGE, UPDATE, DELETE, CTAS) on Delta, Iceberg, and Parquet.</li>
+<li><strong>It does not accelerate</strong>: UDFs, the RDD API, the Dataset API, stateful streaming, or queries that already run in under 2 seconds.</li>
+<li>Photon instances consume DBUs at a higher rate: the math works out when the speedup beats the premium — and for CPU-bound workloads it usually works out comfortably.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="what-photon-is-and-why-it-exists" class="level2">
+<h2 class="anchored" data-anchor-id="what-photon-is-and-why-it-exists">1. What Photon is and why it exists</h2>
+<p>Spark executes queries on the <strong>JVM</strong> — the Java virtual machine, the environment where almost the entire big data ecosystem runs. That worked for a decade, but it carries three structural costs:</p>
+<ul>
+<li><strong>Garbage collection</strong> (GC) pauses: the JVM periodically stops everything to clean up memory that’s no longer in use.</li>
+<li>The <strong>JIT</strong> (<em>just-in-time compiler</em>) <em>warm-up</em>: the JVM translates code into machine instructions <em>while</em> the program runs, so the first few minutes are always slower.</li>
+<li>The <strong>per-object memory overhead</strong>: every row drags along extra bytes of Java-specific internal structure.</li>
+</ul>
+<p>None of this was a big deal when the bottleneck was disk. But with SSDs and columnar formats, the bottleneck moved to the <strong>CPU</strong> — and these three costs became the main problem.</p>
+<p>Photon attacks exactly that: it replaces JVM execution with a native C++ runtime that processes data in <strong>columnar batches of thousands of rows</strong>, enabling <strong>SIMD</strong> instructions (<em>Single Instruction, Multiple Data</em>: the processor applies the same operation to several values at once, in a single cycle). Sequential memory access (column by column, not row by row) maximizes memory bandwidth and processor pipeline efficiency.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Row-based execution on the JVM vs Photon’s vectorized execution: same query, different execution layer."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Row-based execution on the JVM vs Photon’s vectorized execution: same query, different execution layer."></a></p>
+</figure>
+</div>
+<figcaption>Row-based execution on the JVM vs Photon’s vectorized execution: same query, different execution layer.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>The key design point: <strong>Catalyst is still the optimizer</strong>. Photon doesn’t replace Spark’s planner, it replaces the execution layer. That’s why it’s compatible with Spark’s APIs — SQL and DataFrames in Python, R, Scala, and Java — with no code changes.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>According to the <strong>TPC-DS</strong> benchmarks (the industry standard for comparing analytical engines: a set of retail queries over synthetic data) published by Databricks, Photon delivers up to <strong>5x better price/performance</strong> than other cloud data warehouses. Like every vendor benchmark, treat it as an upper bound — we’ll build our own further down.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="where-it-runs-and-where-youre-already-using-it-without-knowing" class="level2">
+<h2 class="anchored" data-anchor-id="where-it-runs-and-where-youre-already-using-it-without-knowing">2. Where it runs (and where you’re already using it without knowing)</h2>
+<p>Photon isn’t a product you buy separately: it’s built into Databricks compute. The difference is where it’s on by default and where it’s opt-in:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Compute</th>
+<th>Photon</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>SQL Warehouses</strong> (serverless, pro, classic)</td>
+<td>Always on — it’s the default engine</td>
+</tr>
+<tr class="even">
+<td><strong>Serverless compute</strong> (notebooks, jobs)</td>
+<td>Always on</td>
+</tr>
+<tr class="odd">
+<td><strong>Lakeflow Declarative Pipelines serverless</strong></td>
+<td>Always on</td>
+</tr>
+<tr class="even">
+<td><strong>All-purpose and jobs compute classic</strong></td>
+<td>On by default in the UI — the <strong>Use Photon Acceleration</strong> checkbox</td>
+</tr>
+<tr class="odd">
+<td><strong>Classic declarative pipelines</strong></td>
+<td>Configurable per pipeline</td>
+</tr>
+</tbody>
+</table>
+<p>If you use SQL Warehouses (we covered them in <a href="../databricks-tips-09-sql-warehouses/">Tips #9</a>), you’ve already been running Photon on every dashboard and ad hoc query.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you create clusters via <strong>API</strong> (Clusters API, Jobs API) or via <strong>DABs</strong>, Photon does NOT turn itself on: you have to set <code>runtime_engine: PHOTON</code> explicitly. It’s a classic: the dev cluster created through the UI flies, the production job deployed through CI/CD crawls, and nobody understands why.</p>
+</div>
+</div>
+<p>In a Databricks Asset Bundle, the job cluster looks like this:</p>
+<div id="lst-dabs" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dabs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;1: DABs: enabling Photon on a job cluster with runtime_engine
+</figcaption>
+<div aria-describedby="lst-dabs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">etl_ventas</span><span class="kw">:</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">name</span><span class="kw">:</span><span class="at"> etl-ventas</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">job_clusters</span><span class="kw">:</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">job_cluster_key</span><span class="kw">:</span><span class="at"> main</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">new_cluster</span><span class="kw">:</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">spark_version</span><span class="kw">:</span><span class="at"> </span><span class="st">"17.3.x-scala2.13"</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">node_type_id</span><span class="kw">:</span><span class="at"> Standard_E8ds_v5</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">num_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">runtime_engine</span><span class="kw">:</span><span class="at"> PHOTON</span><span class="co">   # &lt;- without this, it runs on the classic JVM</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>And in the Pipelines API, the flag is <code>photon: true</code>.</p>
+<hr>
+</section>
+<section id="what-it-accelerates-covered-operators-and-expressions" class="level2">
+<h2 class="anchored" data-anchor-id="what-it-accelerates-covered-operators-and-expressions">3. What it accelerates: covered operators and expressions</h2>
+<p>Photon doesn’t cover 100% of Spark. It covers the operators that dominate the execution time of a typical analytical workload:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Category</th>
+<th>Coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Scan</strong></td>
+<td>Parquet, Delta, CSV, JSON — with filter pushdown, dictionary pruning, and row-group skipping</td>
+</tr>
+<tr class="even">
+<td><strong>Joins</strong></td>
+<td>Hash join (replaces sort-merge), nested-loop, null-aware anti join, spatial joins</td>
+</tr>
+<tr class="odd">
+<td><strong>Aggregations</strong></td>
+<td>Hash aggregate, including Min/Max/MinBy/MaxBy over nested types</td>
+</tr>
+<tr class="even">
+<td><strong>Shuffle</strong></td>
+<td>Columnar shuffle redesigned for large-scale joins</td>
+</tr>
+<tr class="odd">
+<td><strong>Sort / Window</strong></td>
+<td>Sort, TopK, Limit, window functions</td>
+</tr>
+<tr class="even">
+<td><strong>Writes</strong></td>
+<td>Delta, Iceberg, and Parquet: INSERT, UPDATE, DELETE, MERGE INTO, CTAS (CREATE TABLE AS SELECT)</td>
+</tr>
+<tr class="odd">
+<td><strong>Expressions</strong></td>
+<td>Comparison, arithmetic, conditionals (IF/CASE), strings, casts, dates/timestamps</td>
+</tr>
+<tr class="even">
+<td><strong>Types</strong></td>
+<td>Numeric, string/binary, decimal, date/timestamp, struct, array, map, variant, geometry/geography</td>
+</tr>
+</tbody>
+</table>
+<p>Two details worth underlining:</p>
+<p><strong>Joins change strategy.</strong> Photon replaces sort-merge joins with high-performance <strong>hash joins</strong>. If you’ve been fighting giant sort-merge joins, this alone can justify the switch.</p>
+<p><strong>The shuffle is columnar too.</strong> It’s not just operator execution: the shuffle was redesigned to move columnar batches, which increases throughput on large joins.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The expression list is representative, not exhaustive, and it grows with every runtime. If a specific function matters to you, verify it with <code>EXPLAIN</code> (section 5) on your DBR version instead of trusting blog lists — including this one.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="the-transparent-fallback-your-query-never-fails-because-of-photon" class="level2">
+<h2 class="anchored" data-anchor-id="the-transparent-fallback-your-query-never-fails-because-of-photon">4. The transparent fallback: your query never fails because of Photon</h2>
+<p>What happens when the query uses something Photon doesn’t support? Nothing dramatic: <strong>Photon falls back to the Spark runtime for that portion of the execution</strong> and the query still produces the correct result.</p>
+<p>This has an important practical consequence: a single query can run <strong>partly in Photon and partly on the JVM</strong>. The execution plan becomes mixed, and every Photon → JVM transition means converting columnar data to rows (and back), which has its own cost.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The fallback is silent. No error, no warning in the notebook — just a query slower than you expected. That’s why section 5 (monitoring) isn’t optional: if you don’t measure how much of your query runs in Photon, you don’t know whether you’re getting your money’s worth or overpaying.</p>
+</div>
+</div>
+<p>The usual suspects that force a fallback:</p>
+<ol type="1">
+<li><strong>UDFs</strong> (<em>User Defined Functions</em>: functions you write yourself in Python or Scala to use inside a query) in the middle of the plan</li>
+<li>The <strong>RDD API</strong> or <strong>Dataset API</strong> (Scala’s typed lambdas)</li>
+<li><strong>Stateful streaming</strong> operators</li>
+<li>Specific expressions not yet covered</li>
+</ol>
+<hr>
+</section>
+<section id="how-to-measure-how-much-photon-your-query-uses" class="level2">
+<h2 class="anchored" data-anchor-id="how-to-measure-how-much-photon-your-query-uses">5. How to measure how much Photon your query uses</h2>
+<p>Don’t guess: Databricks shows you exactly which part of the plan ran in Photon.</p>
+<p><strong>On SQL Warehouses and serverless — Query Profile.</strong> The <em>Execution Details</em> view shows the <strong>percentage of task time that ran in Photon</strong>. In the plan, Photon operators appear in purple and standard ones in gray. One number: if your query spends less than 80% of its time in Photon, something (almost always a UDF or a format) is forcing a fallback.</p>
+<p><strong>On classic clusters — Spark UI.</strong> In the <strong>SQL/DataFrame</strong> tab, the DAG (the flow diagram of the plan, step by step) paints Photon operators <strong>orange</strong> and Spark ones <strong>blue</strong>. Visual and immediate.</p>
+<p><strong>In code — EXPLAIN.</strong> Photon nodes show up with a prefix in the physical plan:</p>
+<div id="lst-explain" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-explain-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;2: EXPLAIN: Photon nodes appear with the Photon prefix in the physical plan
+</figcaption>
+<div aria-describedby="lst-explain-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>spark.sql(<span class="st">"""</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="st">    SELECT categoria, SUM(monto) AS total</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="st">    FROM ventas</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="st">    WHERE fecha &gt;= '2026-01-01'</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">    GROUP BY categoria</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span>).explain()</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co"># == Physical Plan ==</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># AdaptiveSparkPlan isFinalPlan=false</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># +- PhotonResultStage</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">#    +- PhotonGroupingAgg(keys=[categoria], functions=[finalmerge_sum(...)])</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">#       +- PhotonShuffleExchangeSource</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">#          +- PhotonShuffleMapStage</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">#             +- PhotonGroupingAgg(keys=[categoria], functions=[partial_sum(...)])</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">#                +- PhotonScan parquet ventas (filters: fecha &gt;= 2026-01-01)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>If instead of <code>PhotonScan</code> you see <code>FileScan</code>, or a <code>ColumnarToRow</code> shows up in the middle of the plan, there’s your transition to the JVM.</p>
+<hr>
+</section>
+<section id="how-to-read-a-spark-query-plan-without-crying" class="level2">
+<h2 class="anchored" data-anchor-id="how-to-read-a-spark-query-plan-without-crying">6. How to read a Spark query plan (without crying)</h2>
+<p>The <code>EXPLAIN</code> from the previous section is useless if the plan looks like hieroglyphics to you. The good news: 90% of the interpretation boils down to three rules and knowing half a dozen nodes.</p>
+<p><strong>Rule 1 — read it bottom-up.</strong> The most indented node (the leaf) is the first step: almost always a scan. The node at the very top is the result. The plan is a tree where data flows from the leaves to the root.</p>
+<p><strong>Rule 2 — <code>Exchange</code> = shuffle = the expensive node.</strong> Every <code>Exchange</code> (or <code>PhotonShuffleExchange</code>) means moving data between workers over the network. Count how many there are: it’s the best predictor of query cost. A <code>GROUP BY</code> adds one; a join between large tables adds two.</p>
+<p><strong>Rule 3 — the plan you see may not be the one that runs.</strong> The first line usually says <code>AdaptiveSparkPlan isFinalPlan=false</code>: with AQE (Adaptive Query Execution), Spark re-optimizes at runtime using real statistics from each stage. You see the <strong>final</strong> plan in the Spark UI after execution, not in the <code>EXPLAIN</code> beforehand.</p>
+<p>Let’s look at a typical join with its annotated plan:</p>
+<div id="lst-plan-join" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-plan-join-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;3: Query plan of a join + aggregation, read bottom-up
+</figcaption>
+<div aria-describedby="lst-plan-join-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>spark.sql(<span class="st">"""</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="st">    SELECT s.region, SUM(v.monto) AS total</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="st">    FROM ventas v</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="st">    JOIN sucursales s ON v.store_id = s.store_id</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="st">    GROUP BY s.region</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span>).explain()</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># == Physical Plan ==                          (read bottom-up)</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># AdaptiveSparkPlan isFinalPlan=false           &lt;- 6. AQE may re-optimize</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co"># +- PhotonGroupingAgg(keys=[region],</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">#       functions=[finalmerge_sum(...)])        &lt;- 5. final agg post-shuffle</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">#    +- PhotonShuffleExchangeSource             &lt;- 4. shuffle by region (expensive)</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="co">#       +- PhotonGroupingAgg(keys=[region],</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co">#             functions=[partial_sum(...)])     &lt;- 3. pre-aggregates on each worker</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="co">#          +- PhotonBroadcastHashJoin           &lt;- 2. sucursales travels whole</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="co">#             :- PhotonScan parquet ventas</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">#             :     (filters: store_id IS NOT NULL,</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co">#             :      requiredSchema: store_id, monto)   &lt;- 1. reads only 2 columns</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co">#             +- PhotonShuffleExchangeSource [broadcast]</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">#                +- PhotonScan parquet sucursales</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>What this plan is telling you:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>What you look at</th>
+<th>What it tells you</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>PhotonScan</code> + <code>requiredSchema</code></td>
+<td><em>Column pruning</em>: it only reads the columns the query needs. If you see 40 columns for a single-column <code>SUM</code>, something’s off (the classic intermediate <code>SELECT *</code>).</td>
+</tr>
+<tr class="even">
+<td><code>filters:</code> / <code>PushedFilters:</code> in the scan</td>
+<td>The filters were pushed down to the scan: entire row groups get discarded without being read. If your <code>WHERE</code> doesn’t show up here, you’re filtering <em>after</em> reading everything.</td>
+</tr>
+<tr class="odd">
+<td><code>BroadcastHashJoin</code></td>
+<td>The small table travels whole to every worker — no shuffle of the big one. It’s the cheap join; Spark picks it when the small table is under the broadcast threshold.</td>
+</tr>
+<tr class="even">
+<td><code>SortMergeJoin</code></td>
+<td>The classic “heavy” join: shuffle + sort on both sides. With Photon you’ll see <code>PhotonShuffledHashJoin</code> instead — a hash join without the sort.</td>
+</tr>
+<tr class="odd">
+<td><code>partial_sum</code> → <code>finalmerge_sum</code></td>
+<td>Two-phase aggregation: each worker pre-aggregates before the shuffle, so the bare minimum travels over the network. This is normal and it’s fine.</td>
+</tr>
+<tr class="even">
+<td><code>ColumnarToRow</code> / <code>RowToColumnar</code></td>
+<td>The Photon ↔︎ JVM toll we discussed in section 4. One at the end of the plan is normal; several in the middle are a fallback eating your speedup.</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>On runtimes with Photon, the <code>EXPLAIN</code> output ends with a <strong>Photon Explanation</strong> section that explicitly lists which operators don’t run in Photon and why (a UDF, an unsupported expression). It’s the fastest way to diagnose a fallback without opening the Spark UI.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>For long plans, <code>df.explain("formatted")</code> is much more readable than the default: it numbers the operators, shows the compact tree on top and each node’s detail below. And to see the final post-AQE plan with real metrics (rows per stage, spill, timings), the place is the <strong>SQL/DataFrame</strong> tab of the Spark UI — where Photon nodes also show up in orange.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="lab-benchmark-withwithout-photon" class="level2">
+<h2 class="anchored" data-anchor-id="lab-benchmark-withwithout-photon">7. Lab: benchmark with/without Photon</h2>
+<p>Enough theory. The experiment is simple: <strong>same cluster, same code, with and without the checkbox</strong>. We build a TPC-DS-style table (sales with dimensions) big enough for the CPU to be the bottleneck, and throw a query with join + aggregation + window at it.</p>
+<p><strong>Step 1 — generate data</strong> (~200M rows, about 6 GB in Delta):</p>
+<div id="lst-datagen" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-datagen-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;4: Generate a synthetic TPC-DS-style dataset with spark.range
+</figcaption>
+<div aria-describedby="lst-datagen-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    spark.<span class="bu">range</span>(<span class="dv">200_000_000</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"store_id"</span>, (F.col(<span class="st">"id"</span>) <span class="op">%</span> <span class="dv">500</span>).cast(<span class="st">"int"</span>))</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"item_id"</span>, (F.col(<span class="st">"id"</span>) <span class="op">%</span> <span class="dv">100_000</span>).cast(<span class="st">"int"</span>))</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"fecha"</span>, F.date_add(F.lit(<span class="st">"2025-01-01"</span>), (F.col(<span class="st">"id"</span>) <span class="op">%</span> <span class="dv">540</span>).cast(<span class="st">"int"</span>)))</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"cantidad"</span>, (F.col(<span class="st">"id"</span>) <span class="op">%</span> <span class="dv">10</span> <span class="op">+</span> <span class="dv">1</span>).cast(<span class="st">"int"</span>))</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"precio"</span>, F.<span class="bu">round</span>(F.rand(seed<span class="op">=</span><span class="dv">42</span>) <span class="op">*</span> <span class="dv">500</span>, <span class="dv">2</span>))</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    .write.mode(<span class="st">"overwrite"</span>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    .saveAsTable(<span class="st">"lab.photon_bench.store_sales"</span>)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>Step 2 — the query</strong> (scan + filter + implicit join via aggregation + window, all Photon territory):</p>
+<div id="lst-benchquery" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-benchquery-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;5: Benchmark query: heavy aggregation + window function, with timing
+</figcaption>
+<div aria-describedby="lst-benchquery-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>query <span class="op">=</span> <span class="st">"""</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="st">    WITH ventas_diarias AS (</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="st">        SELECT store_id, fecha,</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="st">               SUM(cantidad * precio) AS revenue,</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="st">               COUNT(DISTINCT item_id)  AS items_distintos</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="st">        FROM lab.photon_bench.store_sales</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="st">        WHERE fecha &gt;= '2025-06-01'</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="st">        GROUP BY store_id, fecha</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="st">    )</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="st">    SELECT store_id, fecha, revenue,</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="st">           AVG(revenue) OVER (</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="st">               PARTITION BY store_id ORDER BY fecha</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="st">               ROWS BETWEEN 6 PRECEDING AND CURRENT ROW</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="st">           ) AS revenue_7d</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="st">    FROM ventas_diarias</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="st">    ORDER BY store_id, fecha</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>runs <span class="op">=</span> []</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>):</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>    spark.sql(<span class="st">"CLEAR CACHE"</span>)</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>    t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>    spark.sql(query).write.mode(<span class="st">"overwrite"</span>).<span class="bu">format</span>(<span class="st">"noop"</span>).save()</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    runs.append(time.perf_counter() <span class="op">-</span> t0)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"wall-clock: median </span><span class="sc">{</span><span class="bu">sorted</span>(runs)[<span class="dv">2</span>]<span class="sc">:.1f}</span><span class="ss">s | runs: </span><span class="sc">{</span>[<span class="ss">f'</span><span class="sc">{</span>r<span class="sc">:.1f}</span><span class="ss">'</span> <span class="cf">for</span> r <span class="kw">in</span> runs]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p><strong>Step 3 — run it twice</strong>: once on a cluster with <code>runtime_engine: PHOTON</code> and once on an identical cluster with <code>STANDARD</code>. The full lab (a bundle with both jobs, ready for <code>databricks bundle run</code>) is in <a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/photon">spark-de-ideas-labs</a>.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>noop</code> sink is the honest benchmark trick: it executes the entire plan (scan, shuffle, aggregation, window) without writing anywhere, so you measure pure compute with no output I/O noise. And <code>CLEAR CACHE</code> between runs keeps the disk cache from inflating the results of the repeats.</p>
+</div>
+</div>
+<section id="the-real-results" class="level3">
+<h3 class="anchored" data-anchor-id="the-real-results">The real results</h3>
+<p>I ran it on Azure Databricks: two identical job clusters (driver + 1 worker <code>Standard_D4s_v3</code>, DBR 17.3 LTS), the only difference being the <code>runtime_engine</code>. Five runs per engine:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Engine</th>
+<th>Runs (s)</th>
+<th>Median</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>STANDARD</strong> (JVM)</td>
+<td>26.3 · 11.0 · 11.4 · 10.4 · 10.9</td>
+<td><strong>11.0s</strong></td>
+</tr>
+<tr class="even">
+<td><strong>PHOTON</strong></td>
+<td>15.5 · 6.8 · 6.7 · 6.5 · 6.2</td>
+<td><strong>6.7s</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-2-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Wall-clock of the 5 runs per engine, same hardware (driver + 1 worker Standard_D4s_v3), DBR 17.3 LTS. Run 1 pays the startup tolls on both engines."><img src="index_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Wall-clock of the 5 runs per engine, same hardware (driver + 1 worker Standard_D4s_v3), DBR 17.3 LTS. Run 1 pays the startup tolls on both engines."></a></p>
+</figure>
+</div>
+<figcaption>Wall-clock of the 5 runs per engine, same hardware (driver + 1 worker Standard_D4s_v3), DBR 17.3 LTS. Run 1 pays the startup tolls on both engines.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Speedup: 1.64x</strong> for this query, on this hardware. Three things to read from that:</p>
+<ol type="1">
+<li><strong>The first run lies on both engines</strong> (26.3s and 15.5s): it pays the JIT <em>warm-up</em>, the storage connections, and the shuffle initialization. That’s why the median and not the mean.</li>
+<li><strong>1.64x is less than the 2x-4x from the marketing benchmarks</strong> — and that’s how it should be: it’s a small cluster, a ~10-second query, and a 6 GB dataset. Photon’s speedup grows with scan size and aggregation complexity. This number is <em>your floor</em>, not your ceiling.</li>
+<li><strong>Watch the DBU math</strong> (section 11): with a multiplier of ~2x, a 1.64x speedup on <em>this</em> workload doesn’t pay for itself in money — though it does in time. Exactly the kind of per-job decision we’re talking about.</li>
+</ol>
+<p>And the execution plans the two runs returned — the same query, two worlds:</p>
+<div id="lst-plan-standard" class="default listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-plan-standard-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;6: Execution plan of the STANDARD run: classic Spark HashAggregate + Exchange
+</figcaption>
+<div aria-describedby="lst-plan-standard-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>Sort [store_id ASC, fecha ASC]</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>+- Exchange rangepartitioning(store_id, fecha, 200)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>   +- Window [avg(revenue) windowspecdefinition(...) AS revenue_7d]</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>      +- Sort [store_id ASC, fecha ASC]</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>         +- Exchange hashpartitioning(store_id, 200)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>            +- HashAggregate(keys=[store_id, fecha], functions=[finalmerge_sum(...)])</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>               +- Exchange hashpartitioning(store_id, fecha, 200)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>                  +- HashAggregate(keys=[store_id, fecha], functions=[partial_sum(...)])</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>                     +- Project [store_id, fecha, cantidad, precio]</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                        +- Filter (fecha &gt;= 2025-06-01)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<div id="lst-plan-photon" class="default listing quarto-float quarto-figure quarto-figure-left anchored">
+<figure class="quarto-float quarto-float-lst figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-plan-photon-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Listing&nbsp;7: Execution plan of the PHOTON run: the same steps, every node in Photon
+</figcaption>
+<div aria-describedby="lst-plan-photon-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>PhotonResultStage</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>+- PhotonColumnarToRow</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>   +- PhotonSort [store_id ASC, fecha ASC]</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>      +- PhotonShuffleExchangeSource</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>         +- PhotonShuffleMapStage</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>            +- PhotonShuffleExchangeSink rangepartitioning(store_id, fecha, 200)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>               +- PhotonWindow [avg(revenue) ... AS revenue_7d]</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>                  +- PhotonSort [store_id ASC, fecha ASC]</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>                     +- PhotonShuffleExchangeSource</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>                        +- PhotonShuffleMapStage</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>                           +- PhotonShuffleExchangeSink hashpartitioning(store_id, 200)</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>                              +- PhotonGroupingAgg(keys=[store_id, fecha], ...)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</figure>
+</div>
+<p>Same tree, same steps — but in the second one even the shuffle is Photon (<code>PhotonShuffleExchangeSink/Source</code>), and the only <code>ColumnarToRow</code> sits at the end of the plan, where it belongs: a single conversion, right before returning the result.</p>
+</section>
+<section id="the-visual-evidence-each-runs-spark-ui" class="level3">
+<h3 class="anchored" data-anchor-id="the-visual-evidence-each-runs-spark-ui">The visual evidence: each run’s Spark UI</h3>
+<p>If you’ve never been in there: the <strong>Spark UI</strong> is the web console every Spark cluster ships with, showing the detail of what happened inside the engine. In Databricks you’ll find it on the cluster page (or the job run page), <strong>Spark UI</strong> tab. Inside there are tabs for Jobs, Stages, Executors… and the one we care about here: <strong>SQL/DataFrame</strong>, which lists every executed query with its duration, and clicking one shows you the <strong>DAG of the plan with real per-operator metrics</strong> — how many rows each node processed, how long each stage took. And in Databricks the nodes come color-coded: <strong>blue = JVM, orange = Photon</strong>. It’s literally seeing the fallback (or its absence) with your own eyes.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="spark_ui.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="The front door. The SQL/DataFrame tab of the benchmark cluster: each execution shows up as a row with its duration — that’s where you can tell the 5 runs of ~6 s of the heavy query apart from the millisecond auxiliary queries (the CLEAR CACHE, the count). Click any of them and the DAG opens with its metrics."><img src="spark_ui.png" class="img-fluid figure-img" alt="The front door. The SQL/DataFrame tab of the benchmark cluster: each execution shows up as a row with its duration — that’s where you can tell the 5 runs of ~6 s of the heavy query apart from the millisecond auxiliary queries (the CLEAR CACHE, the count). Click any of them and the DAG opens with its metrics."></a></p>
+<figcaption><strong>The front door.</strong> The SQL/DataFrame tab of the benchmark cluster: each execution shows up as a row with its duration — that’s where you can tell the 5 runs of ~6 s of the heavy query apart from the millisecond auxiliary queries (the <code>CLEAR CACHE</code>, the <code>count</code>). Click any of them and the DAG opens with its metrics.</figcaption>
+</figure>
+</div>
+<p>This is what the two benchmark runs returned:</p>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="no_photon_1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="STANDARD — 10 s. The entire DAG in blue: not a single Photon node. It reads bottom-up (rule 1 from section 6): scan, two-phase aggregation with its Exchanges, and the Window on top."><img src="no_photon_1.png" class="img-fluid figure-img" alt="STANDARD — 10 s. The entire DAG in blue: not a single Photon node. It reads bottom-up (rule 1 from section 6): scan, two-phase aggregation with its Exchanges, and the Window on top."></a></p>
+<figcaption><strong>STANDARD — 10 s.</strong> The entire DAG in blue: not a single Photon node. It reads bottom-up (rule 1 from section 6): scan, two-phase aggregation with its <code>Exchange</code>s, and the <code>Window</code> on top.</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="photon_1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5" title="PHOTON — 6 s. The same query, the whole plan in orange: PhotonResultStage, PhotonSort, PhotonShuffleExchangeSource. The only blue block is the ColumnarToRow at the end — the single conversion to rows, where it belongs."><img src="photon_1.png" class="img-fluid figure-img" alt="PHOTON — 6 s. The same query, the whole plan in orange: PhotonResultStage, PhotonSort, PhotonShuffleExchangeSource. The only blue block is the ColumnarToRow at the end — the single conversion to rows, where it belongs."></a></p>
+<figcaption><strong>PHOTON — 6 s.</strong> The same query, the whole plan in orange: <code>PhotonResultStage</code>, <code>PhotonSort</code>, <code>PhotonShuffleExchangeSource</code>. The only blue block is the <code>ColumnarToRow</code> at the end — the single conversion to rows, where it belongs.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>And zooming into each plan’s detail, the per-operator numbers tell the whole story:</p>
+<div class="quarto-layout-panel" data-layout-ncol="2">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="no_photon_2.png" class="lightbox" data-gallery="quarto-lightbox-gallery-6" title="STANDARD. The Filter receives 200,000,000 rows from the scan and lets 144,073,979 through: first it reads everything, then it filters. The WholeStageCodegen wrapping the HashAggregate racks up 36.2 s of task time — that’s the JVM generating code to process row by row."><img src="no_photon_2.png" class="img-fluid figure-img" alt="STANDARD. The Filter receives 200,000,000 rows from the scan and lets 144,073,979 through: first it reads everything, then it filters. The WholeStageCodegen wrapping the HashAggregate racks up 36.2 s of task time — that’s the JVM generating code to process row by row."></a></p>
+<figcaption><strong>STANDARD.</strong> The <code>Filter</code> receives <strong>200,000,000</strong> rows from the scan and lets <strong>144,073,979</strong> through: first it reads everything, then it filters. The <code>WholeStageCodegen</code> wrapping the <code>HashAggregate</code> racks up <strong>36.2 s of task time</strong> — that’s the JVM generating code to process row by row.</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="photon_3.png" class="lightbox" data-gallery="quarto-lightbox-gallery-7" title="PHOTON. There’s no Filter node: the filter is embedded in the PhotonScan, which already delivers the 144,073,979 filtered rows. The PhotonGroupingAgg reduces them to 116,700 groups (500 stores × ~233 days) before the shuffle — the bare minimum travels over the network."><img src="photon_3.png" class="img-fluid figure-img" alt="PHOTON. There’s no Filter node: the filter is embedded in the PhotonScan, which already delivers the 144,073,979 filtered rows. The PhotonGroupingAgg reduces them to 116,700 groups (500 stores × ~233 days) before the shuffle — the bare minimum travels over the network."></a></p>
+<figcaption><strong>PHOTON.</strong> There’s no <code>Filter</code> node: the filter is embedded in the <code>PhotonScan</code>, which already delivers the <strong>144,073,979</strong> filtered rows. The <code>PhotonGroupingAgg</code> reduces them to <strong>116,700 groups</strong> (500 stores × ~233 days) before the shuffle — the bare minimum travels over the network.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<p>Two facts hidden in those screenshots that are worth the zoom:</p>
+<ul>
+<li>The <strong>task time of the <code>WholeStageCodegen</code></strong> (36.2 s) on the JVM side is exactly the mechanism Photon replaces: Spark generates Java code at runtime for each query; Photon already <em>is</em> native code.</li>
+<li>The <strong>144M → 116,700 reduction</strong> before the shuffle is the <code>partial_sum</code> from section 6 in action: it pre-aggregates on each worker and groups travel over the network, not rows.</li>
+</ul>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Lab bonus: in an earlier run, due to an Azure quota issue, the Photon cluster ended up with <strong>1 worker against the STANDARD’s 2</strong> — and it still won: 7.0s against 11.5s. Photon with half the hardware beat the JVM. Not the comparison I’d publish as a benchmark, but as an anecdote it says a lot.</p>
+</div>
+</div>
+<p>While it runs, open the Spark UI and look at the DAG: on the Photon cluster the entire plan should be orange. If anything shows up blue, you’ve found a fallback — and an opportunity to understand why.</p>
+<hr>
+</section>
+</section>
+<section id="writes-where-photon-surprises" class="level2">
+<h2 class="anchored" data-anchor-id="writes-where-photon-surprises">8. Writes: where Photon surprises</h2>
+<p>The reflex is to associate Photon with read queries, but the <strong>native Parquet writer</strong> also accelerates writes to Delta, Iceberg, and Parquet: <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>MERGE INTO</code>, and <code>CREATE TABLE AS SELECT</code>.</p>
+<p>Two cases where this really shows:</p>
+<ul>
+<li><strong>Wide tables</strong>: with hundreds or thousands of columns, the write improvement is especially significant. If you work with denormalized feature tables or legacy system extracts with 800 columns, this one’s for you.</li>
+<li><strong>Heavy MERGEs</strong>: the MERGE in your CDC pipeline (Change Data Capture: replicating changes — inserts, updates, deletes — from a source system; we covered it with AUTO CDC in <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Tips #11</a>) combines scan + join + write — the three things Photon accelerates at once.</li>
+</ul>
+<hr>
+</section>
+<section id="the-features-that-simply-do-not-exist-without-photon" class="level2">
+<h2 class="anchored" data-anchor-id="the-features-that-simply-do-not-exist-without-photon">9. The features that simply do NOT exist without Photon</h2>
+<p>Photon isn’t just “the same but faster”: there are platform optimizations that <strong>require</strong> Photon to be enabled:</p>
+<ul>
+<li><strong>Predictive I/O</strong> for reads and writes — the heuristic that decides which files to read and how, key for deletion vectors and for speeding up point lookups.</li>
+<li><strong>Dynamic file pruning in MERGE, UPDATE, and DELETE</strong> — without Photon, those DML operations don’t prune files dynamically and end up scanning far more than necessary.</li>
+</ul>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This is the argument usually missing from the cost discussion: turning Photon off on a job with big MERGEs doesn’t just take away the execution speedup — it turns off dynamic file pruning in the MERGE. The job doesn’t go back to “normal Spark speed”: it goes back to something worse than what you measured before optimizing.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="what-photon-doesnt-do-and-wont-do-for-now" class="level2">
+<h2 class="anchored" data-anchor-id="what-photon-doesnt-do-and-wont-do-for-now">10. What Photon doesn’t do (and won’t do for now)</h2>
+<p>The short but important list:</p>
+<ol type="1">
+<li><strong>UDFs</strong>: neither Python nor Scala. A UDF in the middle of the plan cuts off Photon execution and forces the jump to the JVM (columnar → rows conversion included). Before writing a UDF, exhaust the built-in functions — Photon’s expression coverage goes way beyond what people think.</li>
+<li><strong>RDD API and Dataset API</strong>: if you have Scala code with typed lambdas (<code>ds.map(x =&gt; ...)</code>), Photon doesn’t participate. The cost of the Dataset API’s “type safety” is now also measured in DBUs.</li>
+<li><strong>Stateful streaming</strong>: stateful aggregations, <code>mapGroupsWithState</code>, stream-stream joins — not supported. Photon only accelerates <strong>stateless streaming</strong> (transformations + write to Delta/Parquet, with Delta, Parquet, CSV, JSON, Kafka, and Kinesis sources).</li>
+<li><strong>Queries under 2 seconds</strong>: the time goes to planning and scheduling, not execution. Photon can’t accelerate what doesn’t dominate the runtime.</li>
+</ol>
+<hr>
+</section>
+<section id="the-math-when-the-extra-dbu-pays-for-itself" class="level2">
+<h2 class="anchored" data-anchor-id="the-math-when-the-extra-dbu-pays-for-itself">11. The math: when the extra DBU pays for itself</h2>
+<p>First the acronym: the <strong>DBU</strong> (<em>Databricks Unit</em>) is the unit Databricks bills compute in — each instance type consumes a number of DBUs per hour, and you pay DBUs on top of the Azure VM cost. The detail that matters here: Photon instances consume DBUs at a <strong>higher rate</strong> than the same instances without Photon (the exact multiplier depends on the compute type — check it on the <a href="https://azure.microsoft.com/pricing/details/databricks/">Azure Databricks pricing page</a>).</p>
+<p>The math is direct. If the job runs in time <span class="math inline">\(t\)</span> at hourly cost <span class="math inline">\(c\)</span>, and with Photon it runs in <span class="math inline">\(t/s\)</span> (speedup <span class="math inline">\(s\)</span>) at hourly cost <span class="math inline">\(c \cdot m\)</span> (multiplier <span class="math inline">\(m\)</span>):</p>
+<p><span class="math display">\[\text{Photon pays off if } s &gt; m\]</span></p>
+<p>With a typical multiplier close to 2x on jobs compute, you need a <strong>speedup greater than 2x</strong> to save money — plus you finish sooner, which also counts. <em>CPU-bound</em> workloads (where the bottleneck is the processor: wide aggregations, big joins, MERGEs, massive writes) usually clear it with room to spare; <em>I/O-bound</em> ones (dominated by reading or writing against disk and network, where the CPU is on vacation) or those full of UDFs, don’t.</p>
+<p>Our lab from section 7 is the perfect example of the gray zone: a <strong>1.64x</strong> speedup — the job finishes 40% sooner, but with a 2x multiplier the run comes out slightly more expensive. On a dataset 10x larger, that same query would probably cross the threshold. That’s why you do the math per job and with your own data, not with anybody else’s benchmark.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Don’t decide Photon “at the company level”: decide it <strong>per job</strong>. The section 7 benchmark takes 20 minutes to set up and gives you the real answer for <em>your</em> workload. Short, light, or UDF-heavy jobs → no Photon. Heavy SQL/DataFrame jobs → Photon, almost always.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">12. Gotchas</h2>
+<ol type="1">
+<li><strong>Clusters via API/DABs don’t enable Photon on their own.</strong> The UI ticks it by default, the API doesn’t: <code>runtime_engine: PHOTON</code> or you’re running on the JVM without knowing. Audit your bundles today.</li>
+<li><strong>The fallback is silent.</strong> A new UDF in a pipeline that used to fly can double the runtime without anything failing. Metric to watch: % of task time in Photon in the query profile.</li>
+<li><strong><code>ColumnarToRow</code> in the plan = a toll.</strong> Every Photon ↔︎ JVM transition converts formats. Many small transitions can eat the entire speedup.</li>
+<li><strong>Photon doesn’t fix the small files problem.</strong> The scan is more efficient even with small files, but you still pay listing and per-file overhead. <code>OPTIMIZE</code> is still your friend.</li>
+<li><strong>Don’t expect anything on sub-2-second queries.</strong> If your dashboard fires 40 queries of 300ms, Photon isn’t your lever — look at the disk cache and the query design.</li>
+<li><strong>The disk cache lies to you in benchmarks.</strong> The second run always looks better. <code>CLEAR CACHE</code> or a fresh cluster between measurements.</li>
+<li><strong>Spot the engine: the plan tells you.</strong> <code>PhotonScan</code> vs <code>FileScan</code> in the <code>EXPLAIN</code> is the fastest smoke test to know whether you’re running where you think you’re running.</li>
+<li><strong>Streaming: check whether your pipeline is stateful before assuming a speedup.</strong> A <code>dropDuplicates</code> or a window aggregation in the stream makes it stateful — and there Photon doesn’t play.</li>
+</ol>
+<hr>
+</section>
+<section id="when-not-to-use-photon" class="level2">
+<h2 class="anchored" data-anchor-id="when-not-to-use-photon">13. When NOT to use Photon</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Situation</th>
+<th>Why</th>
+<th>Alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>UDF-dominated jobs</strong></td>
+<td>Constant fallback, you pay the multiplier with no speedup</td>
+<td>Refactor to built-ins first, Photon later</td>
+</tr>
+<tr class="even">
+<td><strong>Short queries (&lt;2s)</strong></td>
+<td>Planning dominates the time, not execution</td>
+<td>Disk cache, serverless SQL warehouse</td>
+</tr>
+<tr class="odd">
+<td><strong>Stateful streaming</strong></td>
+<td>Not supported — everything runs on the JVM</td>
+<td>Classic Structured Streaming (<a href="../databricks-tips-03-structured-streaming/">Tips #4</a>)</td>
+</tr>
+<tr class="even">
+<td><strong>RDD / Dataset API code</strong></td>
+<td>Photon doesn’t participate</td>
+<td>Migrate to the DataFrame API (then Photon)</td>
+</tr>
+<tr class="odd">
+<td><strong>I/O-bound jobs</strong> (moving files, simple ingestion)</td>
+<td>The bottleneck is network/storage, not CPU</td>
+<td>Cheap compute without Photon</td>
+</tr>
+<tr class="even">
+<td><strong>Zero migration budget and jobs already fast</strong></td>
+<td>No pain, no ROI to justify re-testing</td>
+<td>Leave it for the next cycle</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/compute/photon">What is Photon? — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/compute/configure#photon-image">Use Photon acceleration</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/optimizations/predictive-io">What is predictive I/O?</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/optimizations/dynamic-file-pruning">Dynamic file pruning</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/optimizations/disk-cache">Disk cache</a></li>
+<li><a href="https://azure.microsoft.com/pricing/details/databricks/">Azure Databricks pricing</a></li>
+</ul>
+</section>
+<section id="other-posts-in-the-series" class="level2">
+<h2 class="anchored" data-anchor-id="other-posts-in-the-series">Other posts in the series</h2>
+<p>If this post helped you, check out the previous <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC for Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — the 7 things you wish you’d known</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — governance nobody implements well</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers, and micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — from experiment to model</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features that survive production</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker on Databricks</a> — custom containers</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming and event-driven triggers</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — the compute that turns itself on</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — centralized governance for LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — declarative pipelines with built-in quality</li>
+</ul>
+<hr>
+<p><em>Next post in the series: Liquid Clustering — the replacement for partitions and Z-ORDER that reorders your data on its own.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

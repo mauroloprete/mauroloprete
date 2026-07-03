@@ -1,0 +1,943 @@
+---
+title: "If I were starting from scratch... what I'd prioritize learning in Data Engineering"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-02-17"
+categories: [Podcast, Data Engineering, Career]
+description: "Python, SQL, Spark, dbt, Databricks — the order matters. What I learned after years of working with data and what I'd do differently if I had to start over."
+image: cover.png
+---
+
+::: callout-tip
+## Episode material
+
+-   {{< fa display >}} [**Watch the slides for this episode**](/slides/si-arrancara-de-cero/)
+-   {{< fa brands github >}} [**Notebooks to run on Databricks Free Edition**](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero)
+:::
+
+I'm Mauro Loprete, Data Engineer at F1RST (Santander Group). I hold both Databricks certifications — [Data Engineer Professional](https://credentials.databricks.com/64b8ff9e-7ff0-4213-a4af-4612ecf973a7) and [Associate](https://credentials.databricks.com/4b91b7aa-d440-441a-8ebf-d933cc10ce48) — and I'm working toward the MVP. I teach Data Science and Machine Learning at [UdelaR](https://www.fcea.edu.uy/), and this podcast is my way of sharing what I've learned along the way.
+
+In this post I share what I'd prioritize today if I had to start over in Data Engineering. The order matters — a lot.
+
+## The pyramid: from the bottom up
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 7
+#| fig-height: 3
+#| fig-align: center
+#| fig-cap: "Learning pyramid: Python and SQL as the foundation, with Spark, dbt and Databricks as the upper layers."
+
+library(ggplot2)
+
+levels <- data.frame(
+  label = c("Python + SQL", "Apache Spark", "dbt", "Databricks"),
+  sub   = c("The fundamentals — no shortcuts",
+            "Distributed processing",
+            "Modular transformation in SQL",
+            "Unity Catalog · DABs · LDP"),
+  y     = c(1, 2, 3, 4),
+  width = c(6.0, 4.5, 3.0, 1.8),
+  color = c("#0d9488", "#2563eb", "#ea580c", "#7c3aed")
+)
+
+ggplot(levels) +
+  geom_tile(aes(x = 0, y = y, width = width, height = 1.0, fill = color),
+            color = NA, show.legend = FALSE) +
+  geom_text(aes(x = 0, y = y + 0.07, label = label),
+            color = "white", fontface = "bold", size = 5.5) +
+  geom_text(aes(x = 0, y = y - 0.2, label = sub),
+            color = "white", size = 3.2, alpha = 0.85) +
+  scale_fill_identity() +
+  scale_y_continuous(expand = expansion(mult = 0.02)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.margin = margin(2, 2, 2, 2),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
+```
+
+You can't learn Spark without knowing Python. You can't understand dbt without mastering SQL. And Databricks without Spark is like driving a race car without knowing how to brake.
+
+## 1. Python: the foundation of everything
+
+I'm not talking about writing a `print("Hello world")`. I'm talking about:
+
+-   **Data structures**: lists, dictionaries, sets, tuples. 80% of what you do in data is manipulating structures.
+-   **Functions and decorators**: when you work with Spark or dbt, you'll need to understand how functions compose.
+-   **File handling**: JSON, CSV, YAML, Parquet. In data engineering you live reading and writing files.
+-   **Virtual environments and dependencies**: `venv`, `pip`, `pyproject.toml`. If you don't know how to manage dependencies, your first production project will be a disaster.
+-   **Basic testing**: `pytest`. You don't need to be a TDD expert, but you do need to know how to test a function.
+
+``` {#lst-dataclass-product .python lst-cap="Dataclass to model a data product with validation"}
+# The bare minimum you need to master in Python
+from dataclasses import dataclass
+from typing import List, Optional
+import json
+
+@dataclass
+class DataProduct:
+    name: str
+    owner: str
+    tables: List[str]
+    sla_hours: Optional[int] = None
+
+    def is_critical(self) -> bool:
+        return self.sla_hours is not None and self.sla_hours <= 4
+
+# Read config, parse, validate — this is 60% of the real job
+with open("products.json") as f:
+    products = [DataProduct(**p) for p in json.load(f)]
+
+critical = [p for p in products if p.is_critical()]
+```
+
+**Mistake I made**: I started with pandas without mastering pure Python. Later it took me twice as long to understand why things didn't work. Python first, then the libraries.
+
+### Classes: why they matter and when to use each kind
+
+In data engineering you end up modeling things all the time: pipeline configurations, connections, validation results, data contracts. If you do everything with dictionaries, you spend your life writing `config["database"]["host"]` and praying the key exists.
+
+Classes solve that: they give you structure, autocomplete in the IDE, and clear errors when something is missing.
+
+The thing is, Python has several ways to define classes, and each one has its place:
+
+**Traditional class** — full control, but lots of boilerplate:
+
+``` {#lst-class-tradicional .python lst-cap="Traditional class with __init__, __repr__ and __eq__ boilerplate"}
+class Pipeline:
+    def __init__(self, name: str, source: str, target: str, schedule: str = "daily"):
+        self.name = name
+        self.source = source
+        self.target = target
+        self.schedule = schedule
+
+    def __repr__(self):
+        return f"Pipeline(name={self.name!r}, source={self.source!r})"
+
+    def __eq__(self, other):
+        return (self.name == other.name and self.source == other.source
+                and self.target == other.target and self.schedule == other.schedule)
+
+p = Pipeline("ingest_sales", "raw.sales", "silver.sales")
+```
+
+That's 12 lines for something that should be simple. And if you forget `__eq__`, two pipelines with the same data won't be equal. And if you forget `__repr__`, debugging is a pain.
+
+**`@dataclass`** — the right choice 90% of the time:
+
+``` {#lst-dataclass-pipeline .python lst-cap="Dataclass: same functionality in 5 lines, with safe defaults"}
+from dataclasses import dataclass, field
+from typing import Optional
+
+@dataclass
+class Pipeline:
+    name: str
+    source: str
+    target: str
+    schedule: str = "daily"
+    tags: list[str] = field(default_factory=list)
+
+    def full_target(self) -> str:
+        return f"catalog.{self.target}"
+
+p = Pipeline("ingest_sales", "raw.sales", "silver.sales")
+print(p)  # Pipeline(name='ingest_sales', source='raw.sales', ...)
+p == Pipeline("ingest_sales", "raw.sales", "silver.sales")  # True
+```
+
+5 lines and you get `__init__`, `__repr__`, `__eq__` for free. You can add your own methods. Use `field(default_factory=list)` for mutable default values (never write `tags: list = []` — it's a classic Python bug).
+
+**`@dataclass(frozen=True)`** — when the object shouldn't change:
+
+``` {#lst-frozen-dataclass .python lst-cap="Frozen dataclass: immutable object that fails if you try to mutate it"}
+@dataclass(frozen=True)
+class ConnectionConfig:
+    host: str
+    port: int
+    database: str
+    ssl: bool = True
+
+# This works:
+config = ConnectionConfig("db.prod.internal", 5432, "analytics")
+
+# This fails (and that's what you want):
+config.host = "other"  # FrozenInstanceError
+```
+
+Configurations, credentials, validation results — anything that shouldn't mutate after being created. Plus, frozen dataclasses are hashable, so you can use them in sets and as dictionary keys.
+
+#### What is immutability and why should you care?
+
+An immutable object is one that can't be modified after it's created. And the obvious question is: why would I want that?
+
+**The problem with mutable objects** is that anyone can change them at any time, and in a pipeline with many functions that turns into a disaster:
+
+``` {#lst-mutable-problem .python lst-cap="Mutability problem: a function modifies the config without warning"}
+# MUTABLE object — the problem
+@dataclass
+class Config:
+    host: str
+    port: int
+    timeout: int = 30
+
+config = Config("db.prod.internal", 5432)
+
+# Function A reads the config
+def connect(config):
+    return f"Connecting to {config.host}:{config.port}"
+
+# Function B modifies it without you noticing
+def add_debug_settings(config):
+    config.host = "localhost"  # ← changed the production config
+    config.timeout = 999
+
+# In your pipeline:
+connect(config)           # → "Connecting to db.prod.internal:5432" ✓
+add_debug_settings(config)
+connect(config)           # → "Connecting to localhost:5432" ← BUG
+```
+
+The same `config` variable now points to `localhost` instead of production. These bugs are hard to find because they don't throw an error — the data is just wrong.
+
+**With immutability this doesn't happen:**
+
+``` {#lst-immutable-solution .python lst-cap="Immutable solution: frozen dataclass + replace() to create copies"}
+@dataclass(frozen=True)
+class Config:
+    host: str
+    port: int
+    timeout: int = 30
+
+config = Config("db.prod.internal", 5432)
+
+# This throws FrozenInstanceError immediately:
+config.host = "localhost"  # ← ERROR, won't let you
+
+# If you need a modified version, you create a new one:
+from dataclasses import replace
+
+debug_config = replace(config, host="localhost", timeout=999)
+
+# config stays intact:
+print(config.host)        # → "db.prod.internal"
+print(debug_config.host)  # → "localhost"
+```
+
+Each version is a separate object. The original is never touched. This is called **creating instead of mutating**, and it's the safest way to work with data that passes through multiple functions.
+
+**In data engineering this comes up all the time:**
+
+``` {#lst-immutable-real-cases .python lst-cap="Real immutability use cases: configs, validations and credentials"}
+# Pipeline configuration — shouldn't change during execution
+@dataclass(frozen=True)
+class PipelineConfig:
+    source_table: str
+    target_table: str
+    batch_size: int = 10000
+    mode: str = "append"
+
+# Result of a validation — it's a fact, it doesn't change
+@dataclass(frozen=True)
+class QualityCheck:
+    rule_name: str
+    passed: bool
+    value: float
+    threshold: float
+
+# Credentials — should NEVER be mutated in memory
+@dataclass(frozen=True)
+class Credentials:
+    host: str
+    token: str
+    workspace_id: str
+```
+
+**When to mutate and when not to?**
+
+-   **Immutable** (`frozen=True`): configurations, credentials, results, metadata — anything that travels between functions and shouldn't change
+-   **Mutable** (regular dataclass): objects that accumulate state during a process, like a logger or a builder you assemble step by step
+
+The rule: when in doubt, make it immutable. It's easier to relax the restriction later than to hunt down a bug caused by an unexpected mutation at 3 AM.
+
+**`NamedTuple`** — when you want immutability + unpacking:
+
+``` {#lst-namedtuple .python lst-cap="NamedTuple: immutable and unpackable like a tuple"}
+from typing import NamedTuple
+
+class ValidationResult(NamedTuple):
+    passed: bool
+    errors: list[str]
+    row_count: int
+
+result = ValidationResult(False, ["nulls in amount"], 1500)
+
+# Unpacks like a tuple:
+passed, errors, count = result
+
+# But you access by name:
+if not result.passed:
+    print(result.errors)
+```
+
+The key difference from a frozen dataclass: NamedTuples are real tuples. You can unpack them, iterate over them, and they use less memory. But you can't add complex methods to them.
+
+**Pydantic `BaseModel`** — when you need validation:
+
+``` {#lst-pydantic-basemodel .python lst-cap="Pydantic BaseModel: automatic validation when creating the object"}
+from pydantic import BaseModel, field_validator
+
+class DataContract(BaseModel):
+    name: str
+    owner: str
+    sla_hours: int
+    columns: list[str]
+
+    @field_validator("sla_hours")
+    @classmethod
+    def sla_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("SLA must be greater than 0")
+        return v
+
+# Validates automatically on creation:
+contract = DataContract(
+    name="transactions",
+    owner="backend-team",
+    sla_hours=4,
+    columns=["id", "amount", "date"]
+)
+
+# This fails with a clear error:
+bad = DataContract(name="x", owner="y", sla_hours=-1, columns=[])
+# ValidationError: SLA must be greater than 0
+
+# Parses from JSON/dict:
+contract = DataContract.model_validate_json('{"name": "tx", ...}')
+```
+
+Pydantic is heavy (it's an external dependency), but when you're parsing YAML configurations, API responses or data contracts, automatic validation saves you hours of debugging.
+
+**When to use each one?**
+
+| Situation                              | Class type                          |
+|----------------------------------------|-------------------------------------|
+| Simple data model (most cases)         | `@dataclass`                        |
+| Configuration that must not change     | `@dataclass(frozen=True)`           |
+| Lightweight, unpackable result         | `NamedTuple`                        |
+| Parsing JSON/YAML with validation      | Pydantic `BaseModel`                |
+| Complex business logic, inheritance    | Traditional class                   |
+| Just grouping data, nothing else       | `dict` (seriously, sometimes it's enough) |
+
+The general rule: start with `@dataclass`. If you need immutability, add `frozen=True`. If you need input validation, use Pydantic. If you need complex inheritance or full control of the lifecycle, a traditional class. And if it's throwaway data you use once, a `dict` is fine.
+
+### Resources I recommend
+
+-   [Python for Data Engineers](https://realpython.com/) — Real Python is excellent for going beyond the basics
+-   [Automate the Boring Stuff](https://automatetheboringstuff.com/) — to lose the fear of scripting
+-   Python's official documentation is surprisingly good. Read it.
+
+## 2. SQL: the language that never dies
+
+SQL is over 50 years old and it's still the most widely used language in data. It doesn't matter if you use Spark, dbt, Databricks or BigQuery — everything ends up in SQL.
+
+What you really need to master:
+
+-   **Window functions**: `ROW_NUMBER()`, `LAG()`, `LEAD()`, `RANK()`, `SUM() OVER()`. This is what separates a junior analyst from a senior one.
+-   **CTEs**: Common Table Expressions. Write readable SQL, not 200-line nested queries.
+-   **JOINs**: not just `INNER` and `LEFT`. Understand `CROSS`, `ANTI`, `SEMI`. Know when a JOIN multiplies your rows.
+-   **Aggregations with HAVING and GROUPING SETS**: for real reporting.
+-   **Correlated subqueries**: to understand why they're slow and when to avoid them.
+
+``` {#lst-gen-sales-data .python lst-cap="Generate a sales dataset with PySpark to practice SQL"}
+from pyspark.sql import functions as F
+from datetime import date, timedelta
+import random
+
+random.seed(42)
+
+# Generate sales data
+rows = []
+customers = list(range(1, 10))
+for day_offset in range(30):
+    d = date(2026, 1, 1) + timedelta(days=day_offset)
+    for cust in random.sample(customers, k=random.randint(2, 5)):
+        rows.append((
+            cust,
+            float(random.randint(10, 500)),
+            d,
+            random.choice(["COMPLETED", "COMPLETED", "COMPLETED", "PENDING", "FAILED"])
+        ))
+
+sales_df = spark.createDataFrame(rows, ["customer_id", "amount", "sale_date", "status"])
+sales_df.createOrReplaceTempView("sales")
+
+print(f"Rows generated: {sales_df.count()}")
+sales_df.show(5)
+```
+
+``` {#lst-window-functions .sql lst-cap="Window functions: ranking and day-over-day change per customer"}
+%sql
+-- Daily sales per customer with ranking and change vs previous day
+WITH daily_sales AS (
+    SELECT
+        customer_id,
+        sale_date AS sale_day,
+        SUM(amount) AS daily_total,
+        COUNT(*) AS txn_count
+    FROM sales
+    WHERE status = 'COMPLETED'
+    GROUP BY 1, 2
+),
+ranked AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY customer_id
+            ORDER BY daily_total DESC
+        ) AS rn,
+        LAG(daily_total) OVER (
+            PARTITION BY customer_id
+            ORDER BY sale_day
+        ) AS prev_day_total
+    FROM daily_sales
+)
+SELECT
+    customer_id,
+    sale_day,
+    daily_total,
+    prev_day_total,
+    ROUND(
+        (daily_total - prev_day_total) / prev_day_total * 100, 2
+    ) AS pct_change
+FROM ranked
+WHERE rn <= 5
+ORDER BY customer_id, rn
+```
+
+**Mistake I made**: I underestimated window functions. Once you master them, you solve in one query what used to take you 3 Python scripts.
+
+## 3. Spark: thinking distributed
+
+This is where things get interesting. Spark is not "big pandas" — it's a different paradigm. If you don't understand how it works under the hood, you'll write code that takes 10x longer than it should.
+
+### The essentials
+
+-   **Lazy evaluation**: Spark doesn't execute anything until you trigger an action (`collect()`, `count()`, `write()`). Transformations accumulate into a plan.
+-   **Partitions**: your data is distributed across partitions. If you don't understand this, you'll run `coalesce(1)` on a 500GB dataset and kill the cluster.
+-   **Shuffle**: the most expensive operation. Every `JOIN`, `GROUP BY`, `DISTINCT` can trigger a shuffle. Minimize them.
+-   **Broadcast joins**: if a table is small (\< 10MB), broadcast it. The difference can be minutes versus seconds.
+-   **Catalyst optimizer**: Spark optimizes your query plan. But if you write UDFs in Python, the optimizer can't help you.
+
+``` {#lst-spark-native-vs-udf .python lst-cap="Native Spark vs UDF: native functions allow optimization"}
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+
+# Good: use native Spark functions
+df = (
+    spark.read.table("sales.transactions")
+    .filter(F.col("status") == "completed")
+    .withColumn(
+        "running_total",
+        F.sum("amount").over(
+            Window.partitionBy("customer_id")
+            .orderBy("transaction_date")
+            .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+        )
+    )
+)
+
+# Bad: Python UDF (breaks optimization, serializes row by row)
+# @udf(returnType=DoubleType())
+# def calc_running_total(amounts):
+#     return sum(amounts)
+```
+
+### The key concept nobody explains well
+
+Spark has two APIs: **DataFrame** and **Spark SQL**. Internally they're the same thing — both generate the same execution plan. Use whichever feels more comfortable, but understand that:
+
+``` {#lst-df-vs-sql .python lst-cap="DataFrame API and Spark SQL generate the same execution plan"}
+# This:
+df.filter(F.col("amount") > 100).groupBy("customer_id").agg(F.sum("amount"))
+
+# And this:
+spark.sql("""
+    SELECT customer_id, SUM(amount)
+    FROM transactions
+    WHERE amount > 100
+    GROUP BY customer_id
+""")
+
+# Generate EXACTLY the same execution plan.
+```
+
+**Mistake I made**: I wrote Python UDFs for everything at first. When I understood the Catalyst optimizer and switched to native functions, jobs went from 45 minutes to 3 minutes. Without changing the cluster.
+
+### Wrapper functions vs UDFs — the most common confusion
+
+This causes a lot of confusion. If you have a Python function that takes a DataFrame and calls `.withColumn()` inside, is that a UDF?
+
+**No.** They're completely different things.
+
+A **wrapper function** uses Spark's native API. Spark sees the operations, understands them and optimizes them:
+
+``` {#lst-wrapper-function .python lst-cap="Wrapper function: organizes code but uses native Spark inside"}
+# This is NOT a UDF — it uses the Spark API inside
+def add_revenue_flag(df, threshold=1000):
+    return df.withColumn(
+        "high_revenue",
+        F.when(F.col("amount") > threshold, True).otherwise(False)
+    )
+
+# Spark sees F.when and F.col → they're native expressions
+# The Catalyst optimizer can combine, reorder and optimize them
+result = add_revenue_flag(sales_df)
+```
+
+Here Spark knows exactly what you're doing. Your function is just a way to organize the code — under the hood it's still all native Spark.
+
+A **UDF** is when you ask Spark to run pure Python code **row by row**, pulling the data out of the optimized engine and passing it through the Python interpreter:
+
+``` {#lst-udf-real .python lst-cap="Real UDF: serializes row by row between the JVM and Python"}
+# This IS a UDF — pure Python, row by row
+@udf(returnType=BooleanType())
+def high_revenue_udf(amount):
+    return amount > 1000
+
+result = df.withColumn("high_revenue", high_revenue_udf(F.col("amount")))
+```
+
+What happens internally with the UDF?
+
+1.  Spark serializes each row of data (JVM → Python)
+2.  The Python interpreter runs your function
+3.  The result gets serialized back (Python → JVM)
+4.  Repeat that for every row of the DataFrame
+
+That round-trip serialization is called **serde overhead**, and on a dataset with millions of rows it's the difference between 3 minutes and 45 minutes.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 8
+#| fig-height: 3.5
+#| fig-align: center
+#| fig-cap: "Native Spark vs UDF: the native path goes through Catalyst, the UDF serializes row by row between the JVM and Python."
+
+library(ggplot2)
+
+# Flow steps
+native <- data.frame(
+  x = 1:4,
+  label = c("DataFrame", "withColumn\n+ F.when", "Catalyst\noptimizes", "Result"),
+  group = "Native Spark"
+)
+udf <- data.frame(
+  x = 1:4,
+  label = c("DataFrame", "Serialize\nrow to Python", "Run\nPython function", "Serialize\nresult to JVM"),
+  group = "Row-by-row UDF"
+)
+steps <- rbind(
+  transform(native, y = 2),
+  transform(udf, y = 0.7)
+)
+
+# Arrows
+arrows <- data.frame(
+  x = rep(1:3, 2),
+  xend = rep(2:4, 2),
+  y = c(rep(2, 3), rep(0.7, 3))
+)
+
+ggplot() +
+  # Background bands
+  annotate("rect", xmin = 0.4, xmax = 4.6, ymin = 1.55, ymax = 2.45,
+           fill = "#f0fdf4", color = "#86efac", linewidth = 0.5, radius = grid::unit(6, "pt")) +
+  annotate("rect", xmin = 0.4, xmax = 4.6, ymin = 0.25, ymax = 1.15,
+           fill = "#fef2f2", color = "#fca5a5", linewidth = 0.5, radius = grid::unit(6, "pt")) +
+  # Labels
+  annotate("text", x = 0.55, y = 2.4, label = "Native Spark", hjust = 0,
+           fontface = "bold", size = 3.5, color = "#166534") +
+  annotate("text", x = 0.55, y = 1.1, label = "Row-by-row UDF", hjust = 0,
+           fontface = "bold", size = 3.5, color = "#991b1b") +
+  # Nodes
+  geom_tile(data = steps[steps$y == 2,], aes(x = x, y = y),
+            width = 0.75, height = 0.55, fill = "#22c55e", color = NA) +
+  geom_tile(data = steps[steps$y == 0.7,], aes(x = x, y = y),
+            width = 0.75, height = 0.55, fill = "#ef4444", color = NA) +
+  geom_text(data = steps, aes(x = x, y = y, label = label),
+            color = "white", size = 3, fontface = "bold", lineheight = 0.9) +
+  # Arrows
+  geom_segment(data = arrows, aes(x = x + 0.4, xend = xend - 0.4, y = y, yend = y),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.6) +
+  coord_cartesian(xlim = c(0.3, 4.7), ylim = c(0.1, 2.55)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.margin = margin(5, 5, 5, 5),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
+```
+
+**When do you actually need a UDF?** Almost never. But there are legitimate cases:
+
+-   Logic that has no equivalent among Spark's functions (very complex custom regex, domain-specific mathematical calculations)
+-   Calling a Python library that doesn't exist in Spark (a custom ML model, a geocoding library)
+
+And if you have no other choice, use **Pandas UDFs** instead of regular UDFs — they process by batch instead of row by row, and they're much faster:
+
+``` {#lst-pandas-udf .python lst-cap="Pandas UDF: vectorized batch processing, much faster"}
+from pyspark.sql.functions import pandas_udf
+import pandas as pd
+
+@pandas_udf("boolean")
+def high_revenue_pandas(amount: pd.Series) -> pd.Series:
+    return amount > 1000
+
+# Processes by batch (vectorized), not row by row
+result = df.withColumn("high_revenue", high_revenue_pandas(F.col("amount")))
+```
+
+## 4. dbt: SQL with software engineering
+
+dbt (data build tool) changed how data transformations are done. The idea is simple: write your transformations in SQL, but with the software engineering practices that were always missing in data.
+
+### Why it matters
+
+-   **Modularity**: each model is a `SELECT`. They reference each other with `{{ ref('model_name') }}`.
+-   **Testing**: schema tests (`not_null`, `unique`, `relationships`) and custom tests.
+-   **Documentation**: generated automatically from the YAML.
+-   **Lineage**: you know exactly which model depends on which.
+-   **Version control**: everything is code, everything goes to Git.
+
+``` {#lst-dbt-staging .sql lst-cap="dbt staging model: cleaning and typing transactions"}
+-- models/staging/stg_transactions.sql
+WITH source AS (
+    SELECT * FROM {{ source('raw', 'transactions') }}
+),
+
+cleaned AS (
+    SELECT
+        transaction_id,
+        customer_id,
+        CAST(amount AS DECIMAL(18,2)) AS amount,
+        CAST(transaction_date AS DATE) AS transaction_date,
+        UPPER(TRIM(status)) AS status
+    FROM source
+    WHERE transaction_id IS NOT NULL
+)
+
+SELECT * FROM cleaned
+```
+
+``` {#lst-dbt-schema-yaml .yaml lst-cap="dbt schema YAML: not_null, unique and valid range tests"}
+# models/staging/stg_transactions.yml
+version: 2
+
+models:
+  - name: stg_transactions
+    description: "Clean transactions from the core banking system"
+    columns:
+      - name: transaction_id
+        tests:
+          - not_null
+          - unique
+      - name: amount
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000000
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['COMPLETED', 'PENDING', 'FAILED', 'REVERSED']
+```
+
+### dbt on Databricks
+
+dbt works natively with Databricks via `dbt-databricks`. Models materialize as Delta tables in Unity Catalog.
+
+``` {#lst-dbt-profile .yaml lst-cap="dbt-databricks profile: Unity Catalog connection with environment variables"}
+# profiles.yml
+my_project:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      catalog: dev
+      schema: analytics
+      host: "{{ env_var('DBX_HOST') }}"
+      http_path: "{{ env_var('DBX_HTTP_PATH') }}"
+      token: "{{ env_var('DBX_TOKEN') }}"
+```
+
+**Mistake I made**: I tried to do in Python what dbt solves much better in SQL. If your transformation is pure SQL (and most are), use dbt. If you need complex logic with APIs, ML or weird files, then yes, PySpark.
+
+### When dbt and when PySpark
+
+| Case | Tool |
+|------------------------|-----------------------------------------------|
+| SQL transformations (cleaning, joins, aggregations) | **dbt** |
+| Complex logic with external APIs | **PySpark** |
+| Machine Learning pipelines | **PySpark + MLflow** |
+| Processing unstructured files (JSON, XML, images) | **PySpark** |
+| Dimensional models (Kimball) | **dbt** |
+| Streaming / near-real-time | **PySpark Structured Streaming** |
+
+## 5. Databricks: the platform that ties it all together
+
+Databricks isn't just "Spark in the cloud". It's a complete data platform: compute, storage, governance, ML, SQL Analytics, and orchestration.
+
+### What I'd prioritize learning
+
+1.  **Unity Catalog**: the 3-level governance model (`catalog.schema.table`). Permissions, lineage, and auditing. Without this, your lakehouse is a swamp.
+
+2.  **Lakeflow Declarative Pipelines (formerly DLT)**: declarative pipelines with expectations for quality. It's the simplest way to build a Bronze → Silver → Gold pipeline.
+
+3.  **Databricks Asset Bundles**: infrastructure as code. Jobs, pipelines, permissions — everything in YAML, everything in Git, everything deployable with CI/CD.
+
+4.  **Workflows**: native orchestration. Triggers, task dependencies, retry policies. You don't need Airflow for 90% of the cases.
+
+5.  **SQL Warehouses**: for analysts and dashboards. Serverless, scalable, and with smart caching.
+
+``` {#lst-unity-catalog .sql lst-cap="Unity Catalog: create a catalog, a table with Liquid Clustering and grants"}
+-- What you need to know how to do in Databricks from day 1
+-- Create a catalog and schema
+CREATE CATALOG IF NOT EXISTS analytics;
+CREATE SCHEMA IF NOT EXISTS analytics.sales;
+
+-- Create a table with Liquid Clustering
+CREATE TABLE analytics.sales.transactions (
+    transaction_id BIGINT,
+    customer_id BIGINT,
+    amount DECIMAL(18,2),
+    transaction_date DATE
+)
+USING DELTA
+CLUSTER BY (transaction_date, customer_id);
+
+-- Grants (basic governance)
+GRANT USE CATALOG ON CATALOG analytics TO `analysts`;
+GRANT USE SCHEMA ON SCHEMA analytics.sales TO `analysts`;
+GRANT SELECT ON TABLE analytics.sales.transactions TO `analysts`;
+```
+
+**Mistake I made**: I started out using Databricks as "Jupyter in the cloud" — loose notebooks, no version control, no tests. When I discovered DABs and Unity Catalog, I realized I was using 10% of the platform.
+
+## Notebooks are NOT for production
+
+This deserves its own section because it's the most common mistake I see — and the hardest one to fix later.
+
+Notebooks are an **exploratory** tool. They're good for:
+
+-   Exploring a new dataset
+-   Trying out a transformation before productionizing it
+-   Doing ad-hoc analysis
+-   Prototyping a quick idea
+
+Notebooks are **NOT** good for:
+
+-   Production pipelines that run every day
+-   Code that needs testing
+-   Logic that others will maintain
+-   Anything that needs code review in a PR
+
+### The real problem
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 6
+#| fig-height: 3
+#| fig-align: center
+#| fig-cap: "Problems with using notebooks directly in production: no testing, no code review, shared state."
+
+library(ggplot2)
+
+problems <- data.frame(
+  label = c("No testing", "Code review impossible",
+            "Shared state between cells",
+            "No dependency management",
+            "Copy-paste without modules",
+            "'Works in my notebook'"),
+  y = 6:1
+)
+
+ggplot(problems) +
+  # Header
+  annotate("rect", xmin = -0.3, xmax = 5.5, ymin = 6.65, ymax = 7.25,
+           fill = "#dc2626", color = NA) +
+  annotate("text", x = 2.6, y = 6.95, label = "Notebook in production",
+           color = "white", fontface = "bold", size = 5) +
+  # Problem bars
+  geom_tile(aes(x = 2.6, y = y, width = 5.8, height = 0.75),
+            fill = "#fee2e2", color = "#fca5a5", linewidth = 0.3) +
+  geom_text(aes(x = 2.6, y = y, label = label),
+            color = "#991b1b", size = 3.8, fontface = "bold") +
+  # Lines connecting
+  geom_segment(aes(x = 2.6, xend = 2.6, y = 6.65, yend = y + 0.38),
+               color = "#f87171", linewidth = 0.4, alpha = 0) +
+  scale_y_continuous(expand = expansion(mult = 0.02)) +
+  coord_cartesian(xlim = c(-0.3, 5.5)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.margin = margin(2, 5, 2, 5),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
+```
+
+### How to do it right
+
+Use the notebook to **explore and prototype**. Once the logic works, move it into a Python module or a dbt model:
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 8
+#| fig-height: 1.5
+#| fig-align: center
+#| fig-cap: "The right workflow: explore in a notebook, extract to a .py module, test, deploy with DABs and archive the notebook."
+
+library(ggplot2)
+
+flow <- data.frame(
+  x = 1:5,
+  label = c("Notebook\nExplore", ".py module\nExtract logic", "Tests\npytest",
+            "DABs\nDeploy CI/CD", "Notebook\nArchive"),
+  color = c("#f59e0b", "#2563eb", "#16a34a", "#7c3aed", "#6b7280")
+)
+
+arrows <- data.frame(x = 1:4, xend = 2:5)
+
+ggplot(flow) +
+  geom_tile(aes(x = x, y = 0, fill = color), width = 0.85, height = 0.7,
+            color = NA, show.legend = FALSE) +
+  geom_text(aes(x = x, y = 0, label = label), color = "white",
+            fontface = "bold", size = 3.5, lineheight = 0.9) +
+  geom_segment(data = arrows, aes(x = x + 0.45, xend = xend - 0.45, y = 0, yend = 0),
+               arrow = arrow(length = unit(0.15, "cm"), type = "closed"),
+               color = "#94a3b8", linewidth = 0.7) +
+  scale_fill_identity() +
+  coord_cartesian(ylim = c(-0.5, 0.5)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.margin = margin(2, 2, 2, 2),
+        plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic"))
+```
+
+``` {#lst-module-test .python lst-cap="Python module + test: logic extracted from the notebook into production"}
+# src/transformations/clean_sales.py  ← THIS goes to production
+def clean_transactions(df):
+    """Cleans and validates transactions from the core system."""
+    return (
+        df
+        .filter(F.col("transaction_id").isNotNull())
+        .withColumn("amount", F.col("amount").cast("decimal(18,2)"))
+        .withColumn("status", F.upper(F.trim(F.col("status"))))
+        .filter(F.col("amount") > 0)
+    )
+
+# tests/test_clean_sales.py  ← THIS guarantees it doesn't break
+def test_clean_removes_nulls(spark):
+    input_df = spark.createDataFrame([
+        (1, 100.0, "completed"),
+        (None, 200.0, "pending"),
+    ], ["transaction_id", "amount", "status"])
+
+    result = clean_transactions(input_df)
+    assert result.count() == 1
+```
+
+``` {#lst-dab-deploy .yaml lst-cap="Databricks Asset Bundle: deploying the job with CI/CD"}
+# databricks.yml  ← THIS deploys it
+resources:
+  jobs:
+    clean_sales:
+      name: "[${var.env}] Clean Sales"
+      tasks:
+        - task_key: run
+          python_wheel_task:
+            package_name: my_project
+            entry_point: clean_sales
+```
+
+**The rule is simple**: if something runs more than once, it shouldn't live in a notebook. The notebook is the draft, not the final document.
+
+**Mistake I made**: I had 800-line notebooks running in production for months. When something failed at 3 AM, debugging it was a nightmare. The day I migrated everything to Python modules + DABs + tests, I stopped getting alerts on weekends.
+
+## The roadmap: in what order
+
+If I had to start from scratch today, I'd do this:
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 8
+#| fig-height: 3
+#| fig-align: center
+#| fig-cap: "Learning roadmap: Python and SQL first, then Spark, dbt, Databricks and specialization."
+
+library(ggplot2)
+
+gantt <- data.frame(
+  task  = c("Python", "SQL", "Spark", "dbt", "Databricks", "Specialization"),
+  detail = c("Pure Python, not pandas", "Window functions, CTEs",
+             "Lazy eval, partitions, shuffle", "Modularity, testing, docs",
+             "Unity Catalog, DABs, Workflows", "Streaming, ML, Architecture"),
+  start = c(1, 3, 4, 5, 6, 7),
+  end   = c(3, 4, 5, 6, 7, 9),
+  color = c("#0d9488", "#0d9488", "#2563eb", "#ea580c", "#7c3aed", "#6b7280"),
+  y     = 6:1
+)
+
+ggplot(gantt) +
+  # Bars
+  geom_rect(aes(xmin = start, xmax = end, ymin = y - 0.35, ymax = y + 0.35, fill = color),
+            color = NA, show.legend = FALSE) +
+  # Task labels inside bars
+  geom_text(aes(x = (start + end) / 2, y = y + 0.05, label = task),
+            color = "white", fontface = "bold", size = 4) +
+  # Detail below bars
+  geom_text(aes(x = (start + end) / 2, y = y - 0.18, label = detail),
+            color = "white", size = 2.5, alpha = 0.85) +
+  # Month axis
+  scale_x_continuous(
+    breaks = 1:9,
+    labels = c("Month 1", "2", "3", "4", "5", "6", "7", "8", "9+"),
+    position = "top", expand = expansion(mult = 0.02)
+  ) +
+  scale_fill_identity() +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(
+    axis.text.x.top = element_text(size = 9, color = "#64748b", face = "bold"),
+    plot.margin = margin(5, 10, 5, 10),
+    plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic")
+  )
+```
+
+And most importantly: **build something**. Don't just take courses. Grab a public dataset, build an end-to-end pipeline, deploy it, break it, fix it. That's worth more than 10 courses.
+
+## What I would NOT prioritize
+
+-   **Airflow**: Databricks Workflows covers 90% of the cases. Airflow is an amazing tool but it has a steep learning curve and a big operational overhead. Learn it later, if you need it.
+-   **Kafka**: unless your company does real streaming (not micro-batch), you don't need it at the start. Auto Loader + Structured Streaming solves most cases.
+-   **Kubernetes**: as a DE, you don't need to be a K8s expert. Know the basics, but don't go down that rabbit hole.
+-   **All the clouds at once**: pick one (AWS, Azure, GCP) and master it. The concepts transfer, but trying to learn all 3 at once is counterproductive.
+
+## Links
+
+-   [Episode notebooks](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/episodios/si-arrancara-de-cero) — Python, SQL and Spark to run on Databricks Free Edition
+-   [Fundamentals of Data Engineering (Reis & Housley)](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/) — the best book to get started
+-   [dbt Learn](https://courses.getdbt.com/) — free official dbt course
+-   [Databricks Academy](https://www.databricks.com/learn) — official courses, some free
+
+------------------------------------------------------------------------
+
+*Next week on Databricks Tips: Delta Lake — 7 things I wish someone had told me sooner.*

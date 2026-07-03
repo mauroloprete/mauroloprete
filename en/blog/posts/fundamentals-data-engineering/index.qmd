@@ -1,0 +1,111 @@
+---
+title: "Fundamentals of Data Engineering: the foundations every data engineer needs to know"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2025-08-26"
+categories: [Podcast, Data Engineering, Book Review]
+description: "Review of the book by Joe Reis and Matt Housley (O'Reilly, 2nd ed.). The data lifecycle, key architectures, undercurrents and what changed in this edition."
+image: cover.png
+---
+
+If you had to recommend *a single book* to someone starting out in data engineering, this is it. **Fundamentals of Data Engineering** by Joe Reis and Matt Housley (O'Reilly, 2nd edition) doesn't teach you a specific tool: it gives you the complete map of the discipline. It's the book that defines the common vocabulary the industry needed.
+
+In this post I share a deep summary of the book, what resonated with me the most and why I think it should be required reading.
+
+## {{< fa book >}} Why this book matters
+
+Before *Fundamentals*, data engineering was learned the hard way. Every team reinvented definitions, every vendor sold you their stack as *the* solution, and there was no common framework for thinking about the problem end to end.
+
+Reis and Housley pulled off something difficult: writing a book that doesn't age with the technology. Instead of tying itself to Spark, Kafka or Snowflake, it proposes a mental model that applies no matter which tools you use. If a new database or a new processing engine shows up tomorrow, the data lifecycle stays the same.
+
+## {{< fa arrows-spin >}} The data lifecycle
+
+The heart of the book is the **Data Engineering Lifecycle**, a five-stage framework describing how data flows from the moment it's born until it generates value:
+
+### 1. Generation
+
+This is where data is born: applications, IoT, APIs, transactional databases, user events. The key isn't just *what* gets generated, but *how* the source system generates it. Questions you have to ask yourself: is this source reliable? Can I assume a stable schema? What happens if the schema changes without warning?
+
+### 2. Storage
+
+There's no one-size-fits-all solution. Object storage, data warehouses, data lakes, columnar databases, key-value stores: each has trade-offs in cost, latency and complexity. The book insists that the storage decision is *not independent* from the rest of the lifecycle: it directly affects how you'll ingest and transform.
+
+### 3. Ingestion
+
+Moving data from A to B looks simple until it isn't. Batch vs streaming, push vs pull, CDC vs full load. Reis and Housley devote an entire chapter to the pitfalls: what to do when the source is slow, when data arrives out of order, when you need exactly-once (and why that's harder than it looks).
+
+### 4. Transformation
+
+From a simple `SELECT` to feature engineering pipelines with dozens of steps. Transformation is where raw data becomes something useful. The book covers the full spectrum: SQL transforms, dbt-style ELT, streaming transformations, and the eternal batch vs micro-batch debate.
+
+### 5. Serving
+
+The end of the cycle: putting data where it's needed. Dashboards for analysts, APIs for applications, feature stores for ML models, datasets for data scientists. Here the book makes an important distinction: serving isn't just *delivering* data, it's delivering it with the quality, latency and format each consumer needs.
+
+## {{< fa building >}} Architectures: which one to use and when
+
+The book covers the four most relevant architectures today. Here's a summary with a comparison table:
+
+**Lambda**: two parallel paths, one batch and one real-time, converging in a serving layer. It was the first serious answer to the problem of combining historical data with fresh data. The problem: maintaining two pipelines with duplicated logic is expensive and fragile. Use it only if you have very different latency requirements for historical vs real-time and can't unify them.
+
+**Kappa**: simplifies Lambda by using *a single* streaming pipeline that processes everything. Data is persisted in an immutable log (Kafka-style) and reprocessed when needed. Elegant in theory, but in practice it requires mature streaming infrastructure and isn't always cost-effective for purely batch workloads.
+
+**Medallion (Bronze / Silver / Gold)**: the architecture Databricks popularized. Data lands raw in Bronze, gets cleaned in Silver and is modeled for consumption in Gold. It's simple to understand, easy to implement and scales well. If you're starting a greenfield project today, it's probably your best starting point.
+
+**Data Mesh**: not a technical architecture but an organizational model. Each business domain owns its data and exposes it as *data products*. It requires high organizational maturity and a solid self-service platform underneath. It's not for everyone, but it solves real problems in large organizations where the central data team is a bottleneck.
+
+### Comparison table
+
+| Architecture | Complexity | Best for | Main risk |
+|---|---|---|---|
+| Lambda | High | Combining batch + real-time with different requirements | Duplicated logic, double maintenance |
+| Kappa | Medium-High | Unified pipelines on streaming | Streaming infra cost, heavy reprocessing |
+| Medallion | Low-Medium | Modern data lakes / lakehouses | Can become rigid without good governance |
+| Data Mesh | High (organizational) | Large companies with multiple domains | Requires maturity, self-service platform |
+
+## {{< fa water >}} The undercurrents: what holds everything up
+
+Reis and Housley introduce the concept of **undercurrents**: six cross-cutting areas that run through *all* stages of the lifecycle. Ignore any of them and your pipeline will work... until it doesn't.
+
+- **Security**: not a feature you bolt on at the end. Encryption, access control, principle of least privilege: everything has to be there from the design stage. A data breach wipes out years of work in seconds.
+
+- **Data Management**: data quality, lineage, catalogs, metadata. Without data management, your pipelines produce data nobody trusts. And data nobody trusts is data nobody uses.
+
+- **DataOps**: the adaptation of DevOps to the data world. CI/CD for pipelines, automated testing, observability, alerting. If your pipeline breaks at 3 AM and nobody finds out until 10, you have a DataOps problem.
+
+- **Data Architecture**: the high-level design decisions. How systems connect, where each piece of data lives, what contracts exist between teams. Bad architecture can't be fixed with better code.
+
+- **Orchestration**: coordinating dependencies between pipelines, handling retries, managing state. Airflow, Prefect, Dagster, Databricks Workflows: the tool matters less than understanding *what* you need to orchestrate and *why*.
+
+- **Software Engineering**: writing good code, testing, versioning, documenting. Working with data doesn't exempt you from good software engineering practices. The book is emphatic: a data engineer is, above all, an engineer.
+
+::: {.callout-tip}
+## Tip
+If you have to prioritize, start with DataOps and Data Management. They're the two areas where you'll see the most return for the least initial investment.
+:::
+
+## {{< fa code-compare >}} What changed in the 2nd edition
+
+The second edition isn't a cosmetic patch. There are substantial changes reflecting how the industry evolved between 2022 and 2024:
+
+- **Streaming-first**: the first edition treated streaming as an advanced case. The second presents it as a first-class option. The message is clear: if your tool supports streaming, at least evaluate whether you need it before assuming batch is enough.
+
+- **Cloud-native by default**: you can tell the authors stopped assuming anyone starts on-premise. The examples, patterns and recommendations assume you're in the cloud (or on your way there).
+
+- **Governance as a pillar**: Unity Catalog, Purview, Collibra, open-source governance: the second edition gives governance the weight it deserves. It's no longer an optional chapter but an integral part of the lifecycle.
+
+- **Lakehouse as the reference architecture**: the convergence of data lake + data warehouse comes through much more strongly. The lakehouse concept went from being marketing to being the practical recommendation.
+
+## {{< fa comments >}} My personal take
+
+What resonated with me the most is the book's insistence that **technology is what matters least**. It sounds contradictory coming from a technical book, but it's spot on: tools change every two years, principles don't. If you truly understand the lifecycle and the undercurrents, you can adapt to any stack.
+
+What I'd add: more concrete decision-making examples. The book is excellent at explaining *what* things are, but sometimes it's missing the "and in practice, when I have to choose between X and Y, how do I decide?". Real company cases with explicit trade-offs would bring the content down to earth faster.
+
+**Who should read it**: anyone who works with data. If you're a junior data engineer, it's your bible. If you're senior, it organizes ideas you already have floating around. If you're a data scientist, analytics engineer or even a product manager on a data team, it will give you the context you're missing to understand why things are the way they are.
+
+## {{< fa link >}} Links
+
+- {{< fa book >}} [Fundamentals of Data Engineering, 2nd Edition — O'Reilly](https://www.oreilly.com/library/view/fundamentals-of-data/9781098108298/)
+- {{< fa headphones >}} [Listen to the episode on Spotify](https://open.spotify.com/episode/30ad7lO8tRqMMHJy3i776u)

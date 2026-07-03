@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-06-09">
 <meta name="description" content="Rate limiting, guardrails, usage tracking, cost attribution, fallbacks y traffic splitting. Todo lo que necesitás para gobernar LLMs en tu organización.">
 
 <title>Databricks Tips #10: Unity AI Gateway — governance centralizada para LLMs en producción – Mauro Loprete</title>
@@ -99,17 +98,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -151,8 +150,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -198,7 +197,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#qué-es-ai-gateway" id="toc-qué-es-ai-gateway" class="nav-link active" data-scroll-target="#qué-es-ai-gateway">0. Qué es AI Gateway</a></li>
@@ -294,7 +293,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">June 9, 2026</p>
+      <p class="date">9 de junio de 2026</p>
     </div>
   </div>
   
@@ -314,7 +313,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>TL;DR
+<span class="screen-reader-only">Nota</span>TL;DR
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -362,7 +361,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-openai-sdk" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-openai-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Usar AI Gateway con el SDK de OpenAI: solo cambia base_url y api_key
+Listado&nbsp;1: Usar AI Gateway con el SDK de OpenAI: solo cambia base_url y api_key
 </figcaption>
 <div aria-describedby="lst-openai-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> openai <span class="im">import</span> OpenAI</span>
@@ -377,7 +376,7 @@ Listing&nbsp;1: Usar AI Gateway con el SDK de OpenAI: solo cambia base_url y api
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Qué es Delta Lake?"</span>}],</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">256</span>,</span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.choices[<span class="dv">0</span>].message.content)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.choices[<span class="dv">0</span>].message.content)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -385,7 +384,7 @@ Listing&nbsp;1: Usar AI Gateway con el SDK de OpenAI: solo cambia base_url y api
 <div id="lst-anthropic-sdk" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-anthropic-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: API nativa de Anthropic a través de AI Gateway
+Listado&nbsp;2: API nativa de Anthropic a través de AI Gateway
 </figcaption>
 <div aria-describedby="lst-anthropic-sdk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> anthropic</span>
@@ -402,7 +401,7 @@ Listing&nbsp;2: API nativa de Anthropic a través de AI Gateway
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"&lt;ai-gateway-endpoint&gt;"</span>,</span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">256</span>,</span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Qué es Delta Lake?"</span>}],</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -600,7 +599,7 @@ Listing&nbsp;2: API nativa de Anthropic a través de AI Gateway
 <div id="lst-custom-guardrail" class="text listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-custom-guardrail-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Prompt de guardrail custom: bloquear preguntas off-topic para un bot de soporte
+Listado&nbsp;3: Prompt de guardrail custom: bloquear preguntas off-topic para un bot de soporte
 </figcaption>
 <div aria-describedby="lst-custom-guardrail-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <pre class="text"><code>You are evaluating whether a user message is off-topic for a
@@ -635,7 +634,7 @@ Examples:
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Warning</span>Limitaciones de guardrails
+<span class="screen-reader-only">Advertencia</span>Limitaciones de guardrails
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -728,7 +727,7 @@ Examples:
 <div id="lst-request-tags" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-request-tags-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Request tags para cost attribution por proyecto y equipo
+Listado&nbsp;4: Request tags para cost attribution por proyecto y equipo
 </figcaption>
 <div aria-describedby="lst-request-tags-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
@@ -743,7 +742,7 @@ Listing&nbsp;4: Request tags para cost attribution por proyecto y equipo
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cost_center"</span>: <span class="st">"CC-420"</span>,</span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>        })</span>
 <span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    },</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -753,7 +752,7 @@ Listing&nbsp;4: Request tags para cost attribution por proyecto y equipo
 <div id="lst-usage-by-user" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-usage-by-user-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Usage tracking: tokens consumidos por usuario en los últimos 30 días
+Listado&nbsp;5: Usage tracking: tokens consumidos por usuario en los últimos 30 días
 </figcaption>
 <div aria-describedby="lst-usage-by-user-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -764,14 +763,14 @@ Listing&nbsp;5: Usage tracking: tokens consumidos por usuario en los últimos 30
 <span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.ai_gateway.<span class="kw">usage</span></span>
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> event_time <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
 <span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> requester, destination_model</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-usage-by-tag" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-usage-by-tag-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Consumo por proyecto usando request tags
+Listado&nbsp;6: Consumo por proyecto usando request tags
 </figcaption>
 <div aria-describedby="lst-usage-by-tag-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -781,7 +780,7 @@ Listing&nbsp;6: Consumo por proyecto usando request tags
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">system</span>.ai_gateway.<span class="kw">usage</span></span>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> request_tags[<span class="st">'project'</span>] <span class="kw">IS</span> <span class="kw">NOT</span> <span class="kw">NULL</span></span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> request_tags[<span class="st">'project'</span>]</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> total_tokens <span class="kw">DESC</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -796,7 +795,7 @@ Listing&nbsp;6: Consumo por proyecto usando request tags
 <div id="lst-cost-endpoint" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cost-endpoint-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: Costo en DBUs por endpoint en los últimos 30 días
+Listado&nbsp;7: Costo en DBUs por endpoint en los últimos 30 días
 </figcaption>
 <div aria-describedby="lst-cost-endpoint-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -808,14 +807,14 @@ Listing&nbsp;7: Costo en DBUs por endpoint en los últimos 30 días
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> endpoint</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-cost-model" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cost-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;8: Costo en DBUs por modelo destino
+Listado&nbsp;8: Costo en DBUs por modelo destino
 </figcaption>
 <div aria-describedby="lst-cost-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -827,14 +826,14 @@ Listing&nbsp;8: Costo en DBUs por modelo destino
 <span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
 <span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
 <span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> model</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-cost-team" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cost-team-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;9: Costo en DBUs por equipo usando tags de endpoint
+Listado&nbsp;9: Costo en DBUs por equipo usando tags de endpoint
 </figcaption>
 <div aria-describedby="lst-cost-team-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -846,7 +845,7 @@ Listing&nbsp;9: Costo en DBUs por equipo usando tags de endpoint
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_unit <span class="op">=</span> <span class="st">'DBU'</span></span>
 <span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> usage_date <span class="op">&gt;=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">30</span> DAYS</span>
 <span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> team</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> dbus <span class="kw">DESC</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -856,7 +855,7 @@ Listing&nbsp;9: Costo en DBUs por equipo usando tags de endpoint
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Important</span>Costos de modelos externos
+<span class="screen-reader-only">Importante</span>Costos de modelos externos
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -989,7 +988,7 @@ Listing&nbsp;9: Costo en DBUs por equipo usando tags de endpoint
 <div id="lst-external-model" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-external-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;10: Crear endpoint de external model con API key de Anthropic
+Listado&nbsp;10: Crear endpoint de external model con API key de Anthropic
 </figcaption>
 <div aria-describedby="lst-external-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> mlflow.deployments</span>
@@ -1010,14 +1009,14 @@ Listing&nbsp;10: Crear endpoint de external model con API key de Anthropic
 <span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>            }</span>
 <span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>        }]</span>
 <span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    },</span>
-<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-external-bedrock" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-external-bedrock-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;11: External model con Amazon Bedrock
+Listado&nbsp;11: External model con Amazon Bedrock
 </figcaption>
 <div aria-describedby="lst-external-bedrock-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>client.create_endpoint(</span>
@@ -1037,7 +1036,7 @@ Listing&nbsp;11: External model con Amazon Bedrock
 <span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>            }</span>
 <span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>        }]</span>
 <span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    },</span>
-<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1050,7 +1049,7 @@ Listing&nbsp;11: External model con Amazon Bedrock
 <div id="lst-ai-classify" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ai-classify-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;12: ai_classify: clasificar texto usando LLM desde SQL
+Listado&nbsp;12: ai_classify: clasificar texto usando LLM desde SQL
 </figcaption>
 <div aria-describedby="lst-ai-classify-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
@@ -1060,34 +1059,34 @@ Listing&nbsp;12: ai_classify: clasificar texto usando LLM desde SQL
 <span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">ARRAY</span>(<span class="st">'bug'</span>, <span class="st">'feature_request'</span>, <span class="st">'billing'</span>, <span class="st">'question'</span>)</span>
 <span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  ) <span class="kw">AS</span> categoria</span>
 <span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> soporte.tickets</span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> fecha <span class="op">&gt;=</span> <span class="st">'2026-01-01'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> fecha <span class="op">&gt;=</span> <span class="st">'2026-01-01'</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-ai-extract" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ai-extract-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;13: ai_extract: extraer entidades estructuradas de texto libre
+Listado&nbsp;13: ai_extract: extraer entidades estructuradas de texto libre
 </figcaption>
 <div aria-describedby="lst-ai-extract-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> ai_extract(</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  comentario,</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">'producto STRING, sentimiento STRING, urgencia STRING'</span></span>
 <span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>) <span class="kw">AS</span> entidades</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> feedback.comentarios</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> feedback.comentarios</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-ai-summarize" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ai-summarize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;14: ai_summarize: resumir texto a escala con batch inference
+Listado&nbsp;14: ai_summarize: resumir texto a escala con batch inference
 </figcaption>
 <div aria-describedby="lst-ai-summarize-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  contrato_id,</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  ai_summarize(texto_contrato) <span class="kw">AS</span> resumen</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> legal.contratos</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> legal.contratos</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1208,10 +1207,10 @@ Listing&nbsp;14: ai_summarize: resumir texto a escala con batch inference
 <div id="lst-ucode-install" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ucode-install-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;15: Instalar ucode con uv (requiere Python 3.12+)
+Listado&nbsp;15: Instalar ucode con uv (requiere Python 3.12+)
 </figcaption>
 <div aria-describedby="lst-ucode-install-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> tool install git+https://github.com/databricks/ucode</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> tool install git+https://github.com/databricks/ucode</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1221,7 +1220,7 @@ Listing&nbsp;15: Instalar ucode con uv (requiere Python 3.12+)
 <div id="lst-ucode-configure" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ucode-configure-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;16: Configurar ucode: workspace, agentes y MCP servers
+Listado&nbsp;16: Configurar ucode: workspace, agentes y MCP servers
 </figcaption>
 <div aria-describedby="lst-ucode-configure-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Setup interactivo (pregunta workspace y autentica)</span></span>
@@ -1237,7 +1236,7 @@ Listing&nbsp;16: Configurar ucode: workspace, agentes y MCP servers
 <span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure mcp</span>
 <span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Preview sin aplicar cambios</span></span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--dry-run</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> configure <span class="at">--dry-run</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1247,7 +1246,7 @@ Listing&nbsp;16: Configurar ucode: workspace, agentes y MCP servers
 <div id="lst-ucode-usage" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ucode-usage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;17: Usar coding agents a través de AI Gateway con ucode
+Listado&nbsp;17: Usar coding agents a través de AI Gateway con ucode
 </figcaption>
 <div aria-describedby="lst-ucode-usage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Lanzar Claude Code</span></span>
@@ -1263,7 +1262,7 @@ Listing&nbsp;17: Usar coding agents a través de AI Gateway con ucode
 <span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> usage</span>
 <span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Restaurar configs originales</span></span>
-<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> revert</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a><span class="ex">ucode</span> revert</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1536,6 +1535,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -1561,12 +1620,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1958,7 +2017,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

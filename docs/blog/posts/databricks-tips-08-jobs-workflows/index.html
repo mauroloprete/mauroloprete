@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-06-04">
 <meta name="description" content="File arrival triggers, table update triggers, Trigger.AvailableNow, Job Clusters y las limitaciones que no están en el tutorial.">
 
 <title>Databricks Tips #8: Jobs &amp; Workflows — streaming y triggers que arrancan solos – Mauro Loprete</title>
@@ -101,17 +100,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -153,8 +152,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -200,7 +199,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#jobs-en-2-minutos" id="toc-jobs-en-2-minutos" class="nav-link active" data-scroll-target="#jobs-en-2-minutos">Jobs en 2 minutos</a></li>
@@ -286,7 +285,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">June 4, 2026</p>
+      <p class="date">4 de junio de 2026</p>
     </div>
   </div>
   
@@ -458,10 +457,10 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-volume-path" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-volume-path-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Ruta del Volume para configurar el file arrival trigger
+Listado&nbsp;1: Ruta del Volume para configurar el file arrival trigger
 </figcaption>
 <div aria-describedby="lst-volume-path-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/mi_catalogo/mi_schema/mi_volume/bronze/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/mi_catalogo/mi_schema/mi_volume/bronze/</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -480,12 +479,12 @@ Listing&nbsp;1: Ruta del Volume para configurar el file arrival trigger
 <div id="lst-subdirs" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-subdirs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Subdirectorios monitoreados recursivamente por el trigger
+Listado&nbsp;2: Subdirectorios monitoreados recursivamente por el trigger
 </figcaption>
 <div aria-describedby="lst-subdirs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/catalog/schema/volume/bronze/2026/06/</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/catalog/schema/volume/bronze/2026/06/09/</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/catalog/schema/volume/bronze/clientes/</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">/Volumes/catalog/schema/volume/bronze/clientes/</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -499,7 +498,7 @@ Listing&nbsp;2: Subdirectorios monitoreados recursivamente por el trigger
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Important</span>Importante: habilitá file events
+<span class="screen-reader-only">Importante</span>Importante: habilitá file events
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -591,7 +590,7 @@ Listing&nbsp;2: Subdirectorios monitoreados recursivamente por el trigger
 <div id="lst-dynamic-params" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dynamic-params-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Parámetros dinámicos inyectados por el table update trigger
+Listado&nbsp;3: Parámetros dinámicos inyectados por el table update trigger
 </figcaption>
 <div aria-describedby="lst-dynamic-params-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Qué tablas se actualizaron (JSON list)</span></span>
@@ -605,7 +604,7 @@ Listing&nbsp;3: Parámetros dinámicos inyectados por el table update trigger
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Versión del último commit</span></span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>version <span class="op">=</span> dbutils.widgets.get(</span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"job.trigger.table_update.mi_catalogo.mi_schema.mi_tabla.version"</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -666,7 +665,7 @@ Listing&nbsp;3: Parámetros dinámicos inyectados por el table update trigger
 <div id="lst-available-now" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-available-now-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Streaming con Trigger.AvailableNow: procesa todo y termina
+Listado&nbsp;4: Streaming con Trigger.AvailableNow: procesa todo y termina
 </figcaption>
 <div aria-describedby="lst-available-now-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>(spark.readStream</span>
@@ -678,7 +677,7 @@ Listing&nbsp;4: Streaming con Trigger.AvailableNow: procesa todo y termina
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)    <span class="co"># &lt;-- procesa todo y termina</span></span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    .toTable(<span class="st">"catalog.schema.mi_tabla_bronze"</span>)</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -745,7 +744,7 @@ Listing&nbsp;4: Streaming con Trigger.AvailableNow: procesa todo y termina
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>Nota: Serverless
+<span class="screen-reader-only">Nota</span>Nota: Serverless
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -760,7 +759,7 @@ Listing&nbsp;4: Streaming con Trigger.AvailableNow: procesa todo y termina
 <div id="lst-continuous-mode" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-continuous-mode-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Continuous mode con AvailableNow: restart automático al terminar
+Listado&nbsp;5: Continuous mode con AvailableNow: restart automático al terminar
 </figcaption>
 <div aria-describedby="lst-continuous-mode-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Con continuous mode, usás AvailableNow</span></span>
@@ -772,7 +771,7 @@ Listing&nbsp;5: Continuous mode con AvailableNow: restart automático al termina
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
 <span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    .toTable(<span class="st">"catalog.schema.silver"</span>)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -836,7 +835,7 @@ Listing&nbsp;5: Continuous mode con AvailableNow: restart automático al termina
 <div id="lst-autoloader-bronze" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-autoloader-bronze-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: AutoLoader con file events y AvailableNow para ingesta bronze
+Listado&nbsp;6: AutoLoader con file events y AvailableNow para ingesta bronze
 </figcaption>
 <div aria-describedby="lst-autoloader-bronze-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Configuración</span></span>
@@ -857,7 +856,7 @@ Listing&nbsp;6: AutoLoader con file events y AvailableNow para ingesta bronze
 <span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"mergeSchema"</span>, <span class="st">"true"</span>)   <span class="co"># maneja schema evolution</span></span>
 <span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    .toTable(target_table)</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -877,7 +876,7 @@ Listing&nbsp;6: AutoLoader con file events y AvailableNow para ingesta bronze
 <div id="lst-foreach-batch" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-foreach-batch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: foreachBatch con validación y escritura a bronze y quarantine
+Listado&nbsp;7: foreachBatch con validación y escritura a bronze y quarantine
 </figcaption>
 <div aria-describedby="lst-foreach-batch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> procesar_batch(batch_df, batch_id):</span>
@@ -902,7 +901,7 @@ Listing&nbsp;7: foreachBatch con validación y escritura a bronze y quarantine
 <span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
 <span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    .start()</span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -912,7 +911,7 @@ Listing&nbsp;7: foreachBatch con validación y escritura a bronze y quarantine
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Warning</span>Ojo con <code>foreachBatch</code>
+<span class="screen-reader-only">Advertencia</span>Ojo con <code>foreachBatch</code>
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -929,11 +928,11 @@ Listing&nbsp;7: foreachBatch con validación y escritura a bronze y quarantine
 <div id="lst-enable-cdf" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-enable-cdf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;8: Habilitar Change Data Feed en la tabla bronze
+Listado&nbsp;8: Habilitar Change Data Feed en la tabla bronze
 </figcaption>
 <div aria-describedby="lst-enable-cdf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> mi_catalogo.mi_schema.clientes_bronze</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> TBLPROPERTIES (delta.enableChangeDataFeed <span class="op">=</span> <span class="kw">true</span>);</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> TBLPROPERTIES (delta.enableChangeDataFeed <span class="op">=</span> <span class="kw">true</span>);</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -947,7 +946,7 @@ Listing&nbsp;8: Habilitar Change Data Feed en la tabla bronze
 <div id="lst-bronze-to-silver" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-bronze-to-silver-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;9: Transformación bronze a silver con Change Data Feed (CDF)
+Listado&nbsp;9: Transformación bronze a silver con Change Data Feed (CDF)
 </figcaption>
 <div aria-describedby="lst-bronze-to-silver-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>checkpoint_path <span class="op">=</span> <span class="st">"/Volumes/mi_catalogo/mi_schema/checkpoints/clientes_silver/"</span></span>
@@ -964,7 +963,7 @@ Listing&nbsp;9: Transformación bronze a silver con Change Data Feed (CDF)
 <span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"checkpointLocation"</span>, checkpoint_path)</span>
 <span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    .trigger(availableNow<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    .toTable(<span class="st">"mi_catalogo.mi_schema.clientes_silver"</span>)</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -975,7 +974,7 @@ Listing&nbsp;9: Transformación bronze a silver con Change Data Feed (CDF)
 <div id="lst-trigger-logging" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-trigger-logging-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;10: Uso de parámetros dinámicos del trigger para logging
+Listado&nbsp;10: Uso de parámetros dinámicos del trigger para logging
 </figcaption>
 <div aria-describedby="lst-trigger-logging-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Qué tablas se actualizaron</span></span>
@@ -986,7 +985,7 @@ Listing&nbsp;10: Uso de parámetros dinámicos del trigger para logging
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>trigger_version <span class="op">=</span> dbutils.widgets.get(</span>
 <span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"job.trigger.table_update.mi_catalogo.mi_schema.clientes_bronze.version"</span></span>
 <span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Procesando desde versión: </span><span class="sc">{</span>trigger_version<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Procesando desde versión: </span><span class="sc">{</span>trigger_version<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -1188,6 +1187,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -1213,12 +1272,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1610,7 +1669,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

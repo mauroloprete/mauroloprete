@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-03-24">
 <meta name="description" content="Registro de modelos en UC, aliases en vez de stages, linaje de datos a modelo, y model serving con AI Gateway.">
 
 <title>Databricks Tips #5: MLflow + Unity Catalog — del experimento al modelo en producción – Mauro Loprete</title>
@@ -96,17 +95,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -148,8 +147,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -195,7 +194,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#el-cambio-de-workspace-registry-a-unity-catalog" id="toc-el-cambio-de-workspace-registry-a-unity-catalog" class="nav-link active" data-scroll-target="#el-cambio-de-workspace-registry-a-unity-catalog">El cambio: de Workspace Registry a Unity Catalog</a></li>
@@ -241,7 +240,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 24, 2026</p>
+      <p class="date">24 de marzo de 2026</p>
     </div>
   </div>
   
@@ -260,7 +259,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-registry-uri" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-registry-uri-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Cambio de Workspace Registry a Unity Catalog Registry
+Listado&nbsp;1: Cambio de Workspace Registry a Unity Catalog Registry
 </figcaption>
 <div aria-describedby="lst-registry-uri-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> mlflow</span>
@@ -271,7 +270,7 @@ Listing&nbsp;1: Cambio de Workspace Registry a Unity Catalog Registry
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Nuevo: Unity Catalog registry</span></span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>mlflow.set_registry_uri(<span class="st">"databricks-uc"</span>)</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Modelo registrado en catalog.schema.model_name</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Modelo registrado en catalog.schema.model_name</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -282,7 +281,7 @@ Listing&nbsp;1: Cambio de Workspace Registry a Unity Catalog Registry
 <div id="lst-mlflow-tracking" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-mlflow-tracking-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Entrenamiento con tracking y registro del modelo en Unity Catalog
+Listado&nbsp;2: Entrenamiento con tracking y registro del modelo en Unity Catalog
 </figcaption>
 <div aria-describedby="lst-mlflow-tracking-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> mlflow</span>
@@ -320,7 +319,7 @@ Listing&nbsp;2: Entrenamiento con tracking y registro del modelo en Unity Catalo
 <span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>        model_uri,</span>
 <span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        <span class="st">"catalog.ml.churn_predictor"</span></span>
 <span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Version: </span><span class="sc">{</span>mv<span class="sc">.</span>version<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Version: </span><span class="sc">{</span>mv<span class="sc">.</span>version<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -331,7 +330,7 @@ Listing&nbsp;2: Entrenamiento con tracking y registro del modelo en Unity Catalo
 <div id="lst-model-aliases" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-model-aliases-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Aliases de modelos: asignar champion y challenger
+Listado&nbsp;3: Aliases de modelos: asignar champion y challenger
 </figcaption>
 <div aria-describedby="lst-model-aliases-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mlflow <span class="im">import</span> MlflowClient</span>
@@ -362,7 +361,7 @@ Listing&nbsp;3: Aliases de modelos: asignar champion y challenger
 <span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>challenger <span class="op">=</span> mlflow.pyfunc.load_model(</span>
 <span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    <span class="st">"models:/catalog.ml.churn_predictor@challenger"</span></span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -379,7 +378,7 @@ Listing&nbsp;3: Aliases de modelos: asignar champion y challenger
 <div id="lst-linaje-datasets" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-linaje-datasets-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Consultar linaje: datasets usados para entrenar un modelo
+Listado&nbsp;4: Consultar linaje: datasets usados para entrenar un modelo
 </figcaption>
 <div aria-describedby="lst-linaje-datasets-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Ver los inputs de un modelo</span></span>
@@ -387,7 +386,7 @@ Listing&nbsp;4: Consultar linaje: datasets usados para entrenar un modelo
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> input_data <span class="kw">in</span> run.inputs.dataset_inputs:</span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Dataset: </span><span class="sc">{</span>input_data<span class="sc">.</span>dataset<span class="sc">.</span>name<span class="sc">}</span><span class="ss">"</span>)</span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Source: </span><span class="sc">{</span>input_data<span class="sc">.</span>dataset<span class="sc">.</span>source<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Context: </span><span class="sc">{</span>input_data<span class="sc">.</span>tags<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Context: </span><span class="sc">{</span>input_data<span class="sc">.</span>tags<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -398,7 +397,7 @@ Listing&nbsp;4: Consultar linaje: datasets usados para entrenar un modelo
 <div id="lst-model-serving" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-model-serving-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Configurar Model Serving endpoint con A/B testing
+Listado&nbsp;5: Configurar Model Serving endpoint con A/B testing
 </figcaption>
 <div aria-describedby="lst-model-serving-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> requests</span>
@@ -438,7 +437,7 @@ Listing&nbsp;5: Configurar Model Serving endpoint con A/B testing
 <span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>            <span class="st">"traffic_percentage"</span>: <span class="dv">10</span></span>
 <span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>        }</span>
 <span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>    ]</span>
-<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -446,11 +445,11 @@ Listing&nbsp;5: Configurar Model Serving endpoint con A/B testing
 <div id="lst-ai-gateway" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ai-gateway-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: AI Gateway: logging automático de inferencias
+Listado&nbsp;6: AI Gateway: logging automático de inferencias
 </figcaption>
 <div aria-describedby="lst-ai-gateway-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Todas las llamadas al endpoint se logean automáticamente</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># en una tabla de inference logs para monitoreo</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># en una tabla de inference logs para monitoreo</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -461,7 +460,7 @@ Listing&nbsp;6: AI Gateway: logging automático de inferencias
 <div id="lst-feature-store" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-feature-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: Feature Store: crear tabla y entrenar con feature lookups
+Listado&nbsp;7: Feature Store: crear tabla y entrenar con feature lookups
 </figcaption>
 <div aria-describedby="lst-feature-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.feature_engineering <span class="im">import</span> FeatureEngineeringClient</span>
@@ -495,7 +494,7 @@ Listing&nbsp;7: Feature Store: crear tabla y entrenar con feature lookups
 <span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>training_df <span class="op">=</span> training_set.load_df()</span>
 <span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a><span class="co"># El modelo sabe de dónde vienen los features</span></span>
-<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a><span class="co"># En serving, los busca automáticamente</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a><span class="co"># En serving, los busca automáticamente</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -675,6 +674,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -700,12 +759,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1097,7 +1156,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

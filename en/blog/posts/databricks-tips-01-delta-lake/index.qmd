@@ -1,0 +1,173 @@
+---
+title: "Databricks Tips #2: 7 things about Delta Lake I wish someone had told me sooner"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-03-03"
+categories: [Databricks Tips, Data Engineering, Delta Lake]
+description: "Liquid clustering, OPTIMIZE, Z-ORDER, vacuum, time travel and tricks that change how you work with Delta."
+draft: false
+image: cover.png
+---
+
+Second installment of the **Databricks Tips** series, where every week I share something advanced I discovered in production. This time: Delta Lake.
+
+## 1. Liquid Clustering replaces Z-ORDER
+
+If you're still running `OPTIMIZE table ZORDER BY (col)` by hand, stop. Since DBR 13.3+, **Liquid Clustering** does this automatically and adaptively:
+
+```{#lst-liquid-clustering .sql lst-cap="Liquid Clustering: create a table, alter an existing one and optimize"}
+-- Create a table with liquid clustering
+CREATE TABLE catalog.schema.events (
+  event_date DATE,
+  user_id BIGINT,
+  event_type STRING,
+  payload STRING
+)
+USING DELTA
+CLUSTER BY (event_date, user_id);
+
+-- Apply to an existing table
+ALTER TABLE catalog.schema.events
+CLUSTER BY (event_date, user_id);
+
+-- Manual trigger (normally not needed)
+OPTIMIZE catalog.schema.events;
+```
+
+The key difference: Z-ORDER is static (it always sorts by the same columns), while Liquid Clustering adapts to your actual query patterns. Plus, you can change the clustering columns without rewriting the table.
+
+**When to stick with Z-ORDER**: tables where you need exact control over the physical layout and your query pattern never changes.
+
+## 2. OPTIMIZE is not what you think
+
+Lots of people run `OPTIMIZE` as a daily cron job on every table. Wrong:
+
+- **Without a predicate**: it rewrites the *entire* table. On TB-scale tables, that's hours of compute.
+- **With a predicate**: it only rewrites the matching partitions.
+
+```{#lst-optimize-predicate .sql lst-cap="OPTIMIZE with and without a predicate: impact on data rewrites"}
+-- Bad: rewrites everything
+OPTIMIZE catalog.schema.events;
+
+-- Better: only yesterday's partition
+OPTIMIZE catalog.schema.events
+WHERE event_date = current_date() - INTERVAL 1 DAY;
+
+-- Even better with liquid clustering: no manual OPTIMIZE needed
+-- The engine does it incrementally on write
+```
+
+**Tip**: if you use Liquid Clustering, `OPTIMIZE` runs incrementally (only unclustered files). It's safe to run often because it doesn't rewrite what's already fine.
+
+## 3. VACUUM: the detail nobody tells you about
+
+`VACUUM` deletes old files that are no longer part of the table. The default retention is 7 days. But:
+
+```{#lst-vacuum-retention .sql lst-cap="VACUUM: dangerous retention vs. safe 7-day retention"}
+-- This can break active queries
+VACUUM catalog.schema.events RETAIN 0 HOURS;
+
+-- Safe: respect the retention window
+VACUUM catalog.schema.events RETAIN 168 HOURS; -- 7 days
+```
+
+What nobody tells you: **VACUUM does not delete log files** (the delta log). If you need to clean up the log, use:
+
+```{#lst-delta-log .sql lst-cap="Managing the delta log: checkpoint, compaction and retention"}
+-- See how much space the log takes
+DESCRIBE DETAIL catalog.schema.events;
+
+-- Force a checkpoint (compacts the JSON log into Parquet)
+-- Happens automatically every 10 commits, but you can force it:
+SET spark.databricks.delta.checkpoint.partSize = 1;
+OPTIMIZE catalog.schema.events;
+
+-- Configure log retention (default 30 days)
+ALTER TABLE catalog.schema.events
+SET TBLPROPERTIES (delta.logRetentionDuration = 'interval 30 days');
+```
+
+**In production**: automate VACUUM with a weekly job, and never with a retention shorter than the time travel window you need.
+
+## 4. Time Travel: beyond SELECT AS OF
+
+Everyone knows `SELECT * FROM table VERSION AS OF 5`. But time travel has more uses:
+
+```{#lst-time-travel .sql lst-cap="Time Travel: restore, compare versions, clone and history"}
+-- Restore a table to a previous version (rollback)
+RESTORE TABLE catalog.schema.events TO VERSION AS OF 42;
+
+-- Compare two versions (great for validating pipelines)
+SELECT * FROM catalog.schema.events VERSION AS OF 10
+EXCEPT
+SELECT * FROM catalog.schema.events VERSION AS OF 11;
+
+-- Clone a specific version for debugging
+CREATE TABLE catalog.schema.events_debug
+SHALLOW CLONE catalog.schema.events VERSION AS OF 42;
+
+-- See the full operation history
+DESCRIBE HISTORY catalog.schema.events;
+```
+
+`SHALLOW CLONE` is very handy: it creates a reference to the data without copying it. You can run investigative queries against a version without touching the original table.
+
+## 5. Delta Lake Change Data Feed (CDF)
+
+If you have downstream pipelines that need to know *what changed* in a table, you don't need to diff snapshots. Enable CDF:
+
+```{#lst-cdf .sql lst-cap="Change Data Feed: enable CDF and read changes between versions"}
+-- Enable CDF
+ALTER TABLE catalog.schema.events
+SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
+
+-- Read the changes between versions
+SELECT * FROM table_changes('catalog.schema.events', 5, 10);
+
+-- In PySpark
+df_changes = (spark.read.format("delta")
+    .option("readChangeFeed", "true")
+    .option("startingVersion", 5)
+    .option("endingVersion", 10)
+    .table("catalog.schema.events"))
+
+# Extra columns: _change_type, _commit_version, _commit_timestamp
+df_changes.filter("_change_type = 'update_postimage'").show()
+```
+
+`_change_type` can be: `insert`, `update_preimage`, `update_postimage`, `delete`. This is the foundation for efficient CDC without external tools.
+
+## 6. Deletion Vectors: delete without rewriting
+
+Since DBR 14.1, Delta Lake supports **Deletion Vectors** (DVs). Instead of rewriting Parquet files to delete rows, it writes a lightweight file that marks which rows are deleted:
+
+```{#lst-deletion-vectors .sql lst-cap="Deletion Vectors: enable DVs for fast deletes without rewriting"}
+-- Enable DVs
+ALTER TABLE catalog.schema.events
+SET TBLPROPERTIES (
+  'delta.enableDeletionVectors' = true
+);
+
+-- Now DELETE and UPDATE are much faster
+-- because they don't rewrite entire files
+DELETE FROM catalog.schema.events
+WHERE user_id = 12345;
+```
+
+**Real-world impact**: on large tables, a `DELETE` that used to take 30 minutes (rewriting GBs of files) now takes seconds. The files eventually get cleaned up by `OPTIMIZE` or `VACUUM`.
+
+## 7. Table: when to use each feature
+
+| Need | Feature | Since DBR |
+|---|---|---|
+| Order data for fast queries | Liquid Clustering | 13.3 |
+| Compact small files | OPTIMIZE | 7.0 |
+| Clean up old files | VACUUM | 7.0 |
+| Data rollback | Time Travel + RESTORE | 7.0 |
+| Propagate changes downstream | Change Data Feed | 10.4 |
+| Fast deletes/updates | Deletion Vectors | 14.1 |
+
+---
+
+*Next week: Unity Catalog — permissions, lineage and governance patterns nobody implements well.*

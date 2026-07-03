@@ -1,0 +1,753 @@
+---
+title: "Databricks Tips #9: SQL Warehouses — the compute that turns itself on"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-06-06"
+draft: false
+categories: [Databricks Tips, Data Engineering, Serverless]
+description: "Classic, Pro or Serverless: which one to pick, how to size it, and the gotchas that will save you money. With Photon, Query Federation, AI Functions and real costs."
+image: cover.png
+---
+
+Your team runs SQL queries against the lakehouse. Dashboards, reports, exploratory analysis, some light ETL. And it probably does so with an All-Purpose cluster running all day long.
+
+There's a better way.
+
+::: callout-note
+## TL;DR
+
+-   **Serverless** starts in seconds, shuts itself down, and the real cost is usually lower than Classic (pricier DBU but no separate VMs).
+-   **Photon** (vectorized C++) is enabled by default — up to 12x speedup without changing any code.
+-   **Query Federation** lets you query PostgreSQL, Snowflake and BigQuery without migrating data.
+-   **AI Functions** apply LLMs from pure SQL (`ai_classify`, `ai_extract`, `ai_summarize`).
+-   If you see **spill to disk** in the Query Profile, your warehouse is too small. If you see **queued queries**, you need more capacity.
+:::
+
+------------------------------------------------------------------------
+
+## 0. SQL Warehouses in 2 minutes
+
+A SQL Warehouse **is not a general-purpose cluster**. It's a specialized SQL endpoint that:
+
+-   Runs SQL exclusively (no Python, no R, no interactive Scala)
+-   Uses **Photon** by default — a vectorized C++ engine that replaces JVM execution
+-   Has **concurrency scaling** — scales automatically when multiple queries run at once
+-   **Turns itself on** when a query arrives and **shuts itself down** when there's no activity
+-   Integrates with Unity Catalog for governance
+
+**When to use it:**
+
+-   BI and dashboards (Power BI, Tableau, Looker)
+-   Light SQL ETL (`INSERT INTO ... SELECT`, `MERGE`, `CTAS`)
+-   Ad-hoc analytics (SQL explorations from the editor)
+-   AI Functions (LLMs from SQL)
+-   Query Federation (queries against external sources)
+
+**When NOT to:**
+
+-   Continuous streaming (Structured Streaming with `ProcessingTime`)
+-   ML training (Spark ML, MLlib, scikit-learn, PyTorch)
+-   Heavy Python/R notebooks
+-   Complex ETL with vectorized UDFs or pandas UDFs
+
+------------------------------------------------------------------------
+
+## 1. The 3 types: Classic vs Pro vs Serverless
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 4.5
+#| fig-align: center
+#| fig-cap: "Feature comparison across SQL Warehouses: Classic, Pro and Serverless."
+
+library(ggplot2)
+library(dplyr)
+
+features <- data.frame(
+  type = rep(c("Classic", "Pro", "Serverless"), each = 6),
+  feature = rep(c("Photon", "Predictive I/O", "IWM", "Startup", "Infra", "DBU price"), 3),
+  value = c(
+    "Yes", "No", "No", "~4 min", "Your subscription", "~$0.22",
+    "Yes", "Yes", "No", "~4 min", "Your subscription", "~$0.55",
+    "Yes", "Yes", "Yes", "2-6 sec", "Databricks", "~$0.70"
+  ),
+  y = rep(6:1, 3),
+  x = c(rep(1, 6), rep(2, 6), rep(3, 6)),
+  color = c(
+    rep("#94a3b8", 6),
+    rep("#1e293b", 6),
+    rep("#FFA166", 6)
+  )
+)
+
+ggplot() +
+  # General background
+  annotate("rect", xmin = -0.4, xmax = 3.8, ymin = 0, ymax = 8.2,
+           fill = "#f8fafc", color = NA) +
+  # Columns with soft borders
+  annotate("rect", xmin = 0.5, xmax = 1.5, ymin = 0.3, ymax = 6.7,
+           fill = "#f1f5f9", color = "#e2e8f0", linewidth = 0.3) +
+  annotate("rect", xmin = 1.5, xmax = 2.5, ymin = 0.3, ymax = 6.7,
+           fill = "#eef2f7", color = "#cbd5e1", linewidth = 0.3) +
+  annotate("rect", xmin = 2.5, xmax = 3.5, ymin = 0.3, ymax = 6.7,
+           fill = "#fff7ed", color = "#fed7aa", linewidth = 0.3) +
+  # Horizontal separator lines
+  annotate("segment", x = 0.5, xend = 3.5, y = 1.5, yend = 1.5,
+           color = "#e2e8f0", linewidth = 0.3) +
+  annotate("segment", x = 0.5, xend = 3.5, y = 2.5, yend = 2.5,
+           color = "#e2e8f0", linewidth = 0.3) +
+  annotate("segment", x = 0.5, xend = 3.5, y = 3.5, yend = 3.5,
+           color = "#e2e8f0", linewidth = 0.3) +
+  annotate("segment", x = 0.5, xend = 3.5, y = 4.5, yend = 4.5,
+           color = "#e2e8f0", linewidth = 0.3) +
+  annotate("segment", x = 0.5, xend = 3.5, y = 5.5, yend = 5.5,
+           color = "#e2e8f0", linewidth = 0.3) +
+  # Headers
+  annotate("text", x = 1, y = 7.2, label = "Classic", fontface = "bold",
+           size = 4.5, color = "#94a3b8") +
+  annotate("text", x = 2, y = 7.2, label = "Pro", fontface = "bold",
+           size = 4.5, color = "#1e293b") +
+  annotate("text", x = 3, y = 7.2, label = "Serverless", fontface = "bold",
+           size = 4.5, color = "#e8854a") +
+  # Recommended badge
+  annotate("rect", xmin = 2.55, xmax = 3.45, ymin = 7.5, ymax = 7.9,
+           fill = "#fff7ed", color = "#FFA166", linewidth = 0.4) +
+  annotate("text", x = 3, y = 7.7, label = "RECOMMENDED", fontface = "bold",
+           size = 2.5, color = "#9a4e1c") +
+  # Feature labels (left)
+  annotate("text", x = 0.35, y = 6, label = "Photon", hjust = 1,
+           size = 3, color = "#64748b") +
+  annotate("text", x = 0.35, y = 5, label = "Predictive I/O", hjust = 1,
+           size = 3, color = "#64748b") +
+  annotate("text", x = 0.35, y = 4, label = "IWM", hjust = 1,
+           size = 3, color = "#64748b") +
+  annotate("text", x = 0.35, y = 3, label = "Startup", hjust = 1,
+           size = 3, color = "#64748b") +
+  annotate("text", x = 0.35, y = 2, label = "Infrastructure", hjust = 1,
+           size = 3, color = "#64748b") +
+  annotate("text", x = 0.35, y = 1, label = "Price/DBU", hjust = 1,
+           size = 3, color = "#64748b") +
+  # Values
+  geom_text(data = features, aes(x = x, y = y, label = value, color = color),
+            size = 3.2, fontface = "bold") +
+  scale_color_identity() +
+  coord_cartesian(xlim = c(-0.3, 3.7), ylim = c(0.3, 8.2)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "#f8fafc", color = "#e2e8f0",
+                                   linewidth = 0.5),
+    plot.margin = margin(10, 15, 10, 15),
+    plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic")
+  )
+```
+
+The full table:
+
+| Feature | Classic | Pro | Serverless |
+|------------------|------------------|------------------|------------------|
+| **Photon** | Yes | Yes | Yes |
+| **Predictive I/O** | No | Yes | Yes |
+| **Intelligent Workload Management** | No | No | Yes |
+| **Startup time** | \~4 min | \~4 min | 2-6 sec |
+| **Infrastructure** | Your Azure subscription | Your Azure subscription | Managed by Databricks |
+| **Spot instances** | Yes (configurable) | Yes (configurable) | Not applicable |
+| **Query Federation** | No | Yes | Yes |
+| **AI Functions** | No | Yes | Yes |
+| **DBU price (Azure, ref.)** | \~\$0.22 | \~\$0.55 | \~\$0.70 |
+
+::: callout-important
+## The price is not what it seems
+
+Serverless is more expensive per DBU (\$0.70 vs \$0.22 Classic), but the DBU price **includes the infrastructure**. With Classic/Pro you pay DBUs + Azure VMs separately. For intermittent workloads, Serverless TCO is usually lower.
+:::
+
+**When to use each one:**
+
+-   **Serverless** (default): most workloads. Instant startup, smart scaling, no infra management.
+-   **Pro**: when you need VNet injection, an on-premises connection, or Serverless isn't available in your region.
+-   **Classic**: only if you have a legacy external Hive metastore that you haven't migrated to Unity Catalog.
+
+------------------------------------------------------------------------
+
+## 2. Serverless: why it changes the rules
+
+The difference between Classic/Pro and Serverless isn't just the price. It's a different operating model.
+
+**Classic/Pro:**
+
+1.  A query arrives → the warehouse was off → **4 minutes of startup**
+2.  The query runs
+3.  The warehouse sits idle → waiting for more queries → **paying for doing nothing**
+4.  After 10+ minutes of no activity → it shuts down
+
+**Serverless:**
+
+1.  A query arrives → **2-6 seconds of startup**
+2.  The query runs
+3.  No queries → **shuts down in 5 minutes** (and it doesn't matter, because it starts up in seconds)
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 3.5
+#| fig-align: center
+
+library(ggplot2)
+
+# Comparative timeline
+ggplot() +
+  # Background
+  annotate("rect", xmin = -0.3, xmax = 14.8, ymin = -0.1, ymax = 2.8,
+           fill = "#f8fafc", color = NA) +
+
+  # Classic timeline (top)
+  annotate("label", x = 0, y = 2.4, label = " Classic / Pro ", fontface = "bold",
+           hjust = 0, size = 3.5, color = "#1e293b", fill = "#eef2f7",
+           label.size = 0.3, label.r = unit(3, "pt")) +
+  # Startup
+  annotate("rect", xmin = 0.5, xmax = 4.5, ymin = 1.7, ymax = 2.1,
+           fill = "#cbd5e1", color = "#94a3b8", linewidth = 0.3) +
+  annotate("text", x = 2.5, y = 1.9, label = "Startup ~4 min",
+           size = 2.5, color = "#334155", fontface = "bold") +
+  # Execution
+  annotate("rect", xmin = 4.5, xmax = 7, ymin = 1.7, ymax = 2.1,
+           fill = "#334155", color = "#1e293b", linewidth = 0.3) +
+  annotate("text", x = 5.75, y = 1.9, label = "Query",
+           size = 2.5, color = "white", fontface = "bold") +
+  # Idle
+  annotate("rect", xmin = 7, xmax = 12, ymin = 1.7, ymax = 2.1,
+           fill = "#e2e8f0", color = "#cbd5e1", linewidth = 0.3) +
+  annotate("text", x = 9.5, y = 1.9, label = "Idle (paying)",
+           size = 2.5, color = "#64748b", fontface = "bold") +
+  # Auto-stop
+  annotate("segment", x = 12, xend = 12, y = 1.6, yend = 2.2,
+           linetype = "dashed", color = "#94a3b8", linewidth = 0.5) +
+  annotate("text", x = 12.3, y = 1.9, label = "Stop",
+           size = 2.3, color = "#94a3b8", hjust = 0) +
+
+  # Serverless timeline (bottom)
+  annotate("label", x = 0, y = 1, label = " Serverless ", fontface = "bold",
+           hjust = 0, size = 3.5, color = "#9a4e1c", fill = "#fff7ed",
+           label.size = 0.3, label.r = unit(3, "pt")) +
+  # Startup (nearly instant)
+  annotate("rect", xmin = 0.5, xmax = 0.8, ymin = 0.3, ymax = 0.7,
+           fill = "#FFA166", color = "#e8854a", linewidth = 0.3) +
+  annotate("text", x = 0.65, y = 0.5, label = "~3s",
+           size = 2, color = "#7c2d12", fontface = "bold") +
+  # Execution
+  annotate("rect", xmin = 0.8, xmax = 3.3, ymin = 0.3, ymax = 0.7,
+           fill = "#334155", color = "#1e293b", linewidth = 0.3) +
+  annotate("text", x = 2.05, y = 0.5, label = "Query",
+           size = 2.5, color = "white", fontface = "bold") +
+  # Fast auto-stop
+  annotate("rect", xmin = 3.3, xmax = 5, ymin = 0.3, ymax = 0.7,
+           fill = "#f1f5f9", color = "#cbd5e1", linewidth = 0.3) +
+  annotate("text", x = 4.15, y = 0.5, label = "Short idle",
+           size = 2.3, color = "#94a3b8") +
+  annotate("segment", x = 5, xend = 5, y = 0.2, yend = 0.8,
+           linetype = "dashed", color = "#94a3b8", linewidth = 0.5) +
+  annotate("text", x = 5.3, y = 0.5, label = "Stop\n(doesn't matter,\nstarts in 3s)",
+           size = 2, color = "#e8854a", hjust = 0, lineheight = 0.85) +
+
+  # Legend
+  annotate("rect", xmin = 8, xmax = 8.4, ymin = 0.3, ymax = 0.5,
+           fill = "#cbd5e1", color = "#94a3b8", linewidth = 0.3) +
+  annotate("text", x = 8.6, y = 0.4, label = "Startup", hjust = 0,
+           size = 2.3, color = "#64748b") +
+  annotate("rect", xmin = 10, xmax = 10.4, ymin = 0.3, ymax = 0.5,
+           fill = "#334155", color = "#1e293b", linewidth = 0.3) +
+  annotate("text", x = 10.6, y = 0.4, label = "Execution", hjust = 0,
+           size = 2.3, color = "#64748b") +
+  annotate("rect", xmin = 12, xmax = 12.4, ymin = 0.3, ymax = 0.5,
+           fill = "#e2e8f0", color = "#cbd5e1", linewidth = 0.3) +
+  annotate("text", x = 12.6, y = 0.4, label = "Idle (paying)", hjust = 0,
+           size = 2.3, color = "#64748b") +
+
+  coord_cartesian(xlim = c(-0.2, 14.5), ylim = c(0, 2.7)) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "#f8fafc", color = "#e2e8f0",
+                                   linewidth = 0.5),
+    plot.margin = margin(10, 15, 10, 10)
+  )
+```
+
+### Intelligent Workload Management (IWM)
+
+IWM is exclusive to Serverless. It uses internal ML models to:
+
+1.  **Predict** the resources each query needs before running it
+2.  **Route** the query to the cluster with available capacity
+3.  **Scale** in seconds if the queue grows (not minutes like Classic/Pro)
+4.  **Shrink** clusters automatically when demand drops
+
+With Classic/Pro, scaling follows fixed rules (static thresholds). With Serverless, it's adaptive.
+
+::: callout-tip
+## Aggressive auto-stop on Serverless
+
+Set auto-stop to **5 minutes** without fear. Since it starts in 2-6 seconds, users won't even notice. With Classic/Pro, a low auto-stop is unacceptable because the 4-minute cold start ruins the experience.
+:::
+
+------------------------------------------------------------------------
+
+## 3. Photon: the engine that makes the difference
+
+Photon is the vectorized execution engine that Databricks built from scratch in C++. It's enabled by default on all SQL Warehouses.
+
+**What it does:**
+
+1.  **Improved query optimizer** — enhances Catalyst's execution plan
+2.  **Cache layer** between execution and object storage — up to 5x faster scans
+3.  **Native vectorized execution in C++** — processes data in columnar batches, not row by row
+
+**Reported performance:**
+
+-   Up to **12x speedup** vs other cloud data warehouses
+-   Up to **80% TCO savings**
+-   Compatible with Spark SQL and the DataFrame API — no code changes needed
+
+::: callout-note
+## Photon on regular clusters
+
+Photon is also available on All-Purpose and Job Clusters, but you have to enable it explicitly. On SQL Warehouses it's on by default.
+:::
+
+------------------------------------------------------------------------
+
+## 4. Sizing and concurrency scaling
+
+### T-shirt sizes
+
+SQL Warehouses are configured by size, not by node count. Each size determines the number of workers:
+
+| Size         | Workers | Typical use case                                |
+|--------------|---------|-------------------------------------------------|
+| **2X-Small** | 1       | Development, simple queries                     |
+| **X-Small**  | 2       | Small teams, light BI                           |
+| **Small**    | 4       | Standard production                             |
+| **Medium**   | 8       | Production with medium concurrency              |
+| **Large**    | 16      | Production with high concurrency                |
+| **X-Large**  | 32      | Heavy queries over large tables                 |
+| **2X-Large** | 64      | Enterprise, high concurrency + large tables     |
+| **3X-Large** | 128     | Heavy enterprise                                |
+| **4X-Large** | 256     | Extreme workloads                               |
+
+::: callout-tip
+## Practical sizing rule
+
+Start with a warehouse **larger** than you think you need and scale down later. It's easier to diagnose a warehouse with room to spare than one that falls short. Monitor **spill to disk** in the Query Profile as a signal of under-sizing.
+:::
+
+### Concurrency scaling (Classic/Pro)
+
+Classic and Pro scale with fixed-threshold rules:
+
+-   **1 cluster for every 10 concurrent queries** (fixed ratio)
+-   The upscaling logic is based on estimated load:
+    -   \< 2 min of load: no scaling
+
+    -   2-6 min: +1 cluster
+
+    -   6-12 min: +2 clusters
+
+    -
+
+        > 12 min: +3 clusters and +1 extra every 15 min
+-   If a query waits **5 minutes in the queue**, upscaling is forced
+-   Downscaling: if load stays low for 15 consecutive minutes, it shrinks
+-   Maximum queued queries: **1,000**
+
+### Concurrency scaling (Serverless)
+
+Serverless doesn't use fixed rules. IWM predicts and provisions dynamically:
+
+-   Scales **in seconds** (not minutes)
+-   No fixed queries-per-cluster ratio
+-   The autoscaler anticipates demand instead of reacting after the fact
+
+------------------------------------------------------------------------
+
+## 5. Query Federation
+
+Query Federation (or **Lakehouse Federation**) lets you run queries against external sources **without migrating the data** to Databricks.
+
+### Supported sources
+
+-   PostgreSQL, MySQL, SQL Server
+-   Oracle, Teradata
+-   Azure Synapse (SQL DW)
+-   Amazon Redshift
+-   Snowflake
+-   Google BigQuery
+-   Salesforce Data 360
+-   Other Databricks workspaces
+
+### Setup
+
+1.  Create a **connection** in Unity Catalog (credentials for the external source)
+2.  Create a **foreign catalog** that maps the remote catalog
+3.  Query external tables as if they were local:
+
+``` {#lst-query-federation .sql lst-cap="Query Federation: querying PostgreSQL like a local table"}
+-- After setting up the connection and the foreign catalog
+SELECT *
+FROM postgres_catalog.public.customers
+WHERE country = 'Uruguay'
+```
+
+### Requirements
+
+-   **Pro or Serverless** SQL Warehouse (Classic doesn't support federation)
+-   Unity Catalog enabled
+-   Warehouse version 2023.40 or higher
+
+::: callout-warning
+## No cache for federated queries
+
+Federated queries **don't use cache** (neither Result Cache nor Disk Cache). Every execution hits the external source. If you query the same external table many times, consider migrating the data you need into Delta.
+:::
+
+------------------------------------------------------------------------
+
+## 6. AI Functions: LLMs from SQL
+
+AI Functions let you apply language models directly from SQL. They're ideal for enriching data at scale without leaving the warehouse.
+
+### Available functions
+
+| Category | Function | What it does |
+|------------------------|------------------------|------------------------|
+| **Documents** | `ai_parse_document` | Extracts structured content from documents |
+|  | `ai_extract` | Extracts fields with a defined schema |
+|  | `ai_classify` | Classifies text against labels |
+| **Text** | `ai_fix_grammar` | Fixes grammar |
+|  | `ai_translate` | Translates text |
+|  | `ai_summarize` | Summarizes text |
+|  | `ai_mask` | Masks entities (PII) |
+| **Analysis** | `ai_analyze_sentiment` | Sentiment analysis |
+|  | `ai_similarity` | Semantic similarity score |
+| **Generation** | `ai_gen` | Generates text from a prompt |
+| **Forecast** | `ai_forecast` | Time series forecasting |
+| **General** | `ai_query` | Query any Model Serving model |
+
+### Practical example
+
+``` {#lst-ai-classify .sql lst-cap="ai_classify: classify support tickets by category"}
+-- Classify support tickets by category
+SELECT
+  ticket_id,
+  descripcion,
+  ai_classify(descripcion, ARRAY('bug', 'feature_request', 'question', 'billing')) AS categoria
+FROM soporte.tickets
+WHERE fecha >= '2026-01-01'
+```
+
+``` {#lst-ai-extract .sql lst-cap="ai_extract: extract structured entities from free text"}
+-- Extract entities from free text
+SELECT
+  ai_extract(
+    comentario,
+    'producto STRING, sentimiento STRING, urgencia STRING'
+  ) AS entidades
+FROM feedback.comentarios
+```
+
+``` {#lst-ai-query .sql lst-cap="ai_query: call a custom Model Serving model from SQL"}
+-- Query a custom Model Serving model
+SELECT ai_query(
+  'mi_modelo_endpoint',
+  'Resumí este contrato en 3 bullet points: ' || texto_contrato
+) AS resumen
+FROM legal.contratos
+```
+
+::: callout-tip
+## Automatic batching
+
+AI Functions handle parallelization, retries and scaling internally. Send the whole dataset in **a single query** instead of splitting it into batches manually. Databricks optimizes the execution.
+:::
+
+### Costs
+
+-   Billed under the `MODEL_SERVING` product (offering type `BATCH_INFERENCE`)
+-   `ai_parse_document`, `ai_extract`, `ai_classify` are billed under `AI_FUNCTIONS`
+-   Queryable via the billing system tables
+
+------------------------------------------------------------------------
+
+## 7. Monitoring: Query History and Query Profile
+
+### Query History
+
+-   Accessible from the sidebar → **Query History**
+-   Retains data for the last **30 days**
+-   Filters: user, date range, compute, duration, status, statement type
+-   For admins: the `system.query.history` system table with account-wide data
+
+### Query Profile
+
+The Query Profile shows each query's **execution DAG**. It's your main debugging tool:
+
+-   **Top Operators**: the slowest operators in the query
+-   **Bytes spilled to disk**: a signal that the warehouse is too small for that query
+-   **Rows processed**: data volume at each stage of the plan
+
+::: callout-important
+## Under-sizing signals
+
+If you consistently see **spill to disk** in the Query Profile, your warehouse is too small. Go up one size or consider Serverless so IWM adjusts automatically.
+:::
+
+### Warehouse Monitoring tab
+
+From the warehouse detail page in the UI:
+
+-   **Running queries**: queries executing right now
+-   **Queued queries**: queries waiting for an available cluster
+-   **Cluster count**: how many clusters are active
+-   **Peak Queued Queries**: if it's consistently \> 0, you need more capacity
+
+------------------------------------------------------------------------
+
+## 8. Cost optimization
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 4
+#| fig-align: center
+#| fig-cap: "Estimated monthly cost for Classic, Pro and Serverless (Small, 8h/day, 22 days). Serverless includes infra in the DBU."
+
+library(ggplot2)
+
+# Estimated monthly cost comparison
+ggplot() +
+  # Background
+  annotate("rect", xmin = 0.3, xmax = 6.7, ymin = -0.1, ymax = 6.1,
+           fill = "#f8fafc", color = NA) +
+
+  # Title
+  annotate("text", x = 3.5, y = 5.5, label = "Estimated monthly cost (8h/day, 22 days, Small)",
+           fontface = "bold", size = 3.8, color = "#1e293b") +
+
+  # Classic
+  annotate("rect", xmin = 1, xmax = 2.5, ymin = 0.5, ymax = 4.5,
+           fill = "#f1f5f9", color = "#e2e8f0", linewidth = 0.3) +
+  annotate("text", x = 1.75, y = 4.8, label = "Classic", fontface = "bold",
+           size = 4, color = "#94a3b8") +
+  # DBU cost
+  annotate("rect", xmin = 1.2, xmax = 2.3, ymin = 1, ymax = 2.5,
+           fill = "#cbd5e1", color = "#94a3b8", linewidth = 0.3) +
+  annotate("text", x = 1.75, y = 1.75, label = "DBUs\n~$310",
+           size = 2.8, color = "#334155", fontface = "bold", lineheight = 0.9) +
+  # VM cost
+  annotate("rect", xmin = 1.2, xmax = 2.3, ymin = 2.5, ymax = 4,
+           fill = "#94a3b8", color = "#64748b", linewidth = 0.3) +
+  annotate("text", x = 1.75, y = 3.25, label = "Azure VMs\n~$520",
+           size = 2.8, color = "#1e293b", fontface = "bold", lineheight = 0.9) +
+  # Total
+  annotate("label", x = 1.75, y = 4.3, label = " ~$830/mo ",
+           size = 2.5, color = "#475569", fontface = "bold",
+           fill = "white", label.size = 0.3, label.r = unit(3, "pt")) +
+
+  # Pro
+  annotate("rect", xmin = 2.8, xmax = 4.3, ymin = 0.5, ymax = 4.5,
+           fill = "#eef2f7", color = "#cbd5e1", linewidth = 0.3) +
+  annotate("text", x = 3.55, y = 4.8, label = "Pro", fontface = "bold",
+           size = 4, color = "#1e293b") +
+  annotate("rect", xmin = 3, xmax = 4.1, ymin = 1, ymax = 2.9,
+           fill = "#475569", color = "#334155", linewidth = 0.3) +
+  annotate("text", x = 3.55, y = 1.95, label = "DBUs\n~$775",
+           size = 2.8, color = "white", fontface = "bold", lineheight = 0.9) +
+  annotate("rect", xmin = 3, xmax = 4.1, ymin = 2.9, ymax = 4,
+           fill = "#1e293b", color = "#0f172a", linewidth = 0.3) +
+  annotate("text", x = 3.55, y = 3.45, label = "Azure VMs\n~$520",
+           size = 2.8, color = "white", fontface = "bold", lineheight = 0.9) +
+  annotate("label", x = 3.55, y = 4.3, label = " ~$1,295/mo ",
+           size = 2.5, color = "#475569", fontface = "bold",
+           fill = "white", label.size = 0.3, label.r = unit(3, "pt")) +
+
+  # Serverless
+  annotate("rect", xmin = 4.6, xmax = 6.1, ymin = 0.5, ymax = 4.5,
+           fill = "#fff7ed", color = "#fed7aa", linewidth = 0.3) +
+  annotate("text", x = 5.35, y = 4.8, label = "Serverless", fontface = "bold",
+           size = 4, color = "#e8854a") +
+  annotate("rect", xmin = 4.8, xmax = 5.9, ymin = 1, ymax = 3.2,
+           fill = "#FFA166", color = "#e8854a", linewidth = 0.3) +
+  annotate("text", x = 5.35, y = 2.1, label = "DBUs\n(infra included)\n~$990",
+           size = 2.8, color = "#7c2d12", fontface = "bold", lineheight = 0.9) +
+  annotate("label", x = 5.35, y = 4.3, label = " ~$990/mo ",
+           size = 2.5, color = "#475569", fontface = "bold",
+           fill = "white", label.size = 0.3, label.r = unit(3, "pt")) +
+
+  # Note
+  annotate("text", x = 3.5, y = 0.2,
+           label = "Serverless: no separate VMs, aggressive auto-stop lowers the real cost",
+           size = 2.3, color = "#9a4e1c", fontface = "italic") +
+
+  coord_cartesian(xlim = c(0.5, 6.5), ylim = c(0, 6)) +
+  labs(caption = "\u26a1 Spark de Ideas \u00b7 mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "#f8fafc", color = "#e2e8f0",
+                                   linewidth = 0.5),
+    plot.margin = margin(10, 15, 10, 15),
+    plot.caption = element_text(color = "#94a3b8", size = 7, hjust = 1, face = "italic")
+  )
+```
+
+### Rules for optimizing costs
+
+**1. Aggressive auto-stop**
+
+-   Serverless: **5 minutes** (the UI minimum). It starts in seconds, so there's no impact.
+-   Pro/Classic: **10-15 minutes**. The 4-minute cold start makes anything lower impractical.
+
+**2. Right-sizing**
+
+-   Monitor **spill to disk** in the Query Profile → warehouse too small
+-   Monitor **Peak Queued Queries** in the Monitoring tab → you need more clusters or a bigger size
+-   With Serverless, IWM adjusts dynamically — less micro-management
+
+**3. Tagging for cost allocation**
+
+Implement workspace-level tags to track costs per team:
+
+``` {#lst-cost-tags .json lst-cap="Workspace tags for per-team cost allocation"}
+{
+  "business_unit": "analytics",
+  "project": "dashboard_ventas",
+  "environment": "prod"
+}
+```
+
+The tags show up in the billing system tables so you can do per-team chargeback.
+
+**4. Efficient queries**
+
+-   Filter early, select only the columns you need
+-   Use `ZORDER` / `OPTIMIZE` on the underlying Delta tables
+-   Avoid `SELECT *` against large tables
+-   Photon is already enabled — nothing extra to do
+
+------------------------------------------------------------------------
+
+## 9. Serverless Compute for Jobs
+
+Serverless isn't just for SQL Warehouses. Databricks extended serverless to **notebooks, workflows and Lakeflow Declarative Pipelines**.
+
+### What changes compared to Job Clusters
+
+| Aspect | Job Cluster | Serverless Compute |
+|------------------------|------------------------|------------------------|
+| **Configuration** | Instance type, workers, autoscaling | Nothing — Databricks manages everything |
+| **Startup** | 2-5 minutes | Seconds |
+| **Performance** | Depends on your config | Up to 80% better (auto-sizing) |
+| **Cost** | \~\$0.15/DBU + VMs | Everything included in the DBU |
+| **Resilience** | Manual (retry config) | Automatic (89% more successful runs) |
+
+### Supported task types
+
+-   Notebook, Python script, dbt, Python wheel, JAR
+
+### Performance modes
+
+-   **Standard**: 70% savings vs Performance-optimized
+-   **Performance-optimized**: for latency-critical workloads
+
+::: callout-note
+## Relationship to Tips #8
+
+In the [previous post](../databricks-tips-08-jobs-workflows/) we saw how to configure Jobs with event-driven triggers. Serverless Compute for Jobs is the perfect complement: triggers that fire on their own + compute that starts in seconds = minimal latency without a 24/7 cluster.
+:::
+
+------------------------------------------------------------------------
+
+## 10. Gotchas that will save you trouble
+
+1.  **SQL Warehouses don't support continuous streaming**. No Structured Streaming with `ProcessingTime`. For streaming use Job Clusters or All-Purpose (see [Tips #8](../databricks-tips-08-jobs-workflows/)).
+
+2.  **SQL Warehouses don't support ML training**. No Spark ML, MLlib, scikit-learn, PyTorch. For ML use Job Clusters with GPU (see [Tips #5](../databricks-tips-04-mlflow-unity-catalog/) and [Tips #6](../databricks-tips-05-feature-engineering/)).
+
+3.  **Serverless Compute doesn't support R**. If your team uses R, you need Classic clusters.
+
+4.  **Serverless Compute doesn't support Spark RDD APIs**. Only Spark Connect APIs (DataFrame, SQL). If you have legacy code with RDDs, it has to be migrated.
+
+5.  **No `df.cache()` or global temp views on Serverless**. Databricks handles caching internally. Restructure your code if it depends on these APIs.
+
+6.  **External Hive metastore = no Serverless**. If your workspace uses an external Hive metastore instead of Unity Catalog, Serverless SQL Warehouses aren't supported. Migrate to UC first.
+
+7.  **The Classic/Pro cold start kills the interactive experience**. Waiting 4 minutes to run a `SELECT count(*)` is unacceptable for analysts. Use Serverless or keep a minimal warehouse always on.
+
+8.  **Azure's Standard tier retires in October 2026**. If you're on Standard, expect at least a 35% increase in DBU rates. Plan your migration to Premium.
+
+9.  **Only SQL UDFs on SQL Warehouses**. No pandas UDFs or vectorized UDFs. For complex transformations that need Python, use a Job Cluster.
+
+10. **Query Federation has no cache**. Every query to an external source hits the origin. If you query the same PostgreSQL table 50 times, consider ingesting it into Delta.
+
+------------------------------------------------------------------------
+
+## 11. When NOT to use SQL Warehouses
+
+| Need                           | Use instead                        |
+|--------------------------------|------------------------------------|
+| **Continuous streaming**       | Job Cluster + Structured Streaming |
+| **ML training**                | Job Cluster with GPU               |
+| **Heavy Python/R notebooks**   | All-Purpose Cluster                |
+| **ETL with vectorized UDFs**   | Job Cluster                        |
+| **Complex orchestration**      | Job Cluster + orchestrator         |
+
+The full decision table:
+
+| Aspect | SQL Warehouse | All-Purpose | Job Cluster |
+|------------------|------------------|------------------|------------------|
+| **Use case** | SQL analytics, BI, dashboards | Interactive development | Production jobs |
+| **Languages** | SQL | Python, SQL, Scala, R | Python, SQL, Scala, R |
+| **Optimized for** | Concurrent SQL queries | Flexibility | Batch execution |
+| **Lifecycle** | Auto-start/auto-stop | Manual or idle timeout | Automatic with the job |
+| **DBU cost** | \$0.22-0.70 | \~\$0.55 | \~\$0.15 |
+| **Concurrency** | High (multi-cluster) | Medium | Low (1 job/cluster) |
+| **Photon** | Always | Optional | Optional |
+| **Streaming** | No | Yes | Yes |
+| **ML Training** | No | Yes | Yes |
+
+------------------------------------------------------------------------
+
+## References
+
+-   [SQL warehouse types — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/compute/sql-warehouse/warehouse-types) — Classic vs Pro vs Serverless
+-   [SQL warehouse sizing, scaling, and queuing](https://learn.microsoft.com/en-us/azure/databricks/compute/sql-warehouse/warehouse-behavior) — T-shirt sizes and concurrency scaling
+-   [What is Photon?](https://learn.microsoft.com/en-us/azure/databricks/compute/photon) — Vectorized C++ engine
+-   [Serverless compute limitations](https://learn.microsoft.com/en-us/azure/databricks/compute/serverless/limitations) — What you can't do
+-   [Query Federation](https://learn.microsoft.com/en-us/azure/databricks/query-federation/database-federation) — Queries against external sources
+-   [AI Functions](https://learn.microsoft.com/en-us/azure/databricks/large-language-models/ai-functions) — LLMs from SQL
+-   [Query history](https://learn.microsoft.com/en-us/azure/databricks/sql/user/queries/query-history) — Query monitoring
+-   [Query profile](https://learn.microsoft.com/en-us/azure/databricks/sql/user/queries/query-profile) — Execution DAG
+-   [Serverless compute for Jobs](https://learn.microsoft.com/en-us/azure/databricks/jobs/run-serverless-jobs) — Serverless beyond SQL
+
+## Other posts in the series
+
+If this post was useful, check out the previous **Databricks Tips**:
+
+-   [**Tips #1**: Databricks Asset Bundles](../databricks-asset-bundles-advanced/) — IaC for Databricks
+-   [**Tips #2**: Delta Lake](../databricks-tips-01-delta-lake/) — the 7 things you wish you had known
+-   [**Tips #3**: Unity Catalog](../databricks-tips-02-unity-catalog/) — the governance nobody implements right
+-   [**Tips #4**: Structured Streaming](../databricks-tips-03-structured-streaming/) — watermarks, triggers and micro-batch
+-   [**Tips #5**: MLflow + Unity Catalog](../databricks-tips-04-mlflow-unity-catalog/) — from experiment to model
+-   [**Tips #6**: Feature Engineering](../databricks-tips-05-feature-engineering/) — features that survive production
+-   [**Tips #7**: Docker on Databricks](../databricks-tips-06-docker-containers/) — custom containers
+-   [**Tips #8**: Jobs & Workflows](../databricks-tips-08-jobs-workflows/) — streaming and event-driven triggers
+
+------------------------------------------------------------------------
+
+*Next week: Delta Live Tables — declarative pipelines with expectations and monitoring.*

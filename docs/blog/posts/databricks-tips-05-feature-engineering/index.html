@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-03-31">
 <meta name="description" content="Feature Store, point-in-time lookups, online features, feature freshness y los errores clásicos de data leakage.">
 
 <title>Databricks Tips #6: Feature Engineering — diseñar features que sobrevivan a producción – Mauro Loprete</title>
@@ -96,17 +95,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -148,8 +147,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -195,7 +194,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#el-problema-training-serving-skew" id="toc-el-problema-training-serving-skew" class="nav-link active" data-scroll-target="#el-problema-training-serving-skew">El problema: training-serving skew</a></li>
@@ -240,7 +239,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 31, 2026</p>
+      <p class="date">31 de marzo de 2026</p>
     </div>
   </div>
   
@@ -259,7 +258,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-training-skew" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-training-skew-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Training-serving skew: data leakage por ventana temporal
+Listado&nbsp;1: Training-serving skew: data leakage por ventana temporal
 </figcaption>
 <div aria-describedby="lst-training-skew-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># En el notebook (entrenamiento):</span></span>
@@ -270,7 +269,7 @@ Listing&nbsp;1: Training-serving skew: data leakage por ventana temporal
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># En producción (serving):</span></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># No tenés acceso a los últimos 30 días de datos</span></span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># El feature se calcula con otra ventana</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># El modelo predice basura</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># El modelo predice basura</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -281,7 +280,7 @@ Listing&nbsp;1: Training-serving skew: data leakage por ventana temporal
 <div id="lst-feature-table" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-feature-table-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Crear Feature Table con timestamp key para point-in-time
+Listado&nbsp;2: Crear Feature Table con timestamp key para point-in-time
 </figcaption>
 <div aria-describedby="lst-feature-table-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.feature_engineering <span class="im">import</span> FeatureEngineeringClient</span>
@@ -295,7 +294,7 @@ Listing&nbsp;2: Crear Feature Table con timestamp key para point-in-time
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    timestamp_keys<span class="op">=</span>[<span class="st">"feature_date"</span>],</span>
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    df<span class="op">=</span>features_df,</span>
 <span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    description<span class="op">=</span><span class="st">"Features diarios de comportamiento de clientes"</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -312,7 +311,7 @@ Listing&nbsp;2: Crear Feature Table con timestamp key para point-in-time
 <div id="lst-pit-lookup" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pit-lookup-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Point-in-time lookup: evitar data leakage en training set
+Listado&nbsp;3: Point-in-time lookup: evitar data leakage en training set
 </figcaption>
 <div aria-describedby="lst-pit-lookup-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.feature_engineering <span class="im">import</span> FeatureLookup</span>
@@ -338,7 +337,7 @@ Listing&nbsp;3: Point-in-time lookup: evitar data leakage en training set
 <span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">"churned"</span></span>
 <span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>training_df <span class="op">=</span> training_set.load_df()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>training_df <span class="op">=</span> training_set.load_df()</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -350,7 +349,7 @@ Listing&nbsp;3: Point-in-time lookup: evitar data leakage en training set
 <div id="lst-pipeline-features" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pipeline-features-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Pipeline de features: batch diario + streaming en DLT
+Listado&nbsp;4: Pipeline de features: batch diario + streaming en DLT
 </figcaption>
 <div aria-describedby="lst-pipeline-features-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Features batch (se calculan diariamente)</span></span>
@@ -391,7 +390,7 @@ Listing&nbsp;4: Pipeline de features: batch diario + streaming en DLT
 <span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"catalog.ml.customer_features"</span>,</span>
 <span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>    df<span class="op">=</span>daily_features,</span>
 <span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    mode<span class="op">=</span><span class="st">"merge"</span></span>
-<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -402,7 +401,7 @@ Listing&nbsp;4: Pipeline de features: batch diario + streaming en DLT
 <div id="lst-online-store" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-online-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Publicar features a Online Store para serving en milisegundos
+Listado&nbsp;5: Publicar features a Online Store para serving en milisegundos
 </figcaption>
 <div aria-describedby="lst-online-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.feature_engineering <span class="im">import</span> FeatureEngineeringClient</span>
@@ -421,7 +420,7 @@ Listing&nbsp;5: Publicar features a Online Store para serving en milisegundos
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="co"># En serving, el modelo busca features online automáticamente</span></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Latencia: ~10ms vs ~2s de Delta</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Latencia: ~10ms vs ~2s de Delta</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -432,7 +431,7 @@ Listing&nbsp;5: Publicar features a Online Store para serving en milisegundos
 <div id="lst-freshness-check" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-freshness-check-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Monitoreo de freshness: alertar si los features son stale
+Listado&nbsp;6: Monitoreo de freshness: alertar si los features son stale
 </figcaption>
 <div aria-describedby="lst-freshness-check-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Chequear freshness antes de servir</span></span>
@@ -445,7 +444,7 @@ Listing&nbsp;6: Monitoreo de freshness: alertar si los features son stale
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>staleness <span class="op">=</span> datetime.now() <span class="op">-</span> latest_feature</span>
 <span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> staleness <span class="op">&gt;</span> timedelta(hours<span class="op">=</span><span class="dv">26</span>):  <span class="co"># batch diario + margen</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> Alert(<span class="ss">f"Features stale by </span><span class="sc">{</span>staleness<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> Alert(<span class="ss">f"Features stale by </span><span class="sc">{</span>staleness<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -626,6 +625,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -651,12 +710,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1048,7 +1107,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

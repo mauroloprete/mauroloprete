@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-07-02">
 <meta name="description" content="Qué es el motor vectorizado de Databricks, dónde corre, qué acelera y qué no, cómo medir cuánto Photon usa tu query, un benchmark con/sin Photon y la cuenta de cuándo el DBU extra se paga solo.">
 
 <title>Databricks Tips #12: Photon — el motor C++ que acelera tus queries sin cambiar código – Mauro Loprete</title>
@@ -99,17 +98,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -180,8 +179,8 @@ window.Quarto = {
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -227,7 +226,7 @@ window.Quarto = {
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#qué-es-photon-y-por-qué-existe" id="toc-qué-es-photon-y-por-qué-existe" class="nav-link active" data-scroll-target="#qué-es-photon-y-por-qué-existe">1. Qué es Photon y por qué existe</a></li>
@@ -283,7 +282,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">July 2, 2026</p>
+      <p class="date">2 de julio de 2026</p>
     </div>
   </div>
   
@@ -303,7 +302,7 @@ window.Quarto = {
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>TL;DR
+<span class="screen-reader-only">Nota</span>TL;DR
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -349,7 +348,7 @@ window.Quarto = {
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Note
+Nota
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -402,7 +401,7 @@ Note
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Important
+Importante
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -413,7 +412,7 @@ Important
 <div id="lst-dabs" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dabs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: DABs: habilitar Photon en un job cluster con runtime_engine
+Listado&nbsp;1: DABs: habilitar Photon en un job cluster con runtime_engine
 </figcaption>
 <div aria-describedby="lst-dabs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
@@ -426,7 +425,7 @@ Listing&nbsp;1: DABs: habilitar Photon en un job cluster con runtime_engine
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">spark_version</span><span class="kw">:</span><span class="at"> </span><span class="st">"17.3.x-scala2.13"</span></span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">node_type_id</span><span class="kw">:</span><span class="at"> Standard_E8ds_v5</span></span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">num_workers</span><span class="kw">:</span><span class="at"> </span><span class="dv">4</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">runtime_engine</span><span class="kw">:</span><span class="at"> PHOTON</span><span class="co">   # &lt;- sin esto, corre JVM clásico</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">runtime_engine</span><span class="kw">:</span><span class="at"> PHOTON</span><span class="co">   # &lt;- sin esto, corre JVM clásico</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -510,7 +509,7 @@ Tip
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Warning
+Advertencia
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -535,7 +534,7 @@ Warning
 <div id="lst-explain" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-explain-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: EXPLAIN: los nodos Photon aparecen con prefijo Photon en el plan físico
+Listado&nbsp;2: EXPLAIN: los nodos Photon aparecen con prefijo Photon en el plan físico
 </figcaption>
 <div aria-describedby="lst-explain-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>spark.sql(<span class="st">"""</span></span>
@@ -552,7 +551,7 @@ Listing&nbsp;2: EXPLAIN: los nodos Photon aparecen con prefijo Photon en el plan
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">#       +- PhotonShuffleExchangeSource</span></span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">#          +- PhotonShuffleMapStage</span></span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">#             +- PhotonGroupingAgg(keys=[categoria], functions=[partial_sum(...)])</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">#                +- PhotonScan parquet ventas (filters: fecha &gt;= 2026-01-01)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co">#                +- PhotonScan parquet ventas (filters: fecha &gt;= 2026-01-01)</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -569,7 +568,7 @@ Listing&nbsp;2: EXPLAIN: los nodos Photon aparecen con prefijo Photon en el plan
 <div id="lst-plan-join" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-plan-join-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Query plan de un join + aggregation, leído de abajo hacia arriba
+Listado&nbsp;3: Query plan de un join + aggregation, leído de abajo hacia arriba
 </figcaption>
 <div aria-describedby="lst-plan-join-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>spark.sql(<span class="st">"""</span></span>
@@ -591,7 +590,7 @@ Listing&nbsp;3: Query plan de un join + aggregation, leído de abajo hacia arrib
 <span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">#             :     (filters: store_id IS NOT NULL,</span></span>
 <span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="co">#             :      requiredSchema: store_id, monto)   &lt;- 1. lee solo 2 columnas</span></span>
 <span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co">#             +- PhotonShuffleExchangeSource [broadcast]</span></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">#                +- PhotonScan parquet sucursales</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">#                +- PhotonScan parquet sucursales</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -653,7 +652,7 @@ Tip
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Note
+Nota
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -669,7 +668,7 @@ Note
 <div id="lst-datagen" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-datagen-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Generar dataset sintético estilo TPC-DS con spark.range
+Listado&nbsp;4: Generar dataset sintético estilo TPC-DS con spark.range
 </figcaption>
 <div aria-describedby="lst-datagen-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
@@ -683,7 +682,7 @@ Listing&nbsp;4: Generar dataset sintético estilo TPC-DS con spark.range
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"precio"</span>, F.<span class="bu">round</span>(F.rand(seed<span class="op">=</span><span class="dv">42</span>) <span class="op">*</span> <span class="dv">500</span>, <span class="dv">2</span>))</span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    .write.mode(<span class="st">"overwrite"</span>)</span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    .saveAsTable(<span class="st">"lab.photon_bench.store_sales"</span>)</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -691,7 +690,7 @@ Listing&nbsp;4: Generar dataset sintético estilo TPC-DS con spark.range
 <div id="lst-benchquery" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-benchquery-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Query de benchmark: aggregation pesada + window function, con timing
+Listado&nbsp;5: Query de benchmark: aggregation pesada + window function, con timing
 </figcaption>
 <div aria-describedby="lst-benchquery-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
@@ -721,7 +720,7 @@ Listing&nbsp;5: Query de benchmark: aggregation pesada + window function, con ti
 <span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>    spark.sql(query).write.mode(<span class="st">"overwrite"</span>).<span class="bu">format</span>(<span class="st">"noop"</span>).save()</span>
 <span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    runs.append(time.perf_counter() <span class="op">-</span> t0)</span>
 <span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"wall-clock: mediana </span><span class="sc">{</span><span class="bu">sorted</span>(runs)[<span class="dv">2</span>]<span class="sc">:.1f}</span><span class="ss">s | runs: </span><span class="sc">{</span>[<span class="ss">f'</span><span class="sc">{</span>r<span class="sc">:.1f}</span><span class="ss">'</span> <span class="cf">for</span> r <span class="kw">in</span> runs]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"wall-clock: mediana </span><span class="sc">{</span><span class="bu">sorted</span>(runs)[<span class="dv">2</span>]<span class="sc">:.1f}</span><span class="ss">s | runs: </span><span class="sc">{</span>[<span class="ss">f'</span><span class="sc">{</span>r<span class="sc">:.1f}</span><span class="ss">'</span> <span class="cf">for</span> r <span class="kw">in</span> runs]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -787,7 +786,7 @@ Tip
 <div id="lst-plan-standard" class="default listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-plan-standard-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Plan de ejecución del run STANDARD: HashAggregate + Exchange clásicos de Spark
+Listado&nbsp;6: Plan de ejecución del run STANDARD: HashAggregate + Exchange clásicos de Spark
 </figcaption>
 <div aria-describedby="lst-plan-standard-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>Sort [store_id ASC, fecha ASC]</span>
@@ -799,14 +798,14 @@ Listing&nbsp;6: Plan de ejecución del run STANDARD: HashAggregate + Exchange cl
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>               +- Exchange hashpartitioning(store_id, fecha, 200)</span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>                  +- HashAggregate(keys=[store_id, fecha], functions=[partial_sum(...)])</span>
 <span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>                     +- Project [store_id, fecha, cantidad, precio]</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                        +- Filter (fecha &gt;= 2025-06-01)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                        +- Filter (fecha &gt;= 2025-06-01)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-plan-photon" class="default listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-plan-photon-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: Plan de ejecución del run PHOTON: los mismos pasos, todos los nodos en Photon
+Listado&nbsp;7: Plan de ejecución del run PHOTON: los mismos pasos, todos los nodos en Photon
 </figcaption>
 <div aria-describedby="lst-plan-photon-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>PhotonResultStage</span>
@@ -820,7 +819,7 @@ Listing&nbsp;7: Plan de ejecución del run PHOTON: los mismos pasos, todos los n
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>                     +- PhotonShuffleExchangeSource</span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>                        +- PhotonShuffleMapStage</span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>                           +- PhotonShuffleExchangeSink hashpartitioning(store_id, 200)</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>                              +- PhotonGroupingAgg(keys=[store_id, fecha], ...)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>                              +- PhotonGroupingAgg(keys=[store_id, fecha], ...)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -888,7 +887,7 @@ Listing&nbsp;7: Plan de ejecución del run PHOTON: los mismos pasos, todos los n
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Note
+Nota
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -922,7 +921,7 @@ Note
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Important
+Importante
 </div>
 </div>
 <div class="callout-body-container callout-body">
@@ -1177,6 +1176,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -1202,12 +1261,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1599,7 +1658,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

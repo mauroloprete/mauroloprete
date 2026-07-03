@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-05-30">
 <meta name="description" content="Databricks Container Services, imágenes custom, golden containers, CI/CD con Docker y los errores que te van a hacer perder horas.">
 
 <title>Databricks Tips #7: Docker en Databricks — contenedores custom para entornos que no se rompen – Mauro Loprete</title>
@@ -101,17 +100,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -153,8 +152,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -200,7 +199,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#docker-en-2-minutos-para-los-que-nunca-lo-usaron" id="toc-docker-en-2-minutos-para-los-que-nunca-lo-usaron" class="nav-link active" data-scroll-target="#docker-en-2-minutos-para-los-que-nunca-lo-usaron">Docker en 2 minutos (para los que nunca lo usaron)</a></li>
@@ -252,7 +251,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">May 30, 2026</p>
+      <p class="date">30 de mayo de 2026</p>
     </div>
   </div>
   
@@ -295,13 +294,13 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-dockerfile-basico" class="dockerfile listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dockerfile-basico-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Dockerfile básico: imagen base, dependencias y código
+Listado&nbsp;1: Dockerfile básico: imagen base, dependencias y código
 </figcaption>
 <div aria-describedby="lst-dockerfile-basico-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Ejemplo básico de Dockerfile</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> python:3.11-slim          <span class="co"># Partís de una imagen base</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">pip</span> install pandas==2.2.3  <span class="co"># Instalás dependencias</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">COPY</span> mi_script.py /app/        <span class="co"># Copiás tu código</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">COPY</span> mi_script.py /app/        <span class="co"># Copiás tu código</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -343,7 +342,7 @@ Listing&nbsp;1: Dockerfile básico: imagen base, dependencias y código
 <div id="lst-habilitar-dcs" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-habilitar-dcs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Habilitar y verificar DCS en Azure vía Databricks CLI
+Listado&nbsp;2: Habilitar y verificar DCS en Azure vía Databricks CLI
 </figcaption>
 <div aria-describedby="lst-habilitar-dcs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Habilitar DCS en Azure Databricks</span></span>
@@ -354,7 +353,7 @@ Listing&nbsp;2: Habilitar y verificar DCS en Azure vía Databricks CLI
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Respuesta esperada:</span></span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># {</span></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">#   "enableDcs": "true"</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -374,7 +373,7 @@ Listing&nbsp;2: Habilitar y verificar DCS en Azure vía Databricks CLI
 <div id="lst-golden-container" class="dockerfile listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-golden-container-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Golden container: dependencias fijas y librerías de sistema
+Listado&nbsp;3: Golden container: dependencias fijas y librerías de sistema
 </figcaption>
 <div aria-describedby="lst-golden-container-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># golden.Dockerfile</span></span>
@@ -391,19 +390,19 @@ Listing&nbsp;3: Golden container: dependencias fijas y librerías de sistema
 <span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">apt-get</span> update <span class="kw">&amp;&amp;</span> <span class="ex">apt-get</span> install <span class="at">-y</span> <span class="at">--no-install-recommends</span> <span class="dt">\</span></span>
 <span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    libgdal-dev <span class="dt">\</span></span>
 <span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    libgeos-dev <span class="dt">\</span></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">&amp;&amp;</span> <span class="fu">rm</span> <span class="at">-rf</span> /var/lib/apt/lists/<span class="pp">*</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">&amp;&amp;</span> <span class="fu">rm</span> <span class="at">-rf</span> /var/lib/apt/lists/<span class="pp">*</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
 <div id="lst-build-push" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-build-push-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Build y push de la imagen golden al registry
+Listado&nbsp;4: Build y push de la imagen golden al registry
 </figcaption>
 <div aria-describedby="lst-build-push-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build + push</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> build <span class="at">-f</span> golden.Dockerfile <span class="at">-t</span> mi-ecr.amazonaws.com/dbx-golden:v2.1.0 .</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> push mi-ecr.amazonaws.com/dbx-golden:v2.1.0</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> push mi-ecr.amazonaws.com/dbx-golden:v2.1.0</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -424,7 +423,7 @@ Listing&nbsp;4: Build y push de la imagen golden al registry
 <div id="lst-cluster-api" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cluster-api-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Crear cluster con imagen Docker vía REST API
+Listado&nbsp;5: Crear cluster con imagen Docker vía REST API
 </figcaption>
 <div aria-describedby="lst-cluster-api-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST <span class="st">"https://&lt;tu-workspace&gt;.cloud.databricks.com/api/2.0/clusters/create"</span> <span class="dt">\</span></span>
@@ -445,7 +444,7 @@ Listing&nbsp;5: Crear cluster con imagen Docker vía REST API
 <span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="st">      "min_workers": 1,</span></span>
 <span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="st">      "max_workers": 4</span></span>
 <span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="st">    }</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="st">  }'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="st">  }'</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -453,7 +452,7 @@ Listing&nbsp;5: Crear cluster con imagen Docker vía REST API
 <div id="lst-cluster-cli" class="bash listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cluster-cli-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Crear cluster con imagen Docker vía Databricks CLI
+Listado&nbsp;6: Crear cluster con imagen Docker vía Databricks CLI
 </figcaption>
 <div aria-describedby="lst-cluster-cli-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> clusters create <span class="at">--json</span> <span class="st">'{</span></span>
@@ -471,7 +470,7 @@ Listing&nbsp;6: Crear cluster con imagen Docker vía Databricks CLI
 <span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="st">    "min_workers": 1,</span></span>
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="st">    "max_workers": 4</span></span>
 <span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="st">  }</span></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="st">}'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="st">}'</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -538,7 +537,7 @@ Listing&nbsp;6: Crear cluster con imagen Docker vía Databricks CLI
 <div id="lst-python-path" class="dockerfile listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-python-path-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: Error frecuente: instalar paquetes en el path correcto
+Listado&nbsp;7: Error frecuente: instalar paquetes en el path correcto
 </figcaption>
 <div aria-describedby="lst-python-path-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># MALO — instala en el Python del sistema</span></span>
@@ -548,7 +547,7 @@ Listing&nbsp;7: Error frecuente: instalar paquetes en el path correcto
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">python</span> <span class="at">-m</span> venv /opt/myenv <span class="kw">&amp;&amp;</span> <span class="ex">/opt/myenv/bin/pip</span> install pandas==2.2.3</span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># BIEN — usa el Python de Databricks</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/pip</span> install pandas==2.2.3</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/pip</span> install pandas==2.2.3</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -570,7 +569,7 @@ Listing&nbsp;7: Error frecuente: instalar paquetes en el path correcto
 <div id="lst-dockerfile-geo" class="dockerfile listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dockerfile-geo-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;8: Dockerfile geoespacial: GDAL, GeoPandas y Prophet
+Listado&nbsp;8: Dockerfile geoespacial: GDAL, GeoPandas y Prophet
 </figcaption>
 <div aria-describedby="lst-dockerfile-geo-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> databricksruntime/standard:16.4-LTS</span>
@@ -592,7 +591,7 @@ Listing&nbsp;8: Dockerfile geoespacial: GDAL, GeoPandas y Prophet
 <span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>    pystan==3.10.0</span>
 <span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Validar que GDAL se linkea bien (esto falla silenciosamente si no)</span></span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/python</span> <span class="at">-c</span> <span class="st">"from osgeo import gdal; print(f'GDAL {gdal.__version__}')"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">/databricks/python3/bin/python</span> <span class="at">-c</span> <span class="st">"from osgeo import gdal; print(f'GDAL {gdal.__version__}')"</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -601,7 +600,7 @@ Listing&nbsp;8: Dockerfile geoespacial: GDAL, GeoPandas y Prophet
 <div id="lst-pipeline-geo" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pipeline-geo-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;9: Pipeline geoespacial: forecast de demanda por zona con Prophet
+Listado&nbsp;9: Pipeline geoespacial: forecast de demanda por zona con Prophet
 </figcaption>
 <div aria-describedby="lst-pipeline-geo-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># El notebook solo tiene lógica de negocio — cero setup</span></span>
@@ -627,7 +626,7 @@ Listing&nbsp;9: Pipeline geoespacial: forecast de demanda por zona con Prophet
 <span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    spark.createDataFrame(forecast[[<span class="st">"ds"</span>, <span class="st">"yhat"</span>, <span class="st">"yhat_lower"</span>, <span class="st">"yhat_upper"</span>]]) <span class="op">\</span></span>
 <span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"zona_id"</span>, lit(zona_id)) <span class="op">\</span></span>
 <span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>        .write.mode(<span class="st">"append"</span>) <span class="op">\</span></span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>        .saveAsTable(<span class="st">"prod.demand.forecast_por_zona"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>        .saveAsTable(<span class="st">"prod.demand.forecast_por_zona"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -638,7 +637,7 @@ Listing&nbsp;9: Pipeline geoespacial: forecast de demanda por zona con Prophet
 <div id="lst-cicd-workflow" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cicd-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;10: GitHub Actions: CI/CD para build, test y push del golden container
+Listado&nbsp;10: GitHub Actions: CI/CD para build, test y push del golden container
 </figcaption>
 <div aria-describedby="lst-cicd-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># .github/workflows/docker-dbx.yml</span></span>
@@ -678,7 +677,7 @@ Listing&nbsp;10: GitHub Actions: CI/CD para build, test y push del golden contai
 <span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
 <span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>          docker tag ${{ secrets.ECR_REGISTRY }}/dbx-golden:${{ github.sha }} \</span>
 <span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>                     ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable</span>
-<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>          docker push ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>          docker push ${{ secrets.ECR_REGISTRY }}/dbx-golden:latest-stable</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -928,6 +927,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -953,12 +1012,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1350,7 +1409,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

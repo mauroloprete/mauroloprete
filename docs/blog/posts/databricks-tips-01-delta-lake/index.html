@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-03-03">
 <meta name="description" content="Liquid clustering, OPTIMIZE, Z-ORDER, vacuum, time travel y trucos que cambian cómo trabajás con Delta.">
 
 <title>Databricks Tips #2: 7 cosas de Delta Lake que ojalá me hubieran dicho antes – Mauro Loprete</title>
@@ -96,17 +95,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -148,8 +147,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -195,7 +194,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#liquid-clustering-reemplaza-a-z-order" id="toc-liquid-clustering-reemplaza-a-z-order" class="nav-link active" data-scroll-target="#liquid-clustering-reemplaza-a-z-order">1. Liquid Clustering reemplaza a Z-ORDER</a></li>
@@ -240,7 +239,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 3, 2026</p>
+      <p class="date">3 de marzo de 2026</p>
     </div>
   </div>
   
@@ -259,7 +258,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-liquid-clustering" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-liquid-clustering-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Liquid Clustering: crear tabla, alterar existente y optimizar
+Listado&nbsp;1: Liquid Clustering: crear tabla, alterar existente y optimizar
 </figcaption>
 <div aria-describedby="lst-liquid-clustering-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Crear tabla con liquid clustering</span></span>
@@ -277,7 +276,7 @@ Listing&nbsp;1: Liquid Clustering: crear tabla, alterar existente y optimizar
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (event_date, user_id);</span>
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co">-- Trigger manual (normalmente no necesario)</span></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>OPTIMIZE catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>OPTIMIZE catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -294,7 +293,7 @@ Listing&nbsp;1: Liquid Clustering: crear tabla, alterar existente y optimizar
 <div id="lst-optimize-predicate" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-optimize-predicate-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: OPTIMIZE con y sin predicado: impacto en reescritura de datos
+Listado&nbsp;2: OPTIMIZE con y sin predicado: impacto en reescritura de datos
 </figcaption>
 <div aria-describedby="lst-optimize-predicate-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Malo: reescribe todo</span></span>
@@ -305,7 +304,7 @@ Listing&nbsp;2: OPTIMIZE con y sin predicado: impacto en reescritura de datos
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> event_date <span class="op">=</span> <span class="fu">current_date</span>() <span class="op">-</span> <span class="dt">INTERVAL</span> <span class="dv">1</span> <span class="dt">DAY</span>;</span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- Aún mejor con liquid clustering: no necesitás OPTIMIZE manual</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- El motor lo hace incrementalmente en escritura</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- El motor lo hace incrementalmente en escritura</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -317,14 +316,14 @@ Listing&nbsp;2: OPTIMIZE con y sin predicado: impacto en reescritura de datos
 <div id="lst-vacuum-retention" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-vacuum-retention-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: VACUUM: retención peligrosa vs.&nbsp;retención segura de 7 dias
+Listado&nbsp;3: VACUUM: retención peligrosa vs.&nbsp;retención segura de 7 dias
 </figcaption>
 <div aria-describedby="lst-vacuum-retention-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Esto puede romper queries activas</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>VACUUM catalog.<span class="kw">schema</span>.<span class="kw">events</span> RETAIN <span class="dv">0</span> HOURS;</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">-- Seguro: respetar la retención</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>VACUUM catalog.<span class="kw">schema</span>.<span class="kw">events</span> RETAIN <span class="dv">168</span> HOURS; <span class="co">-- 7 días</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>VACUUM catalog.<span class="kw">schema</span>.<span class="kw">events</span> RETAIN <span class="dv">168</span> HOURS; <span class="co">-- 7 días</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -332,7 +331,7 @@ Listing&nbsp;3: VACUUM: retención peligrosa vs.&nbsp;retención segura de 7 dia
 <div id="lst-delta-log" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-delta-log-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Gestionar el delta log: checkpoint, compactacion y retención
+Listado&nbsp;4: Gestionar el delta log: checkpoint, compactacion y retención
 </figcaption>
 <div aria-describedby="lst-delta-log-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ver cuánto ocupa el log</span></span>
@@ -345,7 +344,7 @@ Listing&nbsp;4: Gestionar el delta log: checkpoint, compactacion y retención
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- Configurar retención del log (default 30 días)</span></span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> TBLPROPERTIES (delta.logRetentionDuration <span class="op">=</span> <span class="st">'interval 30 days'</span>);</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> TBLPROPERTIES (delta.logRetentionDuration <span class="op">=</span> <span class="st">'interval 30 days'</span>);</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -357,7 +356,7 @@ Listing&nbsp;4: Gestionar el delta log: checkpoint, compactacion y retención
 <div id="lst-time-travel" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-time-travel-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Time Travel: restore, comparar versiones, clone y historial
+Listado&nbsp;5: Time Travel: restore, comparar versiones, clone y historial
 </figcaption>
 <div aria-describedby="lst-time-travel-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Restaurar una tabla a una versión anterior (rollback)</span></span>
@@ -373,7 +372,7 @@ Listing&nbsp;5: Time Travel: restore, comparar versiones, clone y historial
 <span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>SHALLOW <span class="kw">CLONE</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span> VERSION <span class="kw">AS</span> <span class="kw">OF</span> <span class="dv">42</span>;</span>
 <span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ver el historial completo de operaciones</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>DESCRIBE HISTORY catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>DESCRIBE HISTORY catalog.<span class="kw">schema</span>.<span class="kw">events</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -385,7 +384,7 @@ Listing&nbsp;5: Time Travel: restore, comparar versiones, clone y historial
 <div id="lst-cdf" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-cdf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Change Data Feed: activar CDF y leer cambios entre versiones
+Listado&nbsp;6: Change Data Feed: activar CDF y leer cambios entre versiones
 </figcaption>
 <div aria-describedby="lst-cdf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Activar CDF</span></span>
@@ -403,7 +402,7 @@ Listing&nbsp;6: Change Data Feed: activar CDF y leer cambios entre versiones
 <span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    .<span class="kw">table</span>(<span class="ot">"catalog.schema.events"</span>))</span>
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a># Columnas extra: _change_type, _commit_version, _commit_timestamp</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>df_changes.<span class="kw">filter</span>(<span class="ot">"_change_type = 'update_postimage'"</span>).show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>df_changes.<span class="kw">filter</span>(<span class="ot">"_change_type = 'update_postimage'"</span>).show()</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -415,7 +414,7 @@ Listing&nbsp;6: Change Data Feed: activar CDF y leer cambios entre versiones
 <div id="lst-deletion-vectors" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-deletion-vectors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: Deletion Vectors: activar DVs para borrados rapidos sin reescribir
+Listado&nbsp;7: Deletion Vectors: activar DVs para borrados rapidos sin reescribir
 </figcaption>
 <div aria-describedby="lst-deletion-vectors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Activar DVs</span></span>
@@ -427,7 +426,7 @@ Listing&nbsp;7: Deletion Vectors: activar DVs para borrados rapidos sin reescrib
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ahora DELETE y UPDATE son mucho más rápidos</span></span>
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- porque no reescriben archivos completos</span></span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="kw">DELETE</span> <span class="kw">FROM</span> catalog.<span class="kw">schema</span>.<span class="kw">events</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> user_id <span class="op">=</span> <span class="dv">12345</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> user_id <span class="op">=</span> <span class="dv">12345</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -603,6 +602,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -628,12 +687,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1025,7 +1084,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

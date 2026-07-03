@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-03-10">
 <meta name="description" content="Namespace de 3 niveles, GRANTS heredados, linaje automático, row/column security y errores comunes de gobernanza.">
 
 <title>Databricks Tips #3: Unity Catalog — el modelo de gobernanza que nadie implementa bien – Mauro Loprete</title>
@@ -96,17 +95,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -148,8 +147,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -195,7 +194,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#el-modelo-de-3-niveles-más-que-un-namespace" id="toc-el-modelo-de-3-niveles-más-que-un-namespace" class="nav-link active" data-scroll-target="#el-modelo-de-3-niveles-más-que-un-namespace">El modelo de 3 niveles: más que un namespace</a>
@@ -243,7 +242,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 10, 2026</p>
+      <p class="date">10 de marzo de 2026</p>
     </div>
   </div>
   
@@ -261,7 +260,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-namespace-3lvl" class="listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-namespace-3lvl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Namespace de 3 niveles en Unity Catalog
+Listado&nbsp;1: Namespace de 3 niveles en Unity Catalog
 </figcaption>
 <div aria-describedby="lst-namespace-3lvl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <pre><code>metastore
@@ -277,7 +276,7 @@ Listing&nbsp;1: Namespace de 3 niveles en Unity Catalog
 <div id="lst-catalogs-by-env" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-catalogs-by-env-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Opcion A: catalogs organizados por ambiente (dev, staging, prod)
+Listado&nbsp;2: Opcion A: catalogs organizados por ambiente (dev, staging, prod)
 </figcaption>
 <div aria-describedby="lst-catalogs-by-env-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> CATALOG dev;</span>
@@ -287,7 +286,7 @@ Listing&nbsp;2: Opcion A: catalogs organizados por ambiente (dev, staging, prod)
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">-- Mismos schemas en cada catalog</span></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> dev.sales;</span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> staging.sales;</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> prod.sales;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> prod.sales;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -299,7 +298,7 @@ Listing&nbsp;2: Opcion A: catalogs organizados por ambiente (dev, staging, prod)
 <div id="lst-catalogs-by-domain" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-catalogs-by-domain-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Opcion B: catalogs organizados por dominio de negocio
+Listado&nbsp;3: Opcion B: catalogs organizados por dominio de negocio
 </figcaption>
 <div aria-describedby="lst-catalogs-by-domain-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> CATALOG sales;</span>
@@ -309,7 +308,7 @@ Listing&nbsp;3: Opcion B: catalogs organizados por dominio de negocio
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">-- Schemas por etapa</span></span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> sales.bronze;</span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> sales.silver;</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> sales.gold;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SCHEMA</span> sales.gold;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -324,7 +323,7 @@ Listing&nbsp;3: Opcion B: catalogs organizados por dominio de negocio
 <div id="lst-grants-schema" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-grants-schema-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: GRANTS heredados: error comun vs.&nbsp;patron correcto a nivel schema
+Listado&nbsp;4: GRANTS heredados: error comun vs.&nbsp;patron correcto a nivel schema
 </figcaption>
 <div aria-describedby="lst-grants-schema-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Este GRANT da acceso a TODAS las tablas presentes y FUTURAS del catalog</span></span>
@@ -335,7 +334,7 @@ Listing&nbsp;4: GRANTS heredados: error comun vs.&nbsp;patron correcto a nivel s
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">-- Mejor: dar acceso solo al schema gold</span></span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">USE</span> CATALOG <span class="kw">ON</span> CATALOG prod <span class="kw">TO</span> `data<span class="op">-</span>analysts`;</span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">USE</span> <span class="kw">SCHEMA</span> <span class="kw">ON</span> <span class="kw">SCHEMA</span> prod.gold <span class="kw">TO</span> `data<span class="op">-</span>analysts`;</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">SELECT</span> <span class="kw">ON</span> <span class="kw">SCHEMA</span> prod.gold <span class="kw">TO</span> `data<span class="op">-</span>analysts`;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">SELECT</span> <span class="kw">ON</span> <span class="kw">SCHEMA</span> prod.gold <span class="kw">TO</span> `data<span class="op">-</span>analysts`;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -347,7 +346,7 @@ Listing&nbsp;4: GRANTS heredados: error comun vs.&nbsp;patron correcto a nivel s
 <div id="lst-row-col-security" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-row-col-security-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Row y column level security: masking de PII y filtros por region
+Listado&nbsp;5: Row y column level security: masking de PII y filtros por region
 </figcaption>
 <div aria-describedby="lst-row-col-security-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Column masking: ocultar PII</span></span>
@@ -372,7 +371,7 @@ Listing&nbsp;5: Row y column level security: masking de PII y filtros por region
 <span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span>;</span>
 <span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> prod.gold.customers</span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> <span class="kw">ROW</span> <span class="kw">FILTER</span> prod.security.region_filter <span class="kw">ON</span> (region);</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> <span class="kw">ROW</span> <span class="kw">FILTER</span> prod.security.region_filter <span class="kw">ON</span> (region);</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -384,7 +383,7 @@ Listing&nbsp;5: Row y column level security: masking de PII y filtros por region
 <div id="lst-lineage" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-lineage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Linaje automatico: buenas practicas para trazabilidad completa
+Listado&nbsp;6: Linaje automatico: buenas practicas para trazabilidad completa
 </figcaption>
 <div aria-describedby="lst-lineage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Ver linaje de una tabla (qué tablas la alimentan)</span></span>
@@ -394,7 +393,7 @@ Listing&nbsp;6: Linaje automatico: buenas practicas para trazabilidad completa
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co">-- Para que el linaje sea completo:</span></span>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co">-- 1. Usar tablas de Unity Catalog (no paths directos)</span></span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co">-- 2. Evitar df.write.parquet() - usar df.write.saveAsTable()</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- 3. En DLT, el linaje es automático al 100%</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- 3. En DLT, el linaje es automático al 100%</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -402,7 +401,7 @@ Listing&nbsp;6: Linaje automatico: buenas practicas para trazabilidad completa
 <div id="lst-external-location" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-external-location-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: External Location y tabla externa para habilitar linaje en S3
+Listado&nbsp;7: External Location y tabla externa para habilitar linaje en S3
 </figcaption>
 <div aria-describedby="lst-external-location-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> EXTERNAL LOCATION raw_s3</span>
@@ -411,7 +410,7 @@ Listing&nbsp;7: External Location y tabla externa para habilitar linaje en S3
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> prod.bronze.<span class="kw">events</span></span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> DELTA</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>LOCATION <span class="st">'s3://my-bucket/raw/events/'</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>LOCATION <span class="st">'s3://my-bucket/raw/events/'</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -422,7 +421,7 @@ Listing&nbsp;7: External Location y tabla externa para habilitar linaje en S3
 <div id="lst-volumes" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-volumes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;8: Volumes: gestionar archivos no tabulares con gobernanza UC
+Listado&nbsp;8: Volumes: gestionar archivos no tabulares con gobernanza UC
 </figcaption>
 <div aria-describedby="lst-volumes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Volume managed: Databricks gestiona el storage</span></span>
@@ -436,7 +435,7 @@ Listing&nbsp;8: Volumes: gestionar archivos no tabulares con gobernanza UC
 <span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- PUT /api/2.0/fs/files/Volumes/prod/ml/model_artifacts/model.pkl</span></span>
 <span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co">-- Usar en código</span></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> spark.<span class="kw">read</span>.csv(<span class="ot">"/Volumes/prod/raw/landing_zone/customers.csv"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> spark.<span class="kw">read</span>.csv(<span class="ot">"/Volumes/prod/raw/landing_zone/customers.csv"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -580,6 +579,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -605,12 +664,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1002,7 +1061,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

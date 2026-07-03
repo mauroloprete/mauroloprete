@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="../../../es" xml:lang="../../../es"><head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
 
 <meta charset="utf-8">
 <meta name="generator" content="quarto-1.9.38">
@@ -7,7 +7,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mauro Loprete">
-<meta name="dcterms.date" content="2026-04-14">
 <meta name="description" content="Qué son los Data Contracts, por qué los necesitás, y cómo implementé un framework en producción con Databricks y PySpark.">
 
 <title>Data Contracts: cómo diseñar un framework desde cero – Mauro Loprete</title>
@@ -96,17 +95,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   ],
   "show-item-context": false,
   "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
     "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
   }
 }</script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
@@ -148,8 +147,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <span class="navbar-title">Mauro Loprete</span>
     </a>
   </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
   <span class="navbar-toggler-icon"></span>
 </button>
           <div class="collapse navbar-collapse" id="navbarCollapse">
@@ -195,7 +194,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+    <h2 id="toc-title">En esta página</h2>
    
   <ul>
   <li><a href="#el-problema-real" id="toc-el-problema-real" class="nav-link active" data-scroll-target="#el-problema-real">El problema real</a></li>
@@ -246,7 +245,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
     <div>
     <div class="quarto-title-meta-heading">Publicado</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">April 14, 2026</p>
+      <p class="date">14 de abril de 2026</p>
     </div>
   </div>
   
@@ -288,7 +287,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <div id="lst-contract-yaml" class="yaml listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-contract-yaml-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Definición YAML de un Data Contract con schema, SLAs y reglas de calidad
+Listado&nbsp;1: Definición YAML de un Data Contract con schema, SLAs y reglas de calidad
 </figcaption>
 <div aria-describedby="lst-contract-yaml-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># contracts/transactions.yml</span></span>
@@ -349,7 +348,7 @@ Listing&nbsp;1: Definición YAML de un Data Contract con schema, SLAs y reglas d
 <span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> freshness</span></span>
 <span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">sql</span><span class="kw">:</span><span class="at"> </span><span class="st">"SELECT DATEDIFF(hour, MAX(transaction_date), current_date()) FROM {table}"</span></span>
-<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">threshold</span><span class="kw">:</span><span class="at"> </span><span class="dv">26</span><span class="co">  # máximo 26 horas de atraso</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">threshold</span><span class="kw">:</span><span class="at"> </span><span class="dv">26</span><span class="co">  # máximo 26 horas de atraso</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -361,7 +360,7 @@ Listing&nbsp;1: Definición YAML de un Data Contract con schema, SLAs y reglas d
 <div id="lst-parser" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-parser-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Parser de contratos YAML a dataclasses de Python
+Listado&nbsp;2: Parser de contratos YAML a dataclasses de Python
 </figcaption>
 <div aria-describedby="lst-parser-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> yaml</span>
@@ -411,7 +410,7 @@ Listing&nbsp;2: Parser de contratos YAML a dataclasses de Python
 <span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>            owner<span class="op">=</span>raw[<span class="st">"owner"</span>],</span>
 <span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>            columns<span class="op">=</span>columns,</span>
 <span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>            quality_rules<span class="op">=</span>rules</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>        )</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -421,7 +420,7 @@ Listing&nbsp;2: Parser de contratos YAML a dataclasses de Python
 <div id="lst-schema-validator" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-schema-validator-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Validador de schema: compara DataFrame contra el contrato
+Listado&nbsp;3: Validador de schema: compara DataFrame contra el contrato
 </figcaption>
 <div aria-describedby="lst-schema-validator-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> DataFrame</span>
@@ -466,7 +465,7 @@ Listing&nbsp;3: Validador de schema: compara DataFrame contra el contrato
 <span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> extra:</span>
 <span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>        errors.append(<span class="ss">f"Columnas no esperadas: </span><span class="sc">{</span>extra<span class="sc">}</span><span class="ss">"</span>)</span>
 <span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> errors</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> errors</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -476,7 +475,7 @@ Listing&nbsp;3: Validador de schema: compara DataFrame contra el contrato
 <div id="lst-quality-validator" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-quality-validator-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Validador de calidad: ejecuta reglas SQL y reporta violaciones
+Listado&nbsp;4: Validador de calidad: ejecuta reglas SQL y reporta violaciones
 </figcaption>
 <div aria-describedby="lst-quality-validator-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> validate_quality(</span>
@@ -503,7 +502,7 @@ Listing&nbsp;4: Validador de calidad: ejecuta reglas SQL y reporta violaciones
 <span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"FAIL: </span><span class="sc">{</span>rule<span class="sc">.</span>name<span class="sc">}</span><span class="ss"> = </span><span class="sc">{</span>value<span class="sc">}</span><span class="ss"> "</span></span>
 <span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>                  <span class="ss">f"(threshold: </span><span class="sc">{</span>rule<span class="sc">.</span>threshold<span class="sc">}</span><span class="ss">)"</span>)</span>
 <span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> results</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> results</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -513,7 +512,7 @@ Listing&nbsp;4: Validador de calidad: ejecuta reglas SQL y reporta violaciones
 <div id="lst-ingest-pipeline" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ingest-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Pipeline de ingesta con validación de contrato integrada
+Listado&nbsp;5: Pipeline de ingesta con validación de contrato integrada
 </figcaption>
 <div aria-describedby="lst-ingest-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ContractViolation(<span class="pp">Exception</span>):</span>
@@ -555,7 +554,7 @@ Listing&nbsp;5: Pipeline de ingesta con validación de contrato integrada
 <span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Alertar pero no fallar (soft contract)</span></span>
 <span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>        alert_team(contract.owner, failures)</span>
 <span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> quality</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> quality</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -592,7 +591,7 @@ Listing&nbsp;5: Pipeline de ingesta con validación de contrato integrada
 <div id="lst-hard-vs-soft" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-hard-vs-soft-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Hard contract vs Soft contract: fallar o enviar a cuarentena
+Listado&nbsp;6: Hard contract vs Soft contract: fallar o enviar a cuarentena
 </figcaption>
 <div aria-describedby="lst-hard-vs-soft-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Hard contract: falla y para</span></span>
@@ -603,7 +602,7 @@ Listing&nbsp;6: Hard contract vs Soft contract: fallar o enviar a cuarentena
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> schema_errors:</span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    log_violation(contract, schema_errors)</span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># dato entra igual a una tabla de quarantine</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    source_df.write.saveAsTable(<span class="ss">f"</span><span class="sc">{</span>target_table<span class="sc">}</span><span class="ss">_quarantine"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    source_df.write.saveAsTable(<span class="ss">f"</span><span class="sc">{</span>target_table<span class="sc">}</span><span class="ss">_quarantine"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -614,7 +613,7 @@ Listing&nbsp;6: Hard contract vs Soft contract: fallar o enviar a cuarentena
 <div id="lst-dlt-expectations" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-dlt-expectations-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: Data Contracts como DLT Expectations en Databricks
+Listado&nbsp;7: Data Contracts como DLT Expectations en Databricks
 </figcaption>
 <div aria-describedby="lst-dlt-expectations-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> dlt</span>
@@ -627,7 +626,7 @@ Listing&nbsp;7: Data Contracts como DLT Expectations en Databricks
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"valid_date"</span>: <span class="st">"transaction_date &gt;= '2020-01-01'"</span></span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>})</span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> clean_transactions():</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> dlt.read(<span class="st">"bronze_transactions"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> dlt.read(<span class="st">"bronze_transactions"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </figure>
 </div>
@@ -765,6 +764,66 @@ window.addEventListener("quarto-page-loaded", function() {
   initTocToggle();
 });
 </script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -790,12 +849,12 @@ window.addEventListener("quarto-page-loaded", function() {
       // flash "checked"
       button.classList.add('code-copy-button-checked');
       var currentTitle = button.getAttribute("title");
-      button.setAttribute("title", "Copied!");
+      button.setAttribute("title", "Copiado");
       let tooltip;
       if (window.bootstrap) {
         button.setAttribute("data-bs-toggle", "tooltip");
         button.setAttribute("data-bs-placement", "left");
-        button.setAttribute("data-bs-title", "Copied!");
+        button.setAttribute("data-bs-title", "Copiado");
         tooltip = new bootstrap.Tooltip(button, 
           { trigger: "manual", 
             customClass: "code-copy-button-tooltip",
@@ -1187,7 +1246,7 @@ window.addEventListener("quarto-page-loaded", function() {
     script.dataset.emitMetadata = "0";
     script.dataset.inputPosition = "top";
     script.dataset.theme = getTheme();
-    script.dataset.lang = "../../../es";
+    script.dataset.lang = "es";
     script.crossOrigin = "anonymous";
     // Append the script to the desired div instead of at the end of the body
     document.getElementById("quarto-content").appendChild(script);

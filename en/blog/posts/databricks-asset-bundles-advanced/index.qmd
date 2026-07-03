@@ -1,0 +1,410 @@
+---
+title: "Databricks Tips #1: Databricks Asset Bundles — what the documentation doesn't tell you"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-02-24"
+categories: [Databricks Tips, Data Engineering, DevOps]
+description: "Advanced use cases, deployment patterns, complex variables and tricks I picked up working with DABs in production."
+image: cover.png
+---
+
+{{< fa flask >}} **[Hands-on lab](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/databricks-asset-bundles-advanced)** — Notebooks and bundle to run on Databricks Free Edition with the CLI.
+
+---
+
+Databricks Asset Bundles (DABs) is the declarative way to manage your infrastructure on Databricks: jobs, pipelines, models, dashboards, all defined in YAML and deployed with the CLI. The [official documentation](https://docs.databricks.com/aws/en/dev-tools/bundles) covers the basics, but there are advanced patterns you only discover once you use them in production.
+
+Here I'm sharing the cases I wish I had known about earlier.
+
+## 1. Complex variables: not everything is a string
+
+Most examples show simple variables (`my_cluster_id: "abc123"`). But DABs supports **variables typed as `complex`**, which lets you pass entire YAML objects as a variable:
+
+```{#lst-complex-var .yaml lst-cap="Complex variable: reusable cluster configuration in DABs"}
+variables:
+  cluster_config:
+    description: "Reusable cluster configuration"
+    type: complex
+    default:
+      spark_version: "14.3.x-scala2.12"
+      node_type_id: "i3.xlarge"
+      num_workers: 2
+      spark_conf:
+        spark.speculation: true
+        spark.databricks.delta.retentionDurationCheck.enabled: false
+      custom_tags:
+        team: data-engineering
+        cost_center: analytics
+
+resources:
+  jobs:
+    etl_job:
+      name: "Daily ETL"
+      job_clusters:
+        - job_cluster_key: main
+          new_cluster: ${var.cluster_config}
+      tasks:
+        - task_key: ingest
+          job_cluster_key: main
+          notebook_task:
+            notebook_path: ./src/ingest.py
+```
+
+This lets you define a cluster once and reuse it across multiple jobs without duplicating configuration. In dev you set 1 worker, in prod 10, and the job's YAML doesn't change.
+
+## 2. Lookups: referencing existing resources by name
+
+One of the least-known features. Instead of hardcoding cluster, warehouse or policy IDs, you use `lookup` and DABs resolves the ID by name at deploy time:
+
+```{#lst-lookups .yaml lst-cap="Lookups: resolving resource IDs by name at deploy time"}
+variables:
+  shared_cluster:
+    description: "Team shared cluster"
+    lookup:
+      cluster: "shared-analytics-14.3"
+
+  team_warehouse:
+    description: "Team SQL Warehouse"
+    lookup:
+      warehouse: "analytics-warehouse"
+
+  deploy_sp:
+    description: "Service principal for deploys"
+    lookup:
+      service_principal: "sp-data-deploy"
+
+resources:
+  jobs:
+    reporting_job:
+      name: "Weekly reporting"
+      tasks:
+        - task_key: generate_report
+          existing_cluster_id: ${var.shared_cluster}
+          notebook_task:
+            notebook_path: ./src/report.py
+```
+
+Supported lookup types: `alert`, `cluster_policy`, `cluster`, `dashboard`, `instance_pool`, `job`, `metastore`, `notification_destination`, `pipeline`, `query`, `service_principal`, `warehouse`.
+
+## 3. Artifacts: wheels with dynamic versioning
+
+When you package your code as a wheel to deploy in a job, the classic problem is having to bump the version in `setup.py` every time. DABs solves this with `dynamic_version`:
+
+```{#lst-artifacts-whl .yaml lst-cap="Artifacts: packaging wheels with dynamic versioning"}
+bundle:
+  name: my-etl-pipeline
+
+artifacts:
+  etl_core:
+    type: whl
+    build: "poetry build"
+    path: ./etl_core
+    dynamic_version: true  # <-- the version is generated from a timestamp
+
+  transformations:
+    type: whl
+    build: "poetry build"
+    path: ./transformations
+    dynamic_version: true
+
+resources:
+  jobs:
+    main_pipeline:
+      name: "Main pipeline"
+      tasks:
+        - task_key: run_etl
+          spark_python_task:
+            python_file: ./src/main.py
+          libraries:
+            - whl: ./etl_core/dist/*.whl
+            - whl: ./transformations/dist/*.whl
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 2
+```
+
+With `dynamic_version: true` you don't need to touch `pyproject.toml` on every deploy.
+
+## 4. Monorepo with includes: one bundle per domain
+
+On large teams, a single `databricks.yml` becomes unmanageable. The pattern that works best is a monorepo where each domain has its own configuration and a root `databricks.yml` includes them:
+
+```{#lst-monorepo-structure lst-cap="Monorepo structure with one bundle per domain"}
+project/
+├── databricks.yml              # Root bundle
+├── shared/
+│   ├── clusters.yml            # Shared clusters
+│   └── permissions.yml         # Common permissions
+├── domains/
+│   ├── ingestion/
+│   │   ├── resources.yml       # Ingestion jobs
+│   │   └── src/
+│   ├── transformation/
+│   │   ├── resources.yml       # DLT pipelines
+│   │   └── src/
+│   └── serving/
+│       ├── resources.yml       # Model serving endpoints
+│       └── src/
+```
+
+```{#lst-bundle-root .yaml lst-cap="Root bundle: includes, variables and per-environment targets"}
+# databricks.yml
+bundle:
+  name: data-platform
+
+include:
+  - ./shared/*.yml
+  - ./domains/*/resources.yml
+
+variables:
+  environment:
+    description: "Target environment"
+    default: dev
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dev.cloud.databricks.com
+    variables:
+      environment: dev
+
+  prod:
+    mode: production
+    workspace:
+      host: https://prod.cloud.databricks.com
+    run_as:
+      service_principal_name: "sp-data-platform-prod"
+    variables:
+      environment: prod
+    permissions:
+      - service_principal_name: "sp-data-platform-prod"
+        level: CAN_MANAGE
+      - group_name: "data-engineering"
+        level: CAN_VIEW
+```
+
+```{#lst-shared-cluster .yaml lst-cap="Shared cluster with autoscale defined as a complex variable"}
+# shared/clusters.yml
+variables:
+  shared_cluster:
+    type: complex
+    default:
+      spark_version: "14.3.x-scala2.12"
+      node_type_id: "i3.xlarge"
+      autoscale:
+        min_workers: 1
+        max_workers: 8
+      spark_conf:
+        spark.databricks.delta.optimizeWrite.enabled: true
+```
+
+```{#lst-domain-resource .yaml lst-cap="Domain resource: ingestion job with a schedule and the shared cluster"}
+# domains/ingestion/resources.yml
+resources:
+  jobs:
+    ingest_customers:
+      name: "[${var.environment}] Ingest Customers"
+      tasks:
+        - task_key: cdc_load
+          notebook_task:
+            notebook_path: ./domains/ingestion/src/customers.py
+          new_cluster: ${var.shared_cluster}
+      schedule:
+        quartz_cron_expression: "0 0 */2 * * ?"
+        timezone_id: "America/Montevideo"
+```
+
+## 5. Presets: controlling behavior per target
+
+Beyond `mode: development` and `mode: production`, you can use `presets` for fine-grained control:
+
+```{#lst-presets .yaml lst-cap="Presets: fine-grained control of prefixes, triggers and tags per target"}
+targets:
+  dev:
+    mode: development
+    presets:
+      name_prefix: "dev_mauro_"     # Custom prefix instead of the default [dev]
+      trigger_pause_status: PAUSED  # Pause all triggers
+      jobs_max_concurrent_runs: 10  # Allow more concurrent runs
+      pipelines_development: true   # Pipelines in dev mode
+      tags:
+        owner: mauro
+        environment: dev
+        cost_center: sandbox
+
+  staging:
+    presets:
+      name_prefix: "stg_"
+      trigger_pause_status: PAUSED
+      jobs_max_concurrent_runs: 2
+      pipelines_development: false
+      tags:
+        environment: staging
+
+  prod:
+    mode: production
+    presets:
+      name_prefix: ""               # No prefix in prod
+      trigger_pause_status: UNPAUSED
+      jobs_max_concurrent_runs: 1
+      tags:
+        environment: production
+```
+
+The precedence is: **resource configuration > presets > mode defaults**. If a specific job needs `max_concurrent_runs: 5` in prod, you set it on the resource and it wins over the preset.
+
+## 6. run_as + permissions: the production pattern
+
+In production, you should never deploy as your personal user. The right pattern:
+
+```{#lst-run-as-prod .yaml lst-cap="Production pattern: run_as with a service principal and permissions"}
+targets:
+  prod:
+    mode: production
+    run_as:
+      service_principal_name: "sp-etl-prod"
+
+    permissions:
+      - service_principal_name: "sp-etl-prod"
+        level: CAN_MANAGE
+      - group_name: "data-engineers"
+        level: CAN_MANAGE_RUN
+      - group_name: "data-analysts"
+        level: CAN_VIEW
+
+    workspace:
+      host: ${var.prod_host}
+      root_path: /Workspace/Production/.bundle/${bundle.name}/${bundle.target}
+
+    git:
+      branch: main  # Validation: deploys are only allowed from main
+```
+
+In `mode: production`, DABs validates that:
+
+- `run_as` is defined
+- `permissions` is defined
+- The artifact path is not user-specific
+- The current branch matches the configured one (unless `--force`)
+
+## 7. CI/CD with GitHub Actions
+
+The complete workflow for CI/CD with DABs:
+
+```{#lst-cicd-github .yaml lst-cap="CI/CD with GitHub Actions: validate and deploy DABs automatically"}
+# .github/workflows/deploy.yml
+name: Deploy DAB
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: databricks/setup-cli@main
+
+      - name: Validate bundle
+        run: databricks bundle validate
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: databricks/setup-cli@main
+
+      - name: Deploy to production
+        run: databricks bundle deploy --target prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+```
+
+## 8. Sync patterns: what gets uploaded and what doesn't
+
+By default DABs syncs the entire directory. Control which files get uploaded to the workspace:
+
+```{#lst-sync-patterns .yaml lst-cap="Sync patterns: controlling which files get uploaded to the workspace"}
+sync:
+  include:
+    - "src/**/*.py"
+    - "config/**/*.yml"
+    - "requirements.txt"
+  exclude:
+    - "**/__pycache__"
+    - "**/.pytest_cache"
+    - "**/tests/**"
+    - "**/*.egg-info"
+    - ".git/**"
+    - ".venv/**"
+    - "docs/**"
+```
+
+## 9. Variable precedence: order matters
+
+Variables resolve in this order (the first one with a value wins):
+
+1. `--var` on the command line
+2. `BUNDLE_VAR_*` environment variables
+3. The `variable-overrides.json` file
+4. Values in the `targets.*.variables` section
+5. The `default` value in the variable declaration
+
+This lets your CI/CD inject values via `BUNDLE_VAR_*` without touching the YAML:
+
+```{#lst-bundle-var-env .bash lst-cap="Injecting BUNDLE_VAR environment variables in a CI/CD deploy"}
+export BUNDLE_VAR_cluster_config='{"num_workers": 20}'
+export BUNDLE_VAR_environment=prod
+databricks bundle deploy --target prod
+```
+
+## 10. Supported resources (the full list)
+
+DABs isn't just for jobs. The full list of resources you can manage:
+
+| Resource | Description |
+|---|---|
+| `jobs` | Lakeflow Jobs (the most common) |
+| `pipelines` | DLT / Spark Declarative Pipelines |
+| `model_serving_endpoint` | Model serving endpoints with AI Gateway |
+| `registered_model` | Models in Unity Catalog |
+| `experiment` | MLflow experiments |
+| `dashboard` | AI/BI Lakeview dashboards |
+| `alert` | SQL alerts v2 |
+| `quality_monitor` | Data quality monitors |
+| `schema` | Unity Catalog schemas |
+| `volume` | Unity Catalog volumes |
+| `catalog` | Unity Catalog catalogs |
+| `cluster` | All-purpose clusters |
+| `app` | Databricks Apps (Streamlit) |
+
+## Useful links
+
+- [Hands-on lab — bundle + CLI](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/databricks-asset-bundles-advanced) — to run on Databricks Free Edition
+- [Official DABs documentation](https://docs.databricks.com/aws/en/dev-tools/bundles)
+- [Variables and substitutions](https://docs.databricks.com/aws/en/dev-tools/bundles/variables)
+- [Deployment modes](https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes)
+- [Configuration examples](https://docs.databricks.com/aws/en/dev-tools/bundles/examples)
+- [Bundle examples on GitHub](https://github.com/databricks/bundle-examples)
+- [DABs release notes](https://docs.databricks.com/aws/en/release-notes/dev-tools/bundles)
+- [CI/CD with GitHub Actions](https://docs.databricks.com/aws/en/dev-tools/ci-cd/github)
+- [DABs YAML semi-definitive guide (Aryan Sinanan)](https://medium.com/@aryan.sinanan/databricks-dab-databricks-assets-bundles-yaml-semi-definitive-guide-06a8859166d1)

@@ -1,0 +1,157 @@
+---
+title: "DAIS 2026 Day 3: Genie Code for ML, Lakeflow Designer and Nadella x Ghodsi"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/experience.html
+date: "2026-06-17"
+draft: false
+categories: [Data Engineering, Databricks Tips, MLOps]
+description: "Genie Code specializes in ML engineering, Lakeflow Designer leaves preview, AI Runtime adds multi-node training, and Nadella records a fireside chat with Ghodsi. Recap of Day 3 of the Data + AI Summit 2026."
+image: cover.png
+---
+
+Wednesday at the Summit. If the first two days were all keynotes and big announcements ([here's my Day 1-2 recap](/blog/posts/dais-2026-recap/)), Day 3 is where things get technical. There was a keynote session of about 3 hours with Matei Zaharia among the speakers, deep dives into the AI platform, and the news that didn't make it into Ghodsi's show. Here are the ones that caught my attention the most.
+
+::: callout-note
+## TL;DR
+
+-   **Genie Code for ML**: Genie Code with specialized intelligence for ML engineering — assisted feature engineering, training, serving and monitoring.
+-   **Lakeflow Designer**: a visual drag-and-drop canvas for pipelines, backed by versionable code in Git.
+-   **AI Runtime multi-node**: serverless NVIDIA GPUs for training and fine-tuning, now with multi-node support in Private Preview.
+-   **Omnigent** entered official Beta today — [I already covered it in detail in a separate post](/blog/posts/omnigent-meta-harness/).
+-   **Nadella x Ghodsi fireside chat**: Microsoft deepens its integration with Databricks.
+-   Extras: query history redaction, multimodal data in Unity Catalog, Context-Based Ingress.
+:::
+
+------------------------------------------------------------------------
+
+## 1. Genie Code for ML: the data engineering agent specializes
+
+Genie Code was already making noise as an autonomous data engineering agent (I mentioned it in the [Day 1-2 recap](/blog/posts/dais-2026-recap/)). Today [they announced Genie Code for ML](https://www.databricks.com/blog/whats-new-ai-platform-agents-ml-engineering-our-deep-learning-platform-and-new-capabilities): a version with specialized intelligence for ML engineering and native integrations with every component of the Databricks ML platform.
+
+What changes? Instead of a generic coding agent, you get one that understands the full ML lifecycle:
+
+- **Feature engineering**: proposes and generates features from your data.
+- **Model training**: builds training pipelines integrated with MLflow.
+- **Serving**: deploys models to serving endpoints while preserving governance.
+- **Monitoring**: drift detection, endpoint performance debugging and root-cause analysis of alerts.
+
+The blog sums it up like this: getting an ML model to production today can take months, with teams spending hours on repetitive tasks at every stage of the lifecycle. Genie Code for ML aims to cut that overhead.
+
+::: callout-tip
+## Genie ZeroOps for ML
+
+Within the same family, they also announced that Genie Code can query inference tables, diagnose performance issues in serving endpoints and run root-cause analysis on alerts — what they call Genie ZeroOps for ML.
+:::
+
+([Blog](https://www.databricks.com/blog/whats-new-ai-platform-agents-ml-engineering-our-deep-learning-platform-and-new-capabilities))
+
+------------------------------------------------------------------------
+
+## 2. Lakeflow Designer leaves preview
+
+[Lakeflow Designer](https://docs.databricks.com/aws/en/designer/what-is-lakeflow-designer) is a visual canvas for analysts who need to prepare and transform data without writing code. It had been in preview and came out in this round of Summit announcements.
+
+Who is it for? Analysts and data engineers who prefer a visual approach for exploring and transforming data. Whatever you build on the canvas is backed by **versionable code in Git** that you can schedule as jobs to move to production.
+
+What it brings:
+
+- **Built-in operators** for common transformations (joins, aggregations, filters).
+- **Integrated Genie Code**: describe what you want in natural language and it generates the transformation.
+- **Preview of every intermediate step** without running the whole pipeline.
+- **Scheduling as jobs**: what you design can be orchestrated as a production job.
+
+::: callout-tip
+## When to use it
+
+Lakeflow Designer doesn't replace writing SQL or Python for complex pipelines. But for data exploration, quick prototyping of transformations, or letting an analyst build a pipeline without depending on a data engineer, it's a very powerful shortcut. And the fact that the output is real code means an engineer can later pick it up, review it and scale it.
+:::
+
+([Docs](https://docs.databricks.com/aws/en/designer/what-is-lakeflow-designer))
+
+------------------------------------------------------------------------
+
+## 3. AI Runtime: serverless GPUs now multi-node
+
+[AI Runtime](https://www.databricks.com/blog/introducing-ai-runtime-scalable-serverless-nvidia-gpus-databricks-training-and-finetuning) launched in March with serverless GPUs (A10, H100) for training and fine-tuning without having to build clusters. At the Summit [they announced support for multi-node training](https://www.databricks.com/blog/whats-new-ai-platform-agents-ml-engineering-our-deep-learning-platform-and-new-capabilities) in **Private Preview**.
+
+What does it mean in practice? If you're fine-tuning a large model that doesn't fit on a single GPU, you previously had to build a multi-node cluster manually, configure inter-node communication and pray it wouldn't fall over. With multi-node in AI Runtime, you tell it how many resources you need and it takes care of the rest: provisioning, distributing the training and cleanup.
+
+::: callout-warning
+## Current status
+
+Single-node AI Runtime is in Public Preview. The distributed training API (multi-GPU on a single node, 8xH100) is in Beta. Multi-node training is in **Private Preview** — not yet available to everyone.
+:::
+
+([Launch blog](https://www.databricks.com/blog/introducing-ai-runtime-scalable-serverless-nvidia-gpus-databricks-training-and-finetuning) · [DAIS announcement](https://www.databricks.com/blog/whats-new-ai-platform-agents-ml-engineering-our-deep-learning-platform-and-new-capabilities))
+
+------------------------------------------------------------------------
+
+## 4. Pre-recorded fireside chat: Satya Nadella x Ali Ghodsi
+
+The [highlight of the day outside the technical sessions](https://x.com/databricks/status/2067280669181427744) was the pre-recorded fireside chat between Satya Nadella and Ali Ghodsi. Nadella wasn't physically at the Moscone — unlike Greg Brockman (OpenAI), who did attend in person on Tuesday. But the content was substantial: they talked about the importance of enterprise context in AI, the pace of innovation and how to turn frontier models into real outcomes.
+
+The quote that stuck: *"We're enabling every enterprise to fully participate at the frontier with their own IP."*
+
+The Microsoft-Databricks integration keeps deepening: Genie in Teams, in Copilot Cowork, an Excel Add-in with write-back. Azure is the cloud where Databricks is placing its biggest partnership bets, and Nadella recording a fireside chat for the Summit confirms it.
+
+------------------------------------------------------------------------
+
+## The rest of Day 3
+
+| Announcement | What it is | Status |
+|------------------------------------|------------------------------------|------------|
+| **Omnigent Beta** | The open-source meta-harness for coding agents [entered official Beta today](/blog/posts/omnigent-meta-harness/) | Beta |
+| **Genie Code auto-approve** | AI classifier that automatically approves safe agent actions | Beta |
+| **Genie Code full page** | Command center with parallel threads and asset management | Beta |
+| **Query history redaction** | `statement_text` shows `<Redacted>` for non-admins since 6/22 | GA |
+| **Multimodal data (FILE type)** | New FILE type in Delta/Iceberg to govern PDFs, images, audio, video | Beta |
+| **Context-Based Ingress** | Zero-trust policies based on network, identity and access scope | Public Preview |
+| **Private Network Gateway** | Simplified secure connectivity for serverless workloads to private sources | New |
+| **Iceberg v3 GA** | External engines can now read and write Unity Catalog tables | GA |
+| **Runtime 19** | Databricks Runtime powered by Apache Spark 4.2.0 | Beta |
+| **Share Genie Spaces via OpenSharing** | Share AI chat experiences with external partners | Beta |
+
+: {.striped .hover}
+
+### Data After Hours
+
+The Summit closed with a party at Oracle Park (the SF Giants' stadium) and a show by The Chainsmokers. The Summit knows how to wrap things up.
+
+------------------------------------------------------------------------
+
+## What I'm taking away from Day 3
+
+Wednesday's technical keynote showed that Databricks is betting hard on **the platform doing the heavy lifting for you**. Genie Code for ML, serverless AI Runtime, visual Lakeflow Designer — the direction is clear: less ops, less boilerplate, more focus on the business problem.
+
+For those of us working in Data Engineering and ML:
+
+- **Genie Code for ML** lowers the barrier to entry for the full ML lifecycle — if you haven't tried Genie Code yet, this is a good time.
+- **Lakeflow Designer** democratizes pipeline creation without sacrificing code quality.
+- **AI Runtime multi-node** aims to eliminate the headache of building clusters for fine-tuning, although it's still in Private Preview.
+
+Tomorrow is the last day of the Summit. If anything worthwhile comes out, I'll update.
+
+------------------------------------------------------------------------
+
+## References
+
+**Databricks blogs**
+
+-   [Genie Code for ML + AI Platform](https://www.databricks.com/blog/whats-new-ai-platform-agents-ml-engineering-our-deep-learning-platform-and-new-capabilities)
+-   [AI Runtime (March 2026 launch)](https://www.databricks.com/blog/introducing-ai-runtime-scalable-serverless-nvidia-gpus-databricks-training-and-finetuning)
+
+**Documentation**
+
+-   [Lakeflow Designer](https://docs.databricks.com/aws/en/designer/what-is-lakeflow-designer)
+-   [Databricks June 2026 Release Notes](https://docs.databricks.com/aws/en/release-notes/product/2026/june)
+
+**External coverage**
+
+-   [SiliconANGLE — Day 2 Takeaways](https://siliconangle.com/2026/06/17/key-takeaways-day-two-databricks-data-ai-summit/)
+-   [Tweet — Nadella x Ghodsi](https://x.com/databricks/status/2067280669181427744)
+
+**Related posts**
+
+-   [DAIS 2026: everything Databricks announced (Day 1-2 recap)](/blog/posts/dais-2026-recap/)
+-   [Omnigent: the open source meta-harness to orchestrate all your AI agents](/blog/posts/omnigent-meta-harness/)
