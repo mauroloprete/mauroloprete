@@ -11,7 +11,829 @@
 <description>Tips de Databricks, Data Engineering, MLOps y procesamiento de encuestas.</description>
 <language>es</language>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Thu, 02 Jul 2026 03:00:00 GMT</lastBuildDate>
+<lastBuildDate>Mon, 06 Jul 2026 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Databricks Tips #13: OpenSharing — compartir sin copiar</title>
+  <dc:creator>Mauro Loprete</dc:creator>
+  <link>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-13-opensharing/</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>Compartir datos con otra empresa, versión clásica: exportás a CSV, subís a un SFTP, del otro lado alguien baja el archivo, lo importa, y a los tres meses nadie sabe cuál de las cuatro copias es la buena. Versión “moderna”: un pipeline que replica tablas a un bucket del partner, que hay que mantener, monitorear y pagar — por duplicado.</p>
+<p><strong>Delta Sharing</strong> vino a matar eso en 2021 con una idea simple: el que recibe lee tus datos directo de tu storage, sin copia. En el Data + AI Summit 2026 (junio pasado — las novedades completas las cubrimos en el <a href="../dais-2026-recap/">recap de DAIS 2026</a>) Databricks anunció su evolución: <strong>OpenSharing</strong>, ahora como proyecto independiente bajo la Linux Foundation, y con un alcance que ya no es solo tablas — modelos, agent skills y datos no estructurados. En este post vemos cómo funciona el protocolo por abajo, la sintaxis real para armar shares hoy, qué agrega OpenSharing y qué estado tiene cada feature (spoiler: no todo es GA).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Nota</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>OpenSharing es la <strong>evolución de Delta Sharing</strong>, no un reemplazo: mismo protocolo zero-copy, ahora bajo la Linux Foundation, retrocompatible con lo que ya tengas armado.</li>
+<li><strong>Zero-copy</strong> significa que el receptor lee tus archivos Parquet directo de tu object storage con URLs temporales — los datos nunca se duplican ni viajan por un servidor intermedio.</li>
+<li>Lo nuevo que ya es <strong>GA</strong>: compartir a cualquier cliente <strong>Iceberg</strong> (Snowflake, Trino) vía el REST Catalog, y credenciales de storage vendidas por el protocolo para performance nativa.</li>
+<li>Lo nuevo en <strong>preview/beta</strong>: compartir modelos y <strong>agent skills</strong>, Genie Agents con quotas y controles, tablas Lakebase con su change data feed, SecureConnect para redes corporativas y storage <strong>on-premises</strong> (MinIO ya es GA).</li>
+<li>¿Bases <strong>on-premise</strong> como SQL Server, Oracle, MySQL o Postgres? Por OpenSharing no — para eso está <strong>Lakehouse Federation</strong>: consultarlas desde Unity Catalog sin replicarlas. Y el SFTP del partner tiene conector administrado en Lakeflow Connect.</li>
+<li>Sigue siendo <strong>read-only</strong> y zero-copy no es zero-cost: el egress del storage lo pagás vos. La cuenta importa cuando el receptor está en otra región o nube.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="de-delta-sharing-a-opensharing-qué-cambió-de-verdad" class="level2">
+<h2 class="anchored" data-anchor-id="de-delta-sharing-a-opensharing-qué-cambió-de-verdad">1. De Delta Sharing a OpenSharing: qué cambió de verdad</h2>
+<p>Primero lo que <strong>no</strong> cambió: el protocolo de datos es el mismo. Si hoy tenés shares de Delta Sharing funcionando, siguen funcionando — OpenSharing es retrocompatible. Lo que cambió es la gobernanza del proyecto y el alcance:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Delta Sharing (2021–2025)</th>
+<th>OpenSharing (2026+)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Gobernanza</strong></td>
+<td>Proyecto open source liderado por Databricks</td>
+<td>Proyecto independiente en la <strong>Linux Foundation</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Qué compartís</strong></td>
+<td>Tablas y archivos (Delta, Parquet)</td>
+<td>Eso + <strong>Iceberg</strong>, modelos, agent skills, Genie Agents, datos no estructurados, métricas</td>
+</tr>
+<tr class="odd">
+<td><strong>Quién puede leer</strong></td>
+<td>Clientes Delta Sharing (Spark, pandas, Power BI, otro Databricks)</td>
+<td>Eso + <strong>cualquier cliente Iceberg</strong> vía REST Catalog: Snowflake, Trino y compañía</td>
+</tr>
+<tr class="even">
+<td><strong>De dónde salen los datos</strong></td>
+<td>Tu cloud object storage</td>
+<td>Eso + <strong>on-premises</strong>: MinIO (GA) y más partners en camino</td>
+</tr>
+</tbody>
+</table>
+<p>La escala que trae de base no es menor: más de <strong>28.000 receptores de datos</strong> activos y un <strong>33% de los shares</strong> fluyendo entre plataformas distintas vía conectores abiertos. Amadeus, Atlassian, LSEG, SAP y Stripe están entre los usuarios del protocolo.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Nota
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>¿Por qué importa que esté en la Linux Foundation? Porque le baja el riesgo de <em>vendor lock-in</em> al que recibe. Adoptar un protocolo de sharing controlado por un solo vendor es incómodo si sos, por ejemplo, un cliente de Snowflake. Con gobernanza neutral, conectarse deja de ser una apuesta por Databricks y pasa a ser una apuesta por un estándar — que es exactamente el argumento que necesitás para convencer al partner del otro lado.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="zero-copy-cómo-funciona-por-abajo" class="level2">
+<h2 class="anchored" data-anchor-id="zero-copy-cómo-funciona-por-abajo">2. Zero-copy: cómo funciona por abajo</h2>
+<p>La pieza central del protocolo es que <strong>los datos nunca pasan por un servidor intermedio</strong>. El flujo tiene tres pasos:</p>
+<ol type="1">
+<li>El receptor le pide una tabla al <strong>sharing server</strong> del proveedor, autenticándose con su credencial.</li>
+<li>El server valida contra Unity Catalog qué puede ver ese receptor y le devuelve <strong>URLs temporales pre-firmadas</strong> que apuntan a los archivos Parquet de la tabla, directo en el object storage del proveedor.</li>
+<li>El receptor lee esos archivos <strong>directo del storage</strong>, con el motor que quiera.</li>
+</ol>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="El sharing server solo intercambia metadata y URLs temporales: los datos van directo del storage del proveedor al motor del receptor."><img src="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-13-opensharing/index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="El sharing server solo intercambia metadata y URLs temporales: los datos van directo del storage del proveedor al motor del receptor."></a></p>
+</figure>
+</div>
+<figcaption>El sharing server solo intercambia metadata y URLs temporales: los datos van directo del storage del proveedor al motor del receptor.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Tres consecuencias prácticas de este diseño:</p>
+<ul>
+<li><strong>No hay copia que se desactualice.</strong> El receptor lee la última versión de la tabla, siempre. Si tu MERGE de la mañana actualizó los datos, el partner los ve actualizados a la tarde sin que nadie corra nada.</li>
+<li><strong>Revocar acceso es instantáneo.</strong> Sacás el grant y las próximas URLs no se emiten. No hay que “pedir que borren el archivo”.</li>
+<li><strong>El compute lo pone el receptor.</strong> Vos no pagás las queries del otro — solo el storage que ya estabas pagando (y el egress, que veremos en los gotchas).</li>
+</ul>
+<hr>
+</section>
+<section id="los-objetos-shares-y-recipients" class="level2">
+<h2 class="anchored" data-anchor-id="los-objetos-shares-y-recipients">3. Los objetos: shares y recipients</h2>
+<p>En Unity Catalog, compartir se modela con dos objetos. Un <strong>share</strong> es una colección de assets para compartir (tablas, vistas, volúmenes, esquemas enteros). Un <strong>recipient</strong> es quién puede leerlo. La sintaxis es SQL directo:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 1. Crear el share</span></span>
+<span id="cb1-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SHARE</span> ventas_partner</span>
+<span id="cb1-3">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">COMMENT</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Transacciones agregadas para el partner X'</span>;</span>
+<span id="cb1-4"></span>
+<span id="cb1-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 2. Agregar assets</span></span>
+<span id="cb1-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SHARE</span> ventas_partner</span>
+<span id="cb1-7">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ADD</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> prod.ventas.transacciones_diarias;</span>
+<span id="cb1-8"></span>
+<span id="cb1-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Con historia: habilita time travel y change data feed del lado receptor</span></span>
+<span id="cb1-10"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SHARE</span> ventas_partner</span>
+<span id="cb1-11">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ADD</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> prod.ventas.transacciones_diarias <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WITH</span> HISTORY;</span>
+<span id="cb1-12"></span>
+<span id="cb1-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 3. Ver qué quedó adentro</span></span>
+<span id="cb1-14">DESCRIBE <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SHARE</span> ventas_partner;</span></code></pre></div></div>
+<p>Del otro lado, el recipient. Acá hay una bifurcación importante según <strong>quién</strong> recibe:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Caso A: el receptor también usa Databricks (Databricks-to-Databricks)</span></span>
+<span id="cb2-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Se identifica por el ID de su metastore — sin tokens, sin archivos</span></span>
+<span id="cb2-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> RECIPIENT partner_x</span>
+<span id="cb2-4">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">USING</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ID</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'azure:eastus2:a1b2c3d4-...'</span></span>
+<span id="cb2-5">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">COMMENT</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Equipo de datos del partner X'</span>;</span>
+<span id="cb2-6"></span>
+<span id="cb2-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Caso B: el receptor usa cualquier otra cosa (open sharing)</span></span>
+<span id="cb2-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Genera un link de activación para descargar el archivo de credenciales</span></span>
+<span id="cb2-9"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> RECIPIENT consultora_y;</span>
+<span id="cb2-10"></span>
+<span id="cb2-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 4. En ambos casos, el grant es el mismo</span></span>
+<span id="cb2-12"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">GRANT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ON</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SHARE</span> ventas_partner <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TO</span> RECIPIENT partner_x;</span></code></pre></div></div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>El modo <strong>Databricks-to-Databricks</strong> es más rico: además de tablas y vistas podés compartir volúmenes, modelos registrados en Unity Catalog y esquemas completos, y la autenticación la maneja la plataforma. El modo <strong>abierto</strong> es más universal pero más limitado. Si sabés que el receptor tiene Databricks, usá siempre el caso A.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="el-lado-del-que-recibe" class="level2">
+<h2 class="anchored" data-anchor-id="el-lado-del-que-recibe">4. El lado del que recibe</h2>
+<p>En Databricks-to-Databricks, el receptor monta el share como un catálogo más y consulta como si fuera local:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Del lado del receptor</span></span>
+<span id="cb3-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> CATALOG ventas_de_partner</span>
+<span id="cb3-3">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">USING</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SHARE</span> `proveedor<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>x`.ventas_partner;</span>
+<span id="cb3-4"></span>
+<span id="cb3-5"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> ventas_de_partner.ventas.transacciones_diarias</span>
+<span id="cb3-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHERE</span> fecha <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'2026-07-01'</span>;</span></code></pre></div></div>
+<p>En el modo abierto, el receptor descarga un archivo de credenciales (contiene el endpoint del sharing server y un token de acceso) y consume con el cliente que prefiera:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> delta_sharing</span>
+<span id="cb4-2"></span>
+<span id="cb4-3">perfil <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/ruta/al/archivo/config.share"</span></span>
+<span id="cb4-4"></span>
+<span id="cb4-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Explorar qué me compartieron</span></span>
+<span id="cb4-6">cliente <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> delta_sharing.SharingClient(perfil)</span>
+<span id="cb4-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(cliente.list_all_tables())</span>
+<span id="cb4-8"></span>
+<span id="cb4-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Leer a pandas (datasets chicos)</span></span>
+<span id="cb4-10">df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> delta_sharing.load_as_pandas(</span>
+<span id="cb4-11">    <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>perfil<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">#ventas_partner.ventas.transacciones_diarias"</span></span>
+<span id="cb4-12">)</span>
+<span id="cb4-13"></span>
+<span id="cb4-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Leer con Spark (datasets grandes)</span></span>
+<span id="cb4-15">df <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (spark.read</span>
+<span id="cb4-16">      .<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"deltaSharing"</span>)</span>
+<span id="cb4-17">      .load(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>perfil<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">#ventas_partner.ventas.transacciones_diarias"</span>))</span></code></pre></div></div>
+<p>El mismo share se puede leer desde Power BI, Excel, o cualquier herramienta con conector Delta Sharing — y desde 2026, desde cualquier cliente Iceberg. Que es exactamente la sección que sigue.</p>
+<hr>
+</section>
+<section id="lo-nuevo-iceberg-rest-catalog-compartirle-a-snowflake-sin-pelearse" class="level2">
+<h2 class="anchored" data-anchor-id="lo-nuevo-iceberg-rest-catalog-compartirle-a-snowflake-sin-pelearse">5. Lo nuevo — Iceberg REST Catalog: compartirle a Snowflake sin pelearse</h2>
+<p>Hasta ahora, si el receptor vivía en Snowflake, necesitaba el conector de Delta Sharing. Con OpenSharing, el share se expone también vía el <strong>Iceberg REST Catalog</strong> (la API estándar con la que los motores del ecosistema Iceberg descubren y leen tablas — la sigla que vas a ver es <strong>IRC</strong>). Traducción: <strong>cualquier cliente compatible con Iceberg puede leer tu share como si fuera un catálogo Iceberg</strong>, sin instalar nada de Databricks.</p>
+<p>Lo que ya está disponible y lo que viene:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Capacidad</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Compartir a cualquier cliente Iceberg (Snowflake, Trino, etc.)</td>
+<td><strong>GA</strong></td>
+</tr>
+<tr class="even">
+<td>Credenciales de storage vendidas por el protocolo (performance nativa, sin proxy)</td>
+<td><strong>GA</strong></td>
+</tr>
+<tr class="odd">
+<td>Compartir tablas Iceberg <em>foráneas</em> (registradas en AWS Glue, Snowflake Open Catalog u otro catálogo IRC)</td>
+<td>GA anunciada, en camino</td>
+</tr>
+<tr class="even">
+<td>Tablas Lakebase y su change data feed</td>
+<td>Public Preview</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Importante
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>El detalle técnico que hace la diferencia: las <strong>credenciales de storage vendidas por OpenSharing</strong> significan que el cliente Iceberg lee los archivos directo del object storage con credenciales temporales — la misma jugada zero-copy de siempre, sin pasar por un servidor que re-sirva los datos. Sin esto, “compatible con Iceberg” sería un eufemismo para “lento”.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Nota</span>Delta vs.&nbsp;Iceberg: qué es cada uno y cuándo se elige cuál
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si te preguntás por qué “compartir una tabla Delta a un cliente Iceberg” tiene sentido siquiera: los dos son <strong>formatos de tabla abiertos</strong> construidos sobre Parquet. Los datos son archivos Parquet comunes; lo que cada formato agrega es una capa de metadata arriba que aporta transacciones ACID, time travel y evolución de esquema. Las diferencias:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Delta Lake</th>
+<th>Apache Iceberg</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Origen</strong></td>
+<td>Databricks (open source vía delta.io)</td>
+<td>Netflix, hoy proyecto Apache</td>
+</tr>
+<tr class="even">
+<td><strong>Cómo lleva la metadata</strong></td>
+<td>Transaction log en <code>_delta_log/</code> (JSON + checkpoints) junto a los datos</td>
+<td>Snapshots y manifests, coordinados por un catálogo externo</td>
+</tr>
+<tr class="odd">
+<td><strong>Ecosistema más fuerte</strong></td>
+<td>Databricks, Spark</td>
+<td>Snowflake, Trino, Flink, BigQuery</td>
+</tr>
+<tr class="even">
+<td><strong>Puntos fuertes</strong></td>
+<td>MERGE/upserts de primera, Change Data Feed, streaming nativo con Structured Streaming, y todo el stack de optimización de Databricks (Photon, Liquid Clustering, Predictive I/O) trabaja para este formato</td>
+<td><strong>Partition evolution</strong> (cambiar el esquema de particionado sin reescribir la tabla) y <strong>hidden partitioning</strong> (el motor deriva la partición de una expresión — nadie filtra mal por la columna equivocada); neutralidad multi-motor real desde el diseño</td>
+</tr>
+</tbody>
+</table>
+<p>¿Y cuándo se elige cuál en un proyecto de big data?</p>
+<ul>
+<li><strong>Si tu plataforma es Databricks/Spark → Delta</strong>, sin vueltas: cada pieza del stack (el motor, el optimizador, las herramientas de mantenimiento) está construida y afinada para ese formato. Elegir otra cosa ahí es remar con el traje puesto.</li>
+<li><strong>Si tu arquitectura es multi-motor por diseño → Iceberg</strong>: cuando Trino sirve el ad hoc, Flink el streaming y Snowflake el BI, Iceberg es el único contrato que todos hablan como ciudadano de primera, y el catálogo externo hace de árbitro entre motores.</li>
+<li><strong>Si necesitás re-particionar tablas enormes con frecuencia → Iceberg</strong> tiene la ventaja técnica puntual (partition evolution)… aunque Liquid Clustering en Delta ataca el mismo dolor por otro camino: directamente dejar de particionar a mano.</li>
+<li><strong>Si estás en Databricks pero te exigen interoperabilidad → no migres</strong>: UniForm expone tus tablas Delta como Iceberg, y con OpenSharing el cliente Iceberg las lee vía el REST Catalog. La respuesta 2026 es que esta guerra se está volviendo irrelevante: abajo son los mismos Parquet, y “compartir Delta a un cliente Iceberg” es <strong>traducir metadata, no datos</strong>.</li>
+</ul>
+<p>Delta lo vimos a fondo en <a href="../databricks-tips-01-delta-lake/">Tips #2</a>.</p>
+</div>
+</div>
+<p>Si venís siguiendo la interna Delta vs.&nbsp;Iceberg, notá el movimiento: la pelea de formatos se está terminando por arriba, en la capa de protocolo. Compartís una tabla Delta y el otro la lee como Iceberg. El formato de la tabla pasa a ser un detalle de implementación del proveedor.</p>
+<hr>
+</section>
+<section id="lo-nuevo-ai-assets-modelos-agent-skills-y-genie-agents" class="level2">
+<h2 class="anchored" data-anchor-id="lo-nuevo-ai-assets-modelos-agent-skills-y-genie-agents">6. Lo nuevo — AI assets: modelos, agent skills y Genie Agents</h2>
+<p>Acá está el salto conceptual de OpenSharing: <strong>lo que se comparte deja de ser solo datos</strong>. El protocolo ahora contempla:</p>
+<ul>
+<li><strong>Modelos de AI</strong>: compartir un modelo registrado para que el partner lo use, sin mandarle los weights por WeTransfer.</li>
+<li><strong>Agent skills</strong>: la lógica reutilizable de un agente — herramientas, instrucciones, contexto semántico — empaquetada y compartible entre organizaciones.</li>
+<li><strong>Genie Agents</strong> (Beta): compartís una experiencia de chat en lenguaje natural sobre tus datos. El partner pregunta en su idioma y Genie responde con tus tablas por abajo — sin que el partner vea las tablas, ni las instrucciones del agente. Este anuncio lo habíamos anticipado en el <a href="../dais-2026-day-3/">día 3 de DAIS</a>.</li>
+</ul>
+<p>Para el caso Genie, los controles del proveedor son el punto fuerte (y algo que conviene configurar desde el día uno):</p>
+<ul>
+<li>Ocultar las <strong>instrucciones propietarias</strong> del agente (tu prompt engineering no viaja).</li>
+<li>Restringir el acceso a los datos <strong>solo a través del agente</strong> — el receptor conversa, no consulta.</li>
+<li><strong>Quota diaria de prompts</strong> por receptor.</li>
+<li><strong>Tope de filas exportables</strong> en las respuestas.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Advertencia
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>“Compartir un agente” suena a demo de keynote, pero el caso de uso real es concreto: sos un proveedor de datos y en vez de entregar 40 tablas con un data dictionary de 80 páginas, entregás un agente que las conoce. El costo de onboarding del receptor baja de semanas a una conversación. Eso sí: está en <strong>Beta</strong> — probalo con un partner amigo antes de venderlo como producto.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="lo-nuevo-on-premises-y-secureconnect" class="level2">
+<h2 class="anchored" data-anchor-id="lo-nuevo-on-premises-y-secureconnect">7. Lo nuevo — on-premises y SecureConnect</h2>
+<p>La otra frontera que cruza OpenSharing: <strong>los datos ya no tienen que estar en la nube para ser compartibles</strong>. Storage on-premises puede conectarse directo al protocolo:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Partner de storage</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>MinIO</strong></td>
+<td><strong>GA</strong></td>
+</tr>
+<tr class="even">
+<td>Everpure (ex Pure Storage)</td>
+<td>Private Preview</td>
+</tr>
+<tr class="odd">
+<td>Qumulo</td>
+<td>Private Preview (julio 2026)</td>
+</tr>
+<tr class="even">
+<td>VAST Data</td>
+<td>Private Preview (agosto 2026)</td>
+</tr>
+<tr class="odd">
+<td>Cohesity, Commvault, HPE, NetApp, Nutanix, Rubrik</td>
+<td>Anunciados para fin de 2026</td>
+</tr>
+</tbody>
+</table>
+<p>¿Y qué es <strong>MinIO</strong>, el único que ya está GA? Un object storage <strong>open source compatible con la API de S3</strong> que corre donde vos quieras: tus propios servidores, un cluster de Kubernetes, un datacenter privado. Es el estándar de facto para tener “un S3 puertas adentro” — las mismas APIs y herramientas del ecosistema cloud, sin nube. Por eso es el partner natural para arrancar: si tus datos on-prem ya viven en MinIO como Parquet o Delta, ya hablan el idioma que el protocolo necesita.</p>
+<p>Un ejemplo concreto de cómo queda el flujo, con un caso típico de la región — la empresa que por regulación (o por política interna) no puede subir ciertos datos a la nube:</p>
+<ol type="1">
+<li>El histórico vive como tablas Delta sobre un cluster <strong>MinIO</strong> en el datacenter propio. Ahí se queda.</li>
+<li>Ese MinIO se registra como fuente de OpenSharing, y las tablas quedan gobernadas por Unity Catalog como cualquier otra.</li>
+<li>Los analistas consultan desde Databricks serverless — o le preguntan a Genie en lenguaje natural — y el motor lee los archivos <strong>directo del MinIO</strong> con URLs temporales, igual que si fuera un bucket de S3.</li>
+<li>Nada se replicó a la nube: lo que viaja es el resultado de cada query, no el dataset. Y el pipeline de replicación que hoy mantiene alguien del equipo deja de existir.</li>
+</ol>
+<p>Y para el dolor de cabeza de conectar redes corporativas, <strong>SecureConnect</strong> (Public Preview): un proxy administrado por Databricks que elimina la configuración de firewall por receptor. Se configura una vez, y agregar receptores nuevos no requiere tocar reglas de red — que en una empresa grande significa no abrir un ticket a infraestructura por cada partner nuevo.</p>
+<p>Completan el combo multi-cloud: <strong>Global Distribution</strong> (Private Preview) — réplica automática cross-region y cross-cloud para bajar egress y latencia — y <strong>sharing entre dominios regulatorios</strong> (Public Preview) para compartir entre ambientes Databricks que viven bajo regulaciones distintas.</p>
+<hr>
+</section>
+<section id="y-mis-bases-on-premise-federation-sftp-y-el-fin-de-los-pipelines-de-copia" class="level2">
+<h2 class="anchored" data-anchor-id="y-mis-bases-on-premise-federation-sftp-y-el-fin-de-los-pipelines-de-copia">8. ¿Y mis bases on-premise? Federation, SFTP y el fin de los pipelines de copia</h2>
+<p>La pregunta que aparece apenas contás esto en una empresa de acá: “tengo un SQL Server (u Oracle, MySQL, PostgreSQL) on-premise con 15 años de historia — ¿lo puedo compartir así?”. Respuesta honesta: <strong>por OpenSharing directamente no</strong> — el protocolo comparte archivos desde object storage, y tu base relacional no expone Parquet. Pero la pregunta de fondo es otra: “¿puedo laburar con esos datos sin armar pipelines de copia?”. Y ahí la respuesta es sí, con dos piezas que se complementan con OpenSharing:</p>
+<p><strong>Lakehouse Federation</strong> para bases relacionales: registrás la conexión en Unity Catalog y la base entera aparece como un catálogo más — se consulta sin replicar nada:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Una vez: la conexión y el catálogo foráneo</span></span>
+<span id="cb5-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> CONNECTION sqlserver_onprem <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TYPE</span> sqlserver</span>
+<span id="cb5-3">  OPTIONS (host <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'srv-ventas.interno'</span>, port <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'1433'</span>,</span>
+<span id="cb5-4">           <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">user</span> secret(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'kv'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'fed-user'</span>), <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">password</span> secret(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'kv'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'fed-pass'</span>));</span>
+<span id="cb5-5"></span>
+<span id="cb5-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FOREIGN</span> CATALOG ventas_legacy</span>
+<span id="cb5-7">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">USING</span> CONNECTION sqlserver_onprem</span>
+<span id="cb5-8">  OPTIONS (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">database</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ventas'</span>);</span>
+<span id="cb5-9"></span>
+<span id="cb5-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Después: SQL normal, sin copiar una fila</span></span>
+<span id="cb5-11"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> ventas_legacy.dbo.clientes <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHERE</span> alta <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'2026-01-01'</span>;</span></code></pre></div></div>
+<p>Soporta SQL Server, Oracle, MySQL, PostgreSQL, Snowflake, Redshift, BigQuery y más — todo read-only y gobernado por Unity Catalog. El matiz técnico que importa: acá <strong>no hay URLs pre-firmadas</strong>. Cada query viaja por <strong>JDBC</strong> (<em>Java Database Connectivity</em>, el estándar de conectores a bases de datos) hasta la base origen: los filtros y agregaciones se empujan (<em>pushdown</em>) para que los resuelva la base, y el resto del plan lo termina Databricks. Sin réplicas que mantener, pero con un límite claro: si le apuntás 40 dashboards a la base transaccional de producción, el que sufre es el sistema transaccional. Federation es para acceso, exploración e integración — no para volumen analítico sostenido sobre un <strong>OLTP</strong> (<em>online transaction processing</em>: la base que atiende las operaciones del negocio en vivo).</p>
+<p><strong>Lakeflow Connect con conector SFTP</strong> para el otro clásico: el partner que “comparte” dejando archivos en un servidor <strong>SFTP</strong> (<em>Secure File Transfer Protocol</em> — la carpeta compartida remota de toda la vida). El conector administrado hace ingesta incremental con garantía exactly-once, inferencia y evolución de esquema, credenciales gobernadas en Unity Catalog, y lee CSV, JSON, XML, Parquet, Avro y ORC. Acá sí hay copia — es ingesta, no sharing — pero es un conector declarativo, no un pipeline artesanal que alguien tiene que mantener a mano. Y para la dirección contraria — vos dejándole archivos al partner en un SFTP — eso es exactamente lo que OpenSharing viene a jubilar.</p>
+<p><strong>¿Y cuál de los caminos conviene para la base on-premise?</strong> Porque en realidad son tres, no dos. Además de Federation, OpenSharing habilita un patrón nuevo: tu ETL escribe tablas Delta o Iceberg en un MinIO on-prem, y Databricks las monta como catálogo vía <a href="https://www.min.io/blog/the-on-premises-data-databricks-couldnt-reach-until-now">AIStor Table Sharing</a> — la base transaccional se toca una vez por ciclo de carga, y los datos nunca salen del datacenter. Y si los datos <strong>sí pueden</strong> ir a la nube, la tercera vía es Lakeflow Connect con CDC administrado directo al lakehouse. La tabla de decisión:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Federation directo</th>
+<th>RDBMS → Delta en MinIO → OpenSharing</th>
+<th>Lakeflow Connect (CDC a la nube)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ETL propio que mantener</strong></td>
+<td>Ninguno</td>
+<td>El pipeline a Delta/Iceberg</td>
+<td>Ninguno (conector administrado)</td>
+</tr>
+<tr class="even">
+<td><strong>Frescura</strong></td>
+<td>Estado actual, siempre</td>
+<td>La frecuencia de tu pipeline</td>
+<td>Near real-time (CDC)</td>
+</tr>
+<tr class="odd">
+<td><strong>Impacto en la base origen</strong></td>
+<td>Cada query le pega</td>
+<td>Una pasada por ciclo</td>
+<td>Lectura continua del change log</td>
+</tr>
+<tr class="even">
+<td><strong>Performance analítica</strong></td>
+<td>Limitada (pushdown parcial)</td>
+<td>Columnar completo</td>
+<td>Columnar completo</td>
+</tr>
+<tr class="odd">
+<td><strong>¿Los datos salen del datacenter?</strong></td>
+<td>No (viajan resultados, por query)</td>
+<td>No</td>
+<td>Sí — quedan en el lakehouse</td>
+</tr>
+<tr class="even">
+<td><strong>Cuándo</strong></td>
+<td>Ad hoc, POCs, consultas esporádicas</td>
+<td>Consumo pesado + datos que deben quedarse on-prem</td>
+<td>Consumo pesado + la nube está permitida</td>
+</tr>
+</tbody>
+</table>
+<p>La regla corta: exploración esporádica → <strong>Federation</strong>; OLTP que proteger y regulación que ancla los datos on-prem → <strong>MinIO + OpenSharing</strong>; la nube está permitida → <strong>Lakeflow Connect</strong>. Y un atajo que aparece seguido: si ya tenés un proceso que baja las bases a Parquet, la mitad del costo del patrón MinIO ya está pagada — pasar de Parquet suelto a Delta y activar Table Sharing es el paso corto.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>¿Chau, Data Factory (y las herramientas de mover datos)?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Sumá las tres piezas: Federation consulta las bases sin copiarlas, Lakeflow Connect ingesta lo que sí hay que traer (SFTP incluido, y CDC administrado — captura incremental de cambios — desde SQL Server), y OpenSharing distribuye hacia afuera sin exports. El patrón “Copy Activity + Linked Services + triggers” de <strong>Azure Data Factory</strong> — que en la práctica es el 80% de los ADF productivos que existen — ya tiene reemplazo nativo completo dentro del lakehouse, con la gobernanza en un solo lugar.</p>
+<p>Y no es solo Data Factory: aplica a toda la categoría de herramientas que vivía de ese hueco. <strong>Fivetran</strong> — durante años el camino recomendado para conectores administrados hacia Databricks, hasta que Lakeflow Connect ocupó ese rol nativo — y también Airbyte, Stitch, o los jobs de Informatica y Talend que solo mueven tablas de un lado a otro. Todas siguen teniendo sentido para orquestar o ingestar por fuera del ecosistema; como <em>copiadoras oficiales de datos hacia y desde el lakehouse</em>, les llegó el retiro.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="gobernanza-unity-catalog-viaja-con-el-share" class="level2">
+<h2 class="anchored" data-anchor-id="gobernanza-unity-catalog-viaja-con-el-share">9. Gobernanza: Unity Catalog viaja con el share</h2>
+<p>Todo lo anterior sería inmanejable sin una capa de gobernanza única, y acá es donde se nota que OpenSharing nace integrado a Unity Catalog (lo vimos a fondo en <a href="../databricks-tips-02-unity-catalog/">Tips #3</a>):</p>
+<ul>
+<li><strong>Auditoría de cada acceso</strong>: quién leyó qué tabla de qué share y cuándo, en los system tables de auditoría que ya usás.</li>
+<li><strong>Controles a nivel fila y columna</strong> que viajan con el asset compartido — el receptor ve lo que su grant dice, no lo que el archivo contiene.</li>
+<li><strong>Read-only por diseño</strong>: el receptor no puede escribir, ni accidentalmente ni a propósito.</li>
+<li><strong>Tokens con expiración</strong> para recipients del protocolo abierto, rotables desde el proveedor.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Tratá los shares como productos de datos, no como favores puntuales: un share por dominio/partner, vistas (no tablas crudas) como interfaz, y el grant documentado. El día que el partner pida “una columna más”, modificás la vista sin tocar el share — la misma lógica de contratos de datos que aplicás puertas adentro.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="cuándo-usarlo-los-tres-casos-que-justifican-armarlo-hoy" class="level2">
+<h2 class="anchored" data-anchor-id="cuándo-usarlo-los-tres-casos-que-justifican-armarlo-hoy">10. Cuándo usarlo: los tres casos que justifican armarlo hoy</h2>
+<ol type="1">
+<li><strong>Compartir con partners externos</strong> — el caso obvio. Reemplaza SFTPs, exports programados y buckets espejo. Si hoy tenés un pipeline cuyo único trabajo es copiarle datos a alguien, es candidato directo.</li>
+<li><strong>Multi-org interna</strong> — grupos empresariales con varias unidades, cada una con su metastore o su nube. Compartir entre sedes respetando residencia de datos, sin replicación cruzada.</li>
+<li><strong>Monetización</strong> — publicar datasets (o agentes, ahora) en Databricks Marketplace, que corre sobre OpenSharing. El receptor accede sin fricción y la distribución la maneja la plataforma.</li>
+</ol>
+<hr>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">11. Gotchas</h2>
+<ol type="1">
+<li><strong>Zero-copy no es zero-cost: el egress existe.</strong> El receptor lee de <em>tu</em> storage — si está en otra región u otra nube, el egress de esas lecturas lo paga tu cuenta de storage. Para shares intensivos cross-cloud, hacé la cuenta antes; Global Distribution (preview) apunta justo a esto.</li>
+<li><strong>Sin <code>WITH HISTORY</code>, no hay time travel ni CDF del otro lado.</strong> Si el receptor necesita leer el change data feed o versiones anteriores, la tabla tiene que estar compartida con historia — y el CDF además tiene que estar habilitado en la tabla <em>antes</em> de compartirla. Ojo con el default: en DBR 16.2+ las tablas se agregan <code>WITH HISTORY</code> por defecto; en runtimes anteriores, sin historia.</li>
+<li><strong>El lifetime de los tokens se configura a nivel metastore — hacelo corto.</strong> En recipients del protocolo abierto los tokens valen como máximo un año, pero un año es una eternidad: definí un lifetime corto y rotá. Un token vigente en el mail de alguien que ya no trabaja en el partner es un incidente esperando fecha.</li>
+<li><strong>Features nuevas de Delta pueden romper clientes viejos.</strong> Una tabla con deletion vectors o column mapping habilitados exige clientes de sharing que soporten leer en formato Delta. Si tu receptor usa un conector viejo, coordiná versiones antes de habilitar features en la tabla compartida.</li>
+<li><strong>El estado de cada feature importa.</strong> De este post: Iceberg clients y credenciales vendidas son <strong>GA</strong>; SecureConnect y Lakebase sharing, <strong>Public Preview</strong>; Genie Agent Sharing, <strong>Beta</strong>; Global Distribution, <strong>Private Preview</strong>. No armes tu roadmap comercial sobre una private preview.</li>
+<li><strong>Vistas como interfaz, pero ojo con la lógica pesada.</strong> Compartir una vista con 14 joins le traslada ese costo de cómputo a cada query del receptor. Para interfaces estables sobre lógica compleja, materializá primero.</li>
+<li><strong>El nombre del share es parte del contrato.</strong> El receptor monta el share y referencia sus esquemas y tablas por nombre. Renombrar cosas adentro de un share rompe queries ajenas que no ves ni controlás.</li>
+</ol>
+<hr>
+</section>
+<section id="cuándo-no-usar-opensharing" class="level2">
+<h2 class="anchored" data-anchor-id="cuándo-no-usar-opensharing">12. Cuándo NO usar OpenSharing</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Situación</th>
+<th>Por qué</th>
+<th>Alternativa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Compartir dentro de la misma metastore</strong></td>
+<td>Es agregar una capa de indirección innecesaria</td>
+<td><code>GRANT</code> normal de Unity Catalog</td>
+</tr>
+<tr class="even">
+<td><strong>El receptor necesita escribir</strong></td>
+<td>El protocolo es read-only por diseño</td>
+<td>Acceso al workspace, o ingesta inversa como pipeline explícito</td>
+</tr>
+<tr class="odd">
+<td><strong>Transferencia one-shot con cambio de dueño</strong></td>
+<td>No querés un vínculo vivo, querés entregar y desconectar</td>
+<td><code>DEEP CLONE</code> o export puntual</td>
+</tr>
+<tr class="even">
+<td><strong>SLA de latencia estricto para un receptor en otra punta del mundo</strong></td>
+<td>Cada query cruza regiones; la física no negocia</td>
+<td>Réplica regional (o Global Distribution cuando salga de preview)</td>
+</tr>
+<tr class="odd">
+<td><strong>El partner solo acepta “mandame el archivo”</strong></td>
+<td>El protocolo requiere que el receptor consuma, no que reciba</td>
+<td>Export programado — y una charla sobre 2026</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="referencias" class="level2">
+<h2 class="anchored" data-anchor-id="referencias">Referencias</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/opensharing/">What is OpenSharing? — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/opensharing/create-share">Create shares for OpenSharing</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/opensharing/create-recipient">Create recipients for OpenSharing</a></li>
+<li><a href="https://www.databricks.com/blog/introducing-opensharing-next-evolution-delta-sharing-agentic-era">Introducing OpenSharing — Databricks Blog</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-new-opensharing-and-marketplace-capabilities-ai-era">New OpenSharing and Marketplace capabilities — Databricks Blog</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-databricks-storage-ecosystem-governing-enterprise-data-estate-wherever-it-lives">Databricks storage ecosystem: zero-copy sobre datos on-premises — Databricks Blog</a></li>
+<li><a href="https://www.min.io/blog/the-on-premises-data-databricks-couldnt-reach-until-now">AIStor Table Sharing: tablas on-prem montadas en Databricks — MinIO Blog</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing">Press release: Databricks announces OpenSharing</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/query-federation/">Lakehouse Federation — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ingestion/sftp">Ingest files from SFTP servers — Azure Databricks</a></li>
+<li><a href="https://github.com/delta-io/delta-sharing">Delta Sharing en GitHub</a></li>
+</ul>
+</section>
+<section id="otros-posts-de-la-serie" class="level2">
+<h2 class="anchored" data-anchor-id="otros-posts-de-la-serie">Otros posts de la serie</h2>
+<p>Si te sirvió este post, mirá los anteriores de <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC para Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — las 7 cosas que te hubiera gustado saber</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — gobernanza que nadie implementa bien</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers y micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — del experimento al modelo</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features que sobreviven a producción</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker en Databricks</a> — contenedores custom</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming y triggers event-driven</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — el compute que se prende solo</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — governance centralizada para LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — pipelines declarativos con calidad built-in</li>
+<li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — el motor C++ que acelera tus queries sin cambiar código</li>
+</ul>
+<hr>
+<p><em>Próximo post de la serie: Liquid Clustering — el reemplazo de particiones y Z-ORDER que reordena tus datos solo.</em></p>
+
+
+</section>
+
+ ]]></description>
+  <category>Databricks Tips</category>
+  <category>Data Engineering</category>
+  <category>Delta Lake</category>
+  <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-13-opensharing/</guid>
+  <pubDate>Mon, 06 Jul 2026 22:00:00 GMT</pubDate>
+  <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-13-opensharing/cover.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>Databricks Tips #12: Photon — el motor C++ que acelera tus queries sin cambiar código</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -1111,7 +1933,7 @@ Tip
 <li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — pipelines declarativos con calidad built-in</li>
 </ul>
 <hr>
-<p><em>Próximo post de la serie: Liquid Clustering — el reemplazo de particiones y Z-ORDER que reordena tus datos solo.</em></p>
+<p><em>Siguiente post de la serie: <a href="../databricks-tips-13-opensharing/">OpenSharing — compartir sin copiar</a>. Y después: Liquid Clustering, el reemplazo de particiones y Z-ORDER que reordena tus datos solo.</em></p>
 
 
 </section>
@@ -1120,7 +1942,7 @@ Tip
   <category>Databricks Tips</category>
   <category>Data Engineering</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-12-photon/</guid>
-  <pubDate>Thu, 02 Jul 2026 03:00:00 GMT</pubDate>
+  <pubDate>Wed, 01 Jul 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-12-photon/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -6189,7 +7011,7 @@ font-style: inherit;">--template</span> agent-langgraph-advanced</span></code></
   <category>Data Engineering</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/deploy-ai-agents-dabs/</guid>
-  <pubDate>Sat, 27 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Fri, 26 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/deploy-ai-agents-dabs/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -6785,7 +7607,7 @@ font-style: inherit;">--template</span> agent-langgraph-advanced</span></code></
   <category>Databricks Tips</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/genie-zeroops/</guid>
-  <pubDate>Sat, 27 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Fri, 26 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/genie-zeroops/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -8064,7 +8886,7 @@ font-style: inherit;">"esperado"</span>)</span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>Databricks Tips</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/repos-github-databricks/</guid>
-  <pubDate>Sun, 21 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Sat, 20 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/repos-github-databricks/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -8502,7 +9324,7 @@ Importante
   <category>Data Architecture</category>
   <category>Databricks Tips</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/ltap-databricks/</guid>
-  <pubDate>Fri, 19 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Thu, 18 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/ltap-databricks/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -8729,7 +9551,7 @@ Importante
   <category>Databricks Tips</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/dais-2026-day-3/</guid>
-  <pubDate>Wed, 17 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Tue, 16 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/dais-2026-day-3/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -8962,7 +9784,7 @@ Importante
   <category>Databricks Tips</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/dais-2026-recap/</guid>
-  <pubDate>Tue, 16 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Mon, 15 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/dais-2026-recap/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -10360,7 +11182,7 @@ font-style: inherit;"> inherit</span></span></code></pre></div></div>
   <category>Developer Tools</category>
   <category>Open Source</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/omnigent-meta-harness/</guid>
-  <pubDate>Sun, 14 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Sat, 13 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/omnigent-meta-harness/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -12754,7 +13576,7 @@ font-style: inherit;">'...'</span>)</span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>Streaming</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-11-lakeflow-declarative-pipelines/</guid>
-  <pubDate>Thu, 11 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Wed, 10 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-11-lakeflow-declarative-pipelines/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -14526,7 +15348,7 @@ font-style: inherit;">ucode</span> revert</span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-10-ai-gateway/</guid>
-  <pubDate>Tue, 09 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Mon, 08 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-10-ai-gateway/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -15544,7 +16366,7 @@ font-style: inherit;">}</span></span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>Serverless</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-09-sql-warehouses/</guid>
-  <pubDate>Sat, 06 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Fri, 05 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-09-sql-warehouses/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -16577,7 +17399,7 @@ font-style: inherit;">"</span>)</span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>Streaming</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-08-jobs-workflows/</guid>
-  <pubDate>Thu, 04 Jun 2026 03:00:00 GMT</pubDate>
+  <pubDate>Wed, 03 Jun 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-08-jobs-workflows/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -17705,7 +18527,7 @@ font-style: inherit;">|</span></span>
   <category>Data Engineering</category>
   <category>Delta Lake</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-06-docker-containers/</guid>
-  <pubDate>Sat, 30 May 2026 03:00:00 GMT</pubDate>
+  <pubDate>Fri, 29 May 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-06-docker-containers/cover.png" medium="image" type="image/png" height="90" width="144"/>
 </item>
 <item>
@@ -18549,7 +19371,7 @@ font-style: inherit;">=</span> AGGREGATE</span>
   <category>Data Engineering</category>
   <category>Podcast</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/data-mesh-practica/</guid>
-  <pubDate>Tue, 21 Apr 2026 03:00:00 GMT</pubDate>
+  <pubDate>Mon, 20 Apr 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/data-mesh-practica/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -20067,7 +20889,7 @@ font-style: inherit;">"bronze_transactions"</span>)</span></code></pre></div></d
   <category>Data Engineering</category>
   <category>Podcast</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/data-contracts-framework/</guid>
-  <pubDate>Tue, 14 Apr 2026 03:00:00 GMT</pubDate>
+  <pubDate>Mon, 13 Apr 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/data-contracts-framework/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -20686,7 +21508,7 @@ Listado&nbsp;6: Patrón MVP: Medallion con Gold plano sin modelado formal
   <category>Data Engineering</category>
   <category>Podcast</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/data-modeling-medallion-vault-kimball/</guid>
-  <pubDate>Tue, 07 Apr 2026 03:00:00 GMT</pubDate>
+  <pubDate>Mon, 06 Apr 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/data-modeling-medallion-vault-kimball/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -21229,7 +22051,7 @@ font-style: inherit;">"</span>)</span></code></pre></div></div>
   <category>Machine Learning</category>
   <category>Feature Engineering</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-05-feature-engineering/</guid>
-  <pubDate>Tue, 31 Mar 2026 03:00:00 GMT</pubDate>
+  <pubDate>Mon, 30 Mar 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-05-feature-engineering/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -21893,7 +22715,7 @@ font-style: inherit;"># En serving, los busca automáticamente</span></span></co
   <category>MLflow</category>
   <category>Unity Catalog</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-04-mlflow-unity-catalog/</guid>
-  <pubDate>Tue, 24 Mar 2026 03:00:00 GMT</pubDate>
+  <pubDate>Mon, 23 Mar 2026 23:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-04-mlflow-unity-catalog/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -22386,594 +23208,8 @@ font-style: inherit;">        """</span>)</span>
   <category>Data Engineering</category>
   <category>Streaming</category>
   <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-03-structured-streaming/</guid>
-  <pubDate>Tue, 17 Mar 2026 03:00:00 GMT</pubDate>
+  <pubDate>Mon, 16 Mar 2026 23:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-03-structured-streaming/cover.png" medium="image" type="image/png" height="81" width="144"/>
-</item>
-<item>
-  <title>Databricks Tips #3: Unity Catalog — el modelo de gobernanza que nadie implementa bien</title>
-  <dc:creator>Mauro Loprete</dc:creator>
-  <link>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-02-unity-catalog/</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>Tercera entrega de <strong>Databricks Tips</strong>. Unity Catalog parece simple (catalog.schema.table), pero la mayoría de las implementaciones que vi tienen problemas de gobernanza desde el día uno.</p>
-<section id="el-modelo-de-3-niveles-más-que-un-namespace" class="level2">
-<h2 class="anchored" data-anchor-id="el-modelo-de-3-niveles-más-que-un-namespace">El modelo de 3 niveles: más que un namespace</h2>
-<div id="lst-namespace-3lvl" class="listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-namespace-3lvl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listado&nbsp;1: Namespace de 3 niveles en Unity Catalog
-</figcaption>
-<div aria-describedby="lst-namespace-3lvl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<pre><code>metastore
-  └── catalog          (env o dominio)
-       └── schema      (área funcional)
-            └── table  (dato)</code></pre>
-</div>
-</figure>
-</div>
-<p>La primera decisión crítica: <strong>cómo organizar los catalogs</strong>. Hay dos escuelas:</p>
-<section id="opción-a-catalogs-por-ambiente" class="level3">
-<h3 class="anchored" data-anchor-id="opción-a-catalogs-por-ambiente">Opción A: catalogs por ambiente</h3>
-<div id="lst-catalogs-by-env" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-catalogs-by-env-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listado&nbsp;2: Opcion A: catalogs organizados por ambiente (dev, staging, prod)
-</figcaption>
-<div aria-describedby="lst-catalogs-by-env-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> CATALOG dev;</span>
-<span id="cb2-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> CATALOG staging;</span>
-<span id="cb2-3"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> CATALOG prod;</span>
-<span id="cb2-4"></span>
-<span id="cb2-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Mismos schemas en cada catalog</span></span>
-<span id="cb2-6"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> dev.sales;</span>
-<span id="cb2-7"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> staging.sales;</span>
-<span id="cb2-8"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> prod.sales;</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Ventaja</strong>: el código cambia solo el catalog (<code>${environment}.sales.orders</code>), los schemas y tablas son idénticos.</p>
-<p><strong>Desventaja</strong>: necesitás 3x los permisos. Fácil cometer errores cruzando ambientes.</p>
-</section>
-<section id="opción-b-catalogs-por-dominio" class="level3">
-<h3 class="anchored" data-anchor-id="opción-b-catalogs-por-dominio">Opción B: catalogs por dominio</h3>
-<div id="lst-catalogs-by-domain" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-catalogs-by-domain-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listado&nbsp;3: Opcion B: catalogs organizados por dominio de negocio
-</figcaption>
-<div aria-describedby="lst-catalogs-by-domain-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> CATALOG sales;</span>
-<span id="cb3-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> CATALOG finance;</span>
-<span id="cb3-3"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> CATALOG marketing;</span>
-<span id="cb3-4"></span>
-<span id="cb3-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Schemas por etapa</span></span>
-<span id="cb3-6"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> sales.bronze;</span>
-<span id="cb3-7"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> sales.silver;</span>
-<span id="cb3-8"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> sales.gold;</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Ventaja</strong>: alineado con Data Mesh. Cada dominio tiene ownership claro.</p>
-<p><strong>Desventaja</strong>: el deploy es más complejo (no podés simplemente cambiar un prefijo).</p>
-<p><strong>Mi recomendación</strong>: arrancá con la Opción A si tenés un equipo chico. Migrá a Opción B cuando tengas ownership claro por dominio.</p>
-</section>
-</section>
-<section id="grants-heredados-el-error-más-común" class="level2">
-<h2 class="anchored" data-anchor-id="grants-heredados-el-error-más-común">GRANTS heredados: el error más común</h2>
-<p>Los permisos en Unity Catalog son <strong>heredables hacia abajo</strong>. Esto es poderoso pero peligroso:</p>
-<div id="lst-grants-schema" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-grants-schema-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listado&nbsp;4: GRANTS heredados: error comun vs.&nbsp;patron correcto a nivel schema
-</figcaption>
-<div aria-describedby="lst-grants-schema-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Este GRANT da acceso a TODAS las tablas presentes y FUTURAS del catalog</span></span>
-<span id="cb4-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">GRANT</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USE</span> CATALOG <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ON</span> CATALOG prod <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TO</span> `data<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>analysts`;</span>
-<span id="cb4-3"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">GRANT</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ON</span> CATALOG prod <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TO</span> `data<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>analysts`;</span>
-<span id="cb4-4"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">GRANT</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SELECT</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ON</span> CATALOG prod <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TO</span> `data<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>analysts`;</span>
-<span id="cb4-5"></span>
-<span id="cb4-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Mejor: dar acceso solo al schema gold</span></span>
-<span id="cb4-7"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">GRANT</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USE</span> CATALOG <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ON</span> CATALOG prod <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TO</span> `data<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>analysts`;</span>
-<span id="cb4-8"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">GRANT</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ON</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> prod.gold <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TO</span> `data<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>analysts`;</span>
-<span id="cb4-9"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">GRANT</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SELECT</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ON</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SCHEMA</span> prod.gold <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TO</span> `data<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>analysts`;</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Regla de oro</strong>: nunca des <code>SELECT ON CATALOG</code>. Siempre bajá al nivel de schema o tabla.</p>
-</section>
-<section id="row-column-level-security" class="level2">
-<h2 class="anchored" data-anchor-id="row-column-level-security">Row &amp; Column Level Security</h2>
-<p>Esto casi nadie lo usa pero es muy potente para cumplir con regulaciones (GDPR, PCI):</p>
-<div id="lst-row-col-security" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-row-col-security-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listado&nbsp;5: Row y column level security: masking de PII y filtros por region
-</figcaption>
-<div aria-describedby="lst-row-col-security-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Column masking: ocultar PII</span></span>
-<span id="cb5-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">FUNCTION</span> prod.security.mask_email(email STRING)</span>
-<span id="cb5-3">RETURNS STRING</span>
-<span id="cb5-4"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">RETURN</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CASE</span></span>
-<span id="cb5-5">  <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WHEN</span> is_member(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'pii-authorized'</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">THEN</span> email</span>
-<span id="cb5-6">  <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ELSE</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">regexp_replace</span>(email, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'(.).*@'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'$1***@'</span>)</span>
-<span id="cb5-7"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">END</span>;</span>
-<span id="cb5-8"></span>
-<span id="cb5-9"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> prod.gold.customers</span>
-<span id="cb5-10"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">COLUMN</span> email <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SET</span> MASK prod.security.mask_email;</span>
-<span id="cb5-11"></span>
-<span id="cb5-12"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Row filtering: cada equipo ve solo sus datos</span></span>
-<span id="cb5-13"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">FUNCTION</span> prod.security.region_filter(region STRING)</span>
-<span id="cb5-14">RETURNS <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">BOOLEAN</span></span>
-<span id="cb5-15"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">RETURN</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CASE</span></span>
-<span id="cb5-16">  <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WHEN</span> is_member(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'global-access'</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">THEN</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">true</span></span>
-<span id="cb5-17">  <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WHEN</span> is_member(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'latam-team'</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">THEN</span> region <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">IN</span> (<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'LATAM'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'BR'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'UY'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'AR'</span>)</span>
-<span id="cb5-18">  <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WHEN</span> is_member(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'eu-team'</span>) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">THEN</span> region <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">IN</span> (<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'EU'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'UK'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'DE'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'FR'</span>)</span>
-<span id="cb5-19">  <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ELSE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">false</span></span>
-<span id="cb5-20"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">END</span>;</span>
-<span id="cb5-21"></span>
-<span id="cb5-22"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> prod.gold.customers</span>
-<span id="cb5-23"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">SET</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ROW</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">FILTER</span> prod.security.region_filter <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">ON</span> (region);</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p>Ahora un analista de LATAM hace <code>SELECT * FROM prod.gold.customers</code> y solo ve clientes de su región, con emails enmascarados. Sin cambiar una línea de código.</p>
-</section>
-<section id="linaje-automático" class="level2">
-<h2 class="anchored" data-anchor-id="linaje-automático">Linaje automático</h2>
-<p>Unity Catalog trackea linaje automáticamente para cualquier operación que pase por Spark. Para aprovecharlo:</p>
-<div id="lst-lineage" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-lineage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listado&nbsp;6: Linaje automatico: buenas practicas para trazabilidad completa
-</figcaption>
-<div aria-describedby="lst-lineage-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Ver linaje de una tabla (qué tablas la alimentan)</span></span>
-<span id="cb6-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Esto se ve en el UI, pero también vía API:</span></span>
-<span id="cb6-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- GET /api/2.1/unity-catalog/lineage/table-lineage</span></span>
-<span id="cb6-4"></span>
-<span id="cb6-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Para que el linaje sea completo:</span></span>
-<span id="cb6-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- 1. Usar tablas de Unity Catalog (no paths directos)</span></span>
-<span id="cb6-7"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- 2. Evitar df.write.parquet() - usar df.write.saveAsTable()</span></span>
-<span id="cb6-8"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- 3. En DLT, el linaje es automático al 100%</span></span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Tip</strong>: si tenés un pipeline que lee de un path S3 directo, Unity Catalog no puede trackear el linaje. Registrá el path como External Location y External Table:</p>
-<div id="lst-external-location" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-external-location-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listado&nbsp;7: External Location y tabla externa para habilitar linaje en S3
-</figcaption>
-<div aria-describedby="lst-external-location-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> EXTERNAL LOCATION raw_s3</span>
-<span id="cb7-2">URL <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'s3://my-bucket/raw/'</span></span>
-<span id="cb7-3"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">WITH</span> (<span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">STORAGE</span> CREDENTIAL my_credential);</span>
-<span id="cb7-4"></span>
-<span id="cb7-5"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> prod.bronze.<span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">events</span></span>
-<span id="cb7-6"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA</span>
-<span id="cb7-7">LOCATION <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'s3://my-bucket/raw/events/'</span>;</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="volumes-archivos-no-tabulares" class="level2">
-<h2 class="anchored" data-anchor-id="volumes-archivos-no-tabulares">Volumes: archivos no tabulares</h2>
-<p>Desde DBR 13.3, Unity Catalog gobierna también archivos (CSV, JSON, modelos, artefactos):</p>
-<div id="lst-volumes" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-volumes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listado&nbsp;8: Volumes: gestionar archivos no tabulares con gobernanza UC
-</figcaption>
-<div aria-describedby="lst-volumes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Volume managed: Databricks gestiona el storage</span></span>
-<span id="cb8-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> VOLUME prod.ml.model_artifacts;</span>
-<span id="cb8-3"></span>
-<span id="cb8-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Volume external: vos controlás el storage</span></span>
-<span id="cb8-5"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> EXTERNAL VOLUME prod.<span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">raw</span>.landing_zone</span>
-<span id="cb8-6">LOCATION <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'s3://my-bucket/landing/'</span>;</span>
-<span id="cb8-7"></span>
-<span id="cb8-8"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Subir archivos</span></span>
-<span id="cb8-9"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- PUT /api/2.0/fs/files/Volumes/prod/ml/model_artifacts/model.pkl</span></span>
-<span id="cb8-10"></span>
-<span id="cb8-11"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Usar en código</span></span>
-<span id="cb8-12">df <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> spark.<span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">read</span>.csv(<span class="ot" style="color: #003B4F;
-background-color: null;
-font-style: inherit;">"/Volumes/prod/raw/landing_zone/customers.csv"</span>)</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p>Los Volumes tienen los mismos GRANTS que tablas (<code>READ VOLUME</code>, <code>WRITE VOLUME</code>), así que tenés gobernanza uniforme.</p>
-</section>
-<section id="checklist-de-gobernanza" class="level2">
-<h2 class="anchored" data-anchor-id="checklist-de-gobernanza">Checklist de gobernanza</h2>
-<ul class="task-list">
-<li><label><input type="checkbox">Catalogs organizados por ambiente O dominio (no mezclados)</label></li>
-<li><label><input type="checkbox"><code>SELECT ON CATALOG</code> nunca otorgado a grupos amplios</label></li>
-<li><label><input type="checkbox">Column masking en todas las columnas PII</label></li>
-<li><label><input type="checkbox">Row filters para datos multi-tenant</label></li>
-<li><label><input type="checkbox">External Locations registradas (no paths hardcodeados)</label></li>
-<li><label><input type="checkbox">Volumes para archivos no tabulares</label></li>
-<li><label><input type="checkbox">Service Principals para jobs de producción (no usuarios personales)</label></li>
-</ul>
-<hr>
-<p><em>Próxima semana: Structured Streaming — watermarks, triggers y cómo no perder datos en micro-batch.</em></p>
-
-
-</section>
-
- ]]></description>
-  <category>Databricks Tips</category>
-  <category>Data Engineering</category>
-  <category>Unity Catalog</category>
-  <guid>https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-02-unity-catalog/</guid>
-  <pubDate>Tue, 10 Mar 2026 03:00:00 GMT</pubDate>
-  <media:content url="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-02-unity-catalog/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>

@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="description" content="Qué hereda OpenSharing de Delta Sharing y qué agrega: zero-copy real, shares a clientes Iceberg como Snowflake y Trino, modelos y agent skills como assets compartibles, storage on-premises conectado al lakehouse. Con la sintaxis SQL para armar tu primer share.">
+
+<title>Databricks Tips #13: OpenSharing — compartir sin copiar – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Databricks Tips #13: OpenSharing — compartir sin copiar – Mauro Loprete">
+<meta property="og:description" content="Qué hereda OpenSharing de Delta Sharing y qué agrega: zero-copy real, shares a clientes Iceberg como Snowflake y Trino, modelos y agent skills como assets compartibles, storage on-premises conectado al lakehouse. Con la sintaxis SQL para armar tu primer share.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-13-opensharing/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #13: OpenSharing — compartir sin copiar – Mauro Loprete">
+<meta name="twitter:description" content="Qué hereda OpenSharing de Delta Sharing y qué agrega: zero-copy real, shares a clientes Iceberg como Snowflake y Trino, modelos y agent skills como assets compartibles, storage on-premises conectado al lakehouse. Con la sintaxis SQL para armar tu primer share.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-13-opensharing/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">En esta página</h2>
+   
+  <ul>
+  <li><a href="#de-delta-sharing-a-opensharing-qué-cambió-de-verdad" id="toc-de-delta-sharing-a-opensharing-qué-cambió-de-verdad" class="nav-link active" data-scroll-target="#de-delta-sharing-a-opensharing-qué-cambió-de-verdad">1. De Delta Sharing a OpenSharing: qué cambió de verdad</a></li>
+  <li><a href="#zero-copy-cómo-funciona-por-abajo" id="toc-zero-copy-cómo-funciona-por-abajo" class="nav-link" data-scroll-target="#zero-copy-cómo-funciona-por-abajo">2. Zero-copy: cómo funciona por abajo</a></li>
+  <li><a href="#los-objetos-shares-y-recipients" id="toc-los-objetos-shares-y-recipients" class="nav-link" data-scroll-target="#los-objetos-shares-y-recipients">3. Los objetos: shares y recipients</a></li>
+  <li><a href="#el-lado-del-que-recibe" id="toc-el-lado-del-que-recibe" class="nav-link" data-scroll-target="#el-lado-del-que-recibe">4. El lado del que recibe</a></li>
+  <li><a href="#lo-nuevo-iceberg-rest-catalog-compartirle-a-snowflake-sin-pelearse" id="toc-lo-nuevo-iceberg-rest-catalog-compartirle-a-snowflake-sin-pelearse" class="nav-link" data-scroll-target="#lo-nuevo-iceberg-rest-catalog-compartirle-a-snowflake-sin-pelearse">5. Lo nuevo — Iceberg REST Catalog: compartirle a Snowflake sin pelearse</a></li>
+  <li><a href="#lo-nuevo-ai-assets-modelos-agent-skills-y-genie-agents" id="toc-lo-nuevo-ai-assets-modelos-agent-skills-y-genie-agents" class="nav-link" data-scroll-target="#lo-nuevo-ai-assets-modelos-agent-skills-y-genie-agents">6. Lo nuevo — AI assets: modelos, agent skills y Genie Agents</a></li>
+  <li><a href="#lo-nuevo-on-premises-y-secureconnect" id="toc-lo-nuevo-on-premises-y-secureconnect" class="nav-link" data-scroll-target="#lo-nuevo-on-premises-y-secureconnect">7. Lo nuevo — on-premises y SecureConnect</a></li>
+  <li><a href="#y-mis-bases-on-premise-federation-sftp-y-el-fin-de-los-pipelines-de-copia" id="toc-y-mis-bases-on-premise-federation-sftp-y-el-fin-de-los-pipelines-de-copia" class="nav-link" data-scroll-target="#y-mis-bases-on-premise-federation-sftp-y-el-fin-de-los-pipelines-de-copia">8. ¿Y mis bases on-premise? Federation, SFTP y el fin de los pipelines de copia</a></li>
+  <li><a href="#gobernanza-unity-catalog-viaja-con-el-share" id="toc-gobernanza-unity-catalog-viaja-con-el-share" class="nav-link" data-scroll-target="#gobernanza-unity-catalog-viaja-con-el-share">9. Gobernanza: Unity Catalog viaja con el share</a></li>
+  <li><a href="#cuándo-usarlo-los-tres-casos-que-justifican-armarlo-hoy" id="toc-cuándo-usarlo-los-tres-casos-que-justifican-armarlo-hoy" class="nav-link" data-scroll-target="#cuándo-usarlo-los-tres-casos-que-justifican-armarlo-hoy">10. Cuándo usarlo: los tres casos que justifican armarlo hoy</a></li>
+  <li><a href="#gotchas" id="toc-gotchas" class="nav-link" data-scroll-target="#gotchas">11. Gotchas</a></li>
+  <li><a href="#cuándo-no-usar-opensharing" id="toc-cuándo-no-usar-opensharing" class="nav-link" data-scroll-target="#cuándo-no-usar-opensharing">12. Cuándo NO usar OpenSharing</a></li>
+  <li><a href="#referencias" id="toc-referencias" class="nav-link" data-scroll-target="#referencias">Referencias</a></li>
+  <li><a href="#otros-posts-de-la-serie" id="toc-otros-posts-de-la-serie" class="nav-link" data-scroll-target="#otros-posts-de-la-serie">Otros posts de la serie</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #13: OpenSharing — compartir sin copiar</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Data Engineering</div>
+    <div class="quarto-category">Delta Lake</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Qué hereda OpenSharing de Delta Sharing y qué agrega: zero-copy real, shares a clientes Iceberg como Snowflake y Trino, modelos y agent skills como assets compartibles, storage on-premises conectado al lakehouse. Con la sintaxis SQL para armar tu primer share.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">7 de julio de 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Compartir datos con otra empresa, versión clásica: exportás a CSV, subís a un SFTP, del otro lado alguien baja el archivo, lo importa, y a los tres meses nadie sabe cuál de las cuatro copias es la buena. Versión “moderna”: un pipeline que replica tablas a un bucket del partner, que hay que mantener, monitorear y pagar — por duplicado.</p>
+<p><strong>Delta Sharing</strong> vino a matar eso en 2021 con una idea simple: el que recibe lee tus datos directo de tu storage, sin copia. En el Data + AI Summit 2026 (junio pasado — las novedades completas las cubrimos en el <a href="../dais-2026-recap/">recap de DAIS 2026</a>) Databricks anunció su evolución: <strong>OpenSharing</strong>, ahora como proyecto independiente bajo la Linux Foundation, y con un alcance que ya no es solo tablas — modelos, agent skills y datos no estructurados. En este post vemos cómo funciona el protocolo por abajo, la sintaxis real para armar shares hoy, qué agrega OpenSharing y qué estado tiene cada feature (spoiler: no todo es GA).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Nota</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>OpenSharing es la <strong>evolución de Delta Sharing</strong>, no un reemplazo: mismo protocolo zero-copy, ahora bajo la Linux Foundation, retrocompatible con lo que ya tengas armado.</li>
+<li><strong>Zero-copy</strong> significa que el receptor lee tus archivos Parquet directo de tu object storage con URLs temporales — los datos nunca se duplican ni viajan por un servidor intermedio.</li>
+<li>Lo nuevo que ya es <strong>GA</strong>: compartir a cualquier cliente <strong>Iceberg</strong> (Snowflake, Trino) vía el REST Catalog, y credenciales de storage vendidas por el protocolo para performance nativa.</li>
+<li>Lo nuevo en <strong>preview/beta</strong>: compartir modelos y <strong>agent skills</strong>, Genie Agents con quotas y controles, tablas Lakebase con su change data feed, SecureConnect para redes corporativas y storage <strong>on-premises</strong> (MinIO ya es GA).</li>
+<li>¿Bases <strong>on-premise</strong> como SQL Server, Oracle, MySQL o Postgres? Por OpenSharing no — para eso está <strong>Lakehouse Federation</strong>: consultarlas desde Unity Catalog sin replicarlas. Y el SFTP del partner tiene conector administrado en Lakeflow Connect.</li>
+<li>Sigue siendo <strong>read-only</strong> y zero-copy no es zero-cost: el egress del storage lo pagás vos. La cuenta importa cuando el receptor está en otra región o nube.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="de-delta-sharing-a-opensharing-qué-cambió-de-verdad" class="level2">
+<h2 class="anchored" data-anchor-id="de-delta-sharing-a-opensharing-qué-cambió-de-verdad">1. De Delta Sharing a OpenSharing: qué cambió de verdad</h2>
+<p>Primero lo que <strong>no</strong> cambió: el protocolo de datos es el mismo. Si hoy tenés shares de Delta Sharing funcionando, siguen funcionando — OpenSharing es retrocompatible. Lo que cambió es la gobernanza del proyecto y el alcance:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Delta Sharing (2021–2025)</th>
+<th>OpenSharing (2026+)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Gobernanza</strong></td>
+<td>Proyecto open source liderado por Databricks</td>
+<td>Proyecto independiente en la <strong>Linux Foundation</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Qué compartís</strong></td>
+<td>Tablas y archivos (Delta, Parquet)</td>
+<td>Eso + <strong>Iceberg</strong>, modelos, agent skills, Genie Agents, datos no estructurados, métricas</td>
+</tr>
+<tr class="odd">
+<td><strong>Quién puede leer</strong></td>
+<td>Clientes Delta Sharing (Spark, pandas, Power BI, otro Databricks)</td>
+<td>Eso + <strong>cualquier cliente Iceberg</strong> vía REST Catalog: Snowflake, Trino y compañía</td>
+</tr>
+<tr class="even">
+<td><strong>De dónde salen los datos</strong></td>
+<td>Tu cloud object storage</td>
+<td>Eso + <strong>on-premises</strong>: MinIO (GA) y más partners en camino</td>
+</tr>
+</tbody>
+</table>
+<p>La escala que trae de base no es menor: más de <strong>28.000 receptores de datos</strong> activos y un <strong>33% de los shares</strong> fluyendo entre plataformas distintas vía conectores abiertos. Amadeus, Atlassian, LSEG, SAP y Stripe están entre los usuarios del protocolo.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Nota
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>¿Por qué importa que esté en la Linux Foundation? Porque le baja el riesgo de <em>vendor lock-in</em> al que recibe. Adoptar un protocolo de sharing controlado por un solo vendor es incómodo si sos, por ejemplo, un cliente de Snowflake. Con gobernanza neutral, conectarse deja de ser una apuesta por Databricks y pasa a ser una apuesta por un estándar — que es exactamente el argumento que necesitás para convencer al partner del otro lado.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="zero-copy-cómo-funciona-por-abajo" class="level2">
+<h2 class="anchored" data-anchor-id="zero-copy-cómo-funciona-por-abajo">2. Zero-copy: cómo funciona por abajo</h2>
+<p>La pieza central del protocolo es que <strong>los datos nunca pasan por un servidor intermedio</strong>. El flujo tiene tres pasos:</p>
+<ol type="1">
+<li>El receptor le pide una tabla al <strong>sharing server</strong> del proveedor, autenticándose con su credencial.</li>
+<li>El server valida contra Unity Catalog qué puede ver ese receptor y le devuelve <strong>URLs temporales pre-firmadas</strong> que apuntan a los archivos Parquet de la tabla, directo en el object storage del proveedor.</li>
+<li>El receptor lee esos archivos <strong>directo del storage</strong>, con el motor que quiera.</li>
+</ol>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="El sharing server solo intercambia metadata y URLs temporales: los datos van directo del storage del proveedor al motor del receptor."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="El sharing server solo intercambia metadata y URLs temporales: los datos van directo del storage del proveedor al motor del receptor."></a></p>
+</figure>
+</div>
+<figcaption>El sharing server solo intercambia metadata y URLs temporales: los datos van directo del storage del proveedor al motor del receptor.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Tres consecuencias prácticas de este diseño:</p>
+<ul>
+<li><strong>No hay copia que se desactualice.</strong> El receptor lee la última versión de la tabla, siempre. Si tu MERGE de la mañana actualizó los datos, el partner los ve actualizados a la tarde sin que nadie corra nada.</li>
+<li><strong>Revocar acceso es instantáneo.</strong> Sacás el grant y las próximas URLs no se emiten. No hay que “pedir que borren el archivo”.</li>
+<li><strong>El compute lo pone el receptor.</strong> Vos no pagás las queries del otro — solo el storage que ya estabas pagando (y el egress, que veremos en los gotchas).</li>
+</ul>
+<hr>
+</section>
+<section id="los-objetos-shares-y-recipients" class="level2">
+<h2 class="anchored" data-anchor-id="los-objetos-shares-y-recipients">3. Los objetos: shares y recipients</h2>
+<p>En Unity Catalog, compartir se modela con dos objetos. Un <strong>share</strong> es una colección de assets para compartir (tablas, vistas, volúmenes, esquemas enteros). Un <strong>recipient</strong> es quién puede leerlo. La sintaxis es SQL directo:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- 1. Crear el share</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">SHARE</span> ventas_partner</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">COMMENT</span> <span class="st">'Transacciones agregadas para el partner X'</span>;</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">-- 2. Agregar assets</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">SHARE</span> ventas_partner</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">ADD</span> <span class="kw">TABLE</span> prod.ventas.transacciones_diarias;</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- Con historia: habilita time travel y change data feed del lado receptor</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">SHARE</span> ventas_partner</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="kw">ADD</span> <span class="kw">TABLE</span> prod.ventas.transacciones_diarias <span class="kw">WITH</span> HISTORY;</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">-- 3. Ver qué quedó adentro</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>DESCRIBE <span class="kw">SHARE</span> ventas_partner;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Del otro lado, el recipient. Acá hay una bifurcación importante según <strong>quién</strong> recibe:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Caso A: el receptor también usa Databricks (Databricks-to-Databricks)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- Se identifica por el ID de su metastore — sin tokens, sin archivos</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> RECIPIENT partner_x</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">USING</span> <span class="kw">ID</span> <span class="st">'azure:eastus2:a1b2c3d4-...'</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">COMMENT</span> <span class="st">'Equipo de datos del partner X'</span>;</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co">-- Caso B: el receptor usa cualquier otra cosa (open sharing)</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- Genera un link de activación para descargar el archivo de credenciales</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> RECIPIENT consultora_y;</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co">-- 4. En ambos casos, el grant es el mismo</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">SELECT</span> <span class="kw">ON</span> <span class="kw">SHARE</span> ventas_partner <span class="kw">TO</span> RECIPIENT partner_x;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>El modo <strong>Databricks-to-Databricks</strong> es más rico: además de tablas y vistas podés compartir volúmenes, modelos registrados en Unity Catalog y esquemas completos, y la autenticación la maneja la plataforma. El modo <strong>abierto</strong> es más universal pero más limitado. Si sabés que el receptor tiene Databricks, usá siempre el caso A.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="el-lado-del-que-recibe" class="level2">
+<h2 class="anchored" data-anchor-id="el-lado-del-que-recibe">4. El lado del que recibe</h2>
+<p>En Databricks-to-Databricks, el receptor monta el share como un catálogo más y consulta como si fuera local:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Del lado del receptor</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> CATALOG ventas_de_partner</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">USING</span> <span class="kw">SHARE</span> `proveedor<span class="op">-</span>x`.ventas_partner;</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> ventas_de_partner.ventas.transacciones_diarias</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> fecha <span class="op">&gt;=</span> <span class="st">'2026-07-01'</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>En el modo abierto, el receptor descarga un archivo de credenciales (contiene el endpoint del sharing server y un token de acceso) y consume con el cliente que prefiera:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> delta_sharing</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>perfil <span class="op">=</span> <span class="st">"/ruta/al/archivo/config.share"</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Explorar qué me compartieron</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>cliente <span class="op">=</span> delta_sharing.SharingClient(perfil)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(cliente.list_all_tables())</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Leer a pandas (datasets chicos)</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> delta_sharing.load_as_pandas(</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f"</span><span class="sc">{</span>perfil<span class="sc">}</span><span class="ss">#ventas_partner.ventas.transacciones_diarias"</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Leer con Spark (datasets grandes)</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> (spark.read</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">format</span>(<span class="st">"deltaSharing"</span>)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>      .load(<span class="ss">f"</span><span class="sc">{</span>perfil<span class="sc">}</span><span class="ss">#ventas_partner.ventas.transacciones_diarias"</span>))</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>El mismo share se puede leer desde Power BI, Excel, o cualquier herramienta con conector Delta Sharing — y desde 2026, desde cualquier cliente Iceberg. Que es exactamente la sección que sigue.</p>
+<hr>
+</section>
+<section id="lo-nuevo-iceberg-rest-catalog-compartirle-a-snowflake-sin-pelearse" class="level2">
+<h2 class="anchored" data-anchor-id="lo-nuevo-iceberg-rest-catalog-compartirle-a-snowflake-sin-pelearse">5. Lo nuevo — Iceberg REST Catalog: compartirle a Snowflake sin pelearse</h2>
+<p>Hasta ahora, si el receptor vivía en Snowflake, necesitaba el conector de Delta Sharing. Con OpenSharing, el share se expone también vía el <strong>Iceberg REST Catalog</strong> (la API estándar con la que los motores del ecosistema Iceberg descubren y leen tablas — la sigla que vas a ver es <strong>IRC</strong>). Traducción: <strong>cualquier cliente compatible con Iceberg puede leer tu share como si fuera un catálogo Iceberg</strong>, sin instalar nada de Databricks.</p>
+<p>Lo que ya está disponible y lo que viene:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Capacidad</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Compartir a cualquier cliente Iceberg (Snowflake, Trino, etc.)</td>
+<td><strong>GA</strong></td>
+</tr>
+<tr class="even">
+<td>Credenciales de storage vendidas por el protocolo (performance nativa, sin proxy)</td>
+<td><strong>GA</strong></td>
+</tr>
+<tr class="odd">
+<td>Compartir tablas Iceberg <em>foráneas</em> (registradas en AWS Glue, Snowflake Open Catalog u otro catálogo IRC)</td>
+<td>GA anunciada, en camino</td>
+</tr>
+<tr class="even">
+<td>Tablas Lakebase y su change data feed</td>
+<td>Public Preview</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Importante
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>El detalle técnico que hace la diferencia: las <strong>credenciales de storage vendidas por OpenSharing</strong> significan que el cliente Iceberg lee los archivos directo del object storage con credenciales temporales — la misma jugada zero-copy de siempre, sin pasar por un servidor que re-sirva los datos. Sin esto, “compatible con Iceberg” sería un eufemismo para “lento”.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Nota</span>Delta vs.&nbsp;Iceberg: qué es cada uno y cuándo se elige cuál
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si te preguntás por qué “compartir una tabla Delta a un cliente Iceberg” tiene sentido siquiera: los dos son <strong>formatos de tabla abiertos</strong> construidos sobre Parquet. Los datos son archivos Parquet comunes; lo que cada formato agrega es una capa de metadata arriba que aporta transacciones ACID, time travel y evolución de esquema. Las diferencias:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Delta Lake</th>
+<th>Apache Iceberg</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Origen</strong></td>
+<td>Databricks (open source vía delta.io)</td>
+<td>Netflix, hoy proyecto Apache</td>
+</tr>
+<tr class="even">
+<td><strong>Cómo lleva la metadata</strong></td>
+<td>Transaction log en <code>_delta_log/</code> (JSON + checkpoints) junto a los datos</td>
+<td>Snapshots y manifests, coordinados por un catálogo externo</td>
+</tr>
+<tr class="odd">
+<td><strong>Ecosistema más fuerte</strong></td>
+<td>Databricks, Spark</td>
+<td>Snowflake, Trino, Flink, BigQuery</td>
+</tr>
+<tr class="even">
+<td><strong>Puntos fuertes</strong></td>
+<td>MERGE/upserts de primera, Change Data Feed, streaming nativo con Structured Streaming, y todo el stack de optimización de Databricks (Photon, Liquid Clustering, Predictive I/O) trabaja para este formato</td>
+<td><strong>Partition evolution</strong> (cambiar el esquema de particionado sin reescribir la tabla) y <strong>hidden partitioning</strong> (el motor deriva la partición de una expresión — nadie filtra mal por la columna equivocada); neutralidad multi-motor real desde el diseño</td>
+</tr>
+</tbody>
+</table>
+<p>¿Y cuándo se elige cuál en un proyecto de big data?</p>
+<ul>
+<li><strong>Si tu plataforma es Databricks/Spark → Delta</strong>, sin vueltas: cada pieza del stack (el motor, el optimizador, las herramientas de mantenimiento) está construida y afinada para ese formato. Elegir otra cosa ahí es remar con el traje puesto.</li>
+<li><strong>Si tu arquitectura es multi-motor por diseño → Iceberg</strong>: cuando Trino sirve el ad hoc, Flink el streaming y Snowflake el BI, Iceberg es el único contrato que todos hablan como ciudadano de primera, y el catálogo externo hace de árbitro entre motores.</li>
+<li><strong>Si necesitás re-particionar tablas enormes con frecuencia → Iceberg</strong> tiene la ventaja técnica puntual (partition evolution)… aunque Liquid Clustering en Delta ataca el mismo dolor por otro camino: directamente dejar de particionar a mano.</li>
+<li><strong>Si estás en Databricks pero te exigen interoperabilidad → no migres</strong>: UniForm expone tus tablas Delta como Iceberg, y con OpenSharing el cliente Iceberg las lee vía el REST Catalog. La respuesta 2026 es que esta guerra se está volviendo irrelevante: abajo son los mismos Parquet, y “compartir Delta a un cliente Iceberg” es <strong>traducir metadata, no datos</strong>.</li>
+</ul>
+<p>Delta lo vimos a fondo en <a href="../databricks-tips-01-delta-lake/">Tips #2</a>.</p>
+</div>
+</div>
+<p>Si venís siguiendo la interna Delta vs.&nbsp;Iceberg, notá el movimiento: la pelea de formatos se está terminando por arriba, en la capa de protocolo. Compartís una tabla Delta y el otro la lee como Iceberg. El formato de la tabla pasa a ser un detalle de implementación del proveedor.</p>
+<hr>
+</section>
+<section id="lo-nuevo-ai-assets-modelos-agent-skills-y-genie-agents" class="level2">
+<h2 class="anchored" data-anchor-id="lo-nuevo-ai-assets-modelos-agent-skills-y-genie-agents">6. Lo nuevo — AI assets: modelos, agent skills y Genie Agents</h2>
+<p>Acá está el salto conceptual de OpenSharing: <strong>lo que se comparte deja de ser solo datos</strong>. El protocolo ahora contempla:</p>
+<ul>
+<li><strong>Modelos de AI</strong>: compartir un modelo registrado para que el partner lo use, sin mandarle los weights por WeTransfer.</li>
+<li><strong>Agent skills</strong>: la lógica reutilizable de un agente — herramientas, instrucciones, contexto semántico — empaquetada y compartible entre organizaciones.</li>
+<li><strong>Genie Agents</strong> (Beta): compartís una experiencia de chat en lenguaje natural sobre tus datos. El partner pregunta en su idioma y Genie responde con tus tablas por abajo — sin que el partner vea las tablas, ni las instrucciones del agente. Este anuncio lo habíamos anticipado en el <a href="../dais-2026-day-3/">día 3 de DAIS</a>.</li>
+</ul>
+<p>Para el caso Genie, los controles del proveedor son el punto fuerte (y algo que conviene configurar desde el día uno):</p>
+<ul>
+<li>Ocultar las <strong>instrucciones propietarias</strong> del agente (tu prompt engineering no viaja).</li>
+<li>Restringir el acceso a los datos <strong>solo a través del agente</strong> — el receptor conversa, no consulta.</li>
+<li><strong>Quota diaria de prompts</strong> por receptor.</li>
+<li><strong>Tope de filas exportables</strong> en las respuestas.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Advertencia
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>“Compartir un agente” suena a demo de keynote, pero el caso de uso real es concreto: sos un proveedor de datos y en vez de entregar 40 tablas con un data dictionary de 80 páginas, entregás un agente que las conoce. El costo de onboarding del receptor baja de semanas a una conversación. Eso sí: está en <strong>Beta</strong> — probalo con un partner amigo antes de venderlo como producto.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="lo-nuevo-on-premises-y-secureconnect" class="level2">
+<h2 class="anchored" data-anchor-id="lo-nuevo-on-premises-y-secureconnect">7. Lo nuevo — on-premises y SecureConnect</h2>
+<p>La otra frontera que cruza OpenSharing: <strong>los datos ya no tienen que estar en la nube para ser compartibles</strong>. Storage on-premises puede conectarse directo al protocolo:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Partner de storage</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>MinIO</strong></td>
+<td><strong>GA</strong></td>
+</tr>
+<tr class="even">
+<td>Everpure (ex Pure Storage)</td>
+<td>Private Preview</td>
+</tr>
+<tr class="odd">
+<td>Qumulo</td>
+<td>Private Preview (julio 2026)</td>
+</tr>
+<tr class="even">
+<td>VAST Data</td>
+<td>Private Preview (agosto 2026)</td>
+</tr>
+<tr class="odd">
+<td>Cohesity, Commvault, HPE, NetApp, Nutanix, Rubrik</td>
+<td>Anunciados para fin de 2026</td>
+</tr>
+</tbody>
+</table>
+<p>¿Y qué es <strong>MinIO</strong>, el único que ya está GA? Un object storage <strong>open source compatible con la API de S3</strong> que corre donde vos quieras: tus propios servidores, un cluster de Kubernetes, un datacenter privado. Es el estándar de facto para tener “un S3 puertas adentro” — las mismas APIs y herramientas del ecosistema cloud, sin nube. Por eso es el partner natural para arrancar: si tus datos on-prem ya viven en MinIO como Parquet o Delta, ya hablan el idioma que el protocolo necesita.</p>
+<p>Un ejemplo concreto de cómo queda el flujo, con un caso típico de la región — la empresa que por regulación (o por política interna) no puede subir ciertos datos a la nube:</p>
+<ol type="1">
+<li>El histórico vive como tablas Delta sobre un cluster <strong>MinIO</strong> en el datacenter propio. Ahí se queda.</li>
+<li>Ese MinIO se registra como fuente de OpenSharing, y las tablas quedan gobernadas por Unity Catalog como cualquier otra.</li>
+<li>Los analistas consultan desde Databricks serverless — o le preguntan a Genie en lenguaje natural — y el motor lee los archivos <strong>directo del MinIO</strong> con URLs temporales, igual que si fuera un bucket de S3.</li>
+<li>Nada se replicó a la nube: lo que viaja es el resultado de cada query, no el dataset. Y el pipeline de replicación que hoy mantiene alguien del equipo deja de existir.</li>
+</ol>
+<p>Y para el dolor de cabeza de conectar redes corporativas, <strong>SecureConnect</strong> (Public Preview): un proxy administrado por Databricks que elimina la configuración de firewall por receptor. Se configura una vez, y agregar receptores nuevos no requiere tocar reglas de red — que en una empresa grande significa no abrir un ticket a infraestructura por cada partner nuevo.</p>
+<p>Completan el combo multi-cloud: <strong>Global Distribution</strong> (Private Preview) — réplica automática cross-region y cross-cloud para bajar egress y latencia — y <strong>sharing entre dominios regulatorios</strong> (Public Preview) para compartir entre ambientes Databricks que viven bajo regulaciones distintas.</p>
+<hr>
+</section>
+<section id="y-mis-bases-on-premise-federation-sftp-y-el-fin-de-los-pipelines-de-copia" class="level2">
+<h2 class="anchored" data-anchor-id="y-mis-bases-on-premise-federation-sftp-y-el-fin-de-los-pipelines-de-copia">8. ¿Y mis bases on-premise? Federation, SFTP y el fin de los pipelines de copia</h2>
+<p>La pregunta que aparece apenas contás esto en una empresa de acá: “tengo un SQL Server (u Oracle, MySQL, PostgreSQL) on-premise con 15 años de historia — ¿lo puedo compartir así?”. Respuesta honesta: <strong>por OpenSharing directamente no</strong> — el protocolo comparte archivos desde object storage, y tu base relacional no expone Parquet. Pero la pregunta de fondo es otra: “¿puedo laburar con esos datos sin armar pipelines de copia?”. Y ahí la respuesta es sí, con dos piezas que se complementan con OpenSharing:</p>
+<p><strong>Lakehouse Federation</strong> para bases relacionales: registrás la conexión en Unity Catalog y la base entera aparece como un catálogo más — se consulta sin replicar nada:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Una vez: la conexión y el catálogo foráneo</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> CONNECTION sqlserver_onprem <span class="kw">TYPE</span> sqlserver</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  OPTIONS (host <span class="st">'srv-ventas.interno'</span>, port <span class="st">'1433'</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>           <span class="fu">user</span> secret(<span class="st">'kv'</span>, <span class="st">'fed-user'</span>), <span class="kw">password</span> secret(<span class="st">'kv'</span>, <span class="st">'fed-pass'</span>));</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">FOREIGN</span> CATALOG ventas_legacy</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">USING</span> CONNECTION sqlserver_onprem</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  OPTIONS (<span class="kw">database</span> <span class="st">'ventas'</span>);</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co">-- Después: SQL normal, sin copiar una fila</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> ventas_legacy.dbo.clientes <span class="kw">WHERE</span> alta <span class="op">&gt;=</span> <span class="st">'2026-01-01'</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Soporta SQL Server, Oracle, MySQL, PostgreSQL, Snowflake, Redshift, BigQuery y más — todo read-only y gobernado por Unity Catalog. El matiz técnico que importa: acá <strong>no hay URLs pre-firmadas</strong>. Cada query viaja por <strong>JDBC</strong> (<em>Java Database Connectivity</em>, el estándar de conectores a bases de datos) hasta la base origen: los filtros y agregaciones se empujan (<em>pushdown</em>) para que los resuelva la base, y el resto del plan lo termina Databricks. Sin réplicas que mantener, pero con un límite claro: si le apuntás 40 dashboards a la base transaccional de producción, el que sufre es el sistema transaccional. Federation es para acceso, exploración e integración — no para volumen analítico sostenido sobre un <strong>OLTP</strong> (<em>online transaction processing</em>: la base que atiende las operaciones del negocio en vivo).</p>
+<p><strong>Lakeflow Connect con conector SFTP</strong> para el otro clásico: el partner que “comparte” dejando archivos en un servidor <strong>SFTP</strong> (<em>Secure File Transfer Protocol</em> — la carpeta compartida remota de toda la vida). El conector administrado hace ingesta incremental con garantía exactly-once, inferencia y evolución de esquema, credenciales gobernadas en Unity Catalog, y lee CSV, JSON, XML, Parquet, Avro y ORC. Acá sí hay copia — es ingesta, no sharing — pero es un conector declarativo, no un pipeline artesanal que alguien tiene que mantener a mano. Y para la dirección contraria — vos dejándole archivos al partner en un SFTP — eso es exactamente lo que OpenSharing viene a jubilar.</p>
+<p><strong>¿Y cuál de los caminos conviene para la base on-premise?</strong> Porque en realidad son tres, no dos. Además de Federation, OpenSharing habilita un patrón nuevo: tu ETL escribe tablas Delta o Iceberg en un MinIO on-prem, y Databricks las monta como catálogo vía <a href="https://www.min.io/blog/the-on-premises-data-databricks-couldnt-reach-until-now">AIStor Table Sharing</a> — la base transaccional se toca una vez por ciclo de carga, y los datos nunca salen del datacenter. Y si los datos <strong>sí pueden</strong> ir a la nube, la tercera vía es Lakeflow Connect con CDC administrado directo al lakehouse. La tabla de decisión:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Federation directo</th>
+<th>RDBMS → Delta en MinIO → OpenSharing</th>
+<th>Lakeflow Connect (CDC a la nube)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ETL propio que mantener</strong></td>
+<td>Ninguno</td>
+<td>El pipeline a Delta/Iceberg</td>
+<td>Ninguno (conector administrado)</td>
+</tr>
+<tr class="even">
+<td><strong>Frescura</strong></td>
+<td>Estado actual, siempre</td>
+<td>La frecuencia de tu pipeline</td>
+<td>Near real-time (CDC)</td>
+</tr>
+<tr class="odd">
+<td><strong>Impacto en la base origen</strong></td>
+<td>Cada query le pega</td>
+<td>Una pasada por ciclo</td>
+<td>Lectura continua del change log</td>
+</tr>
+<tr class="even">
+<td><strong>Performance analítica</strong></td>
+<td>Limitada (pushdown parcial)</td>
+<td>Columnar completo</td>
+<td>Columnar completo</td>
+</tr>
+<tr class="odd">
+<td><strong>¿Los datos salen del datacenter?</strong></td>
+<td>No (viajan resultados, por query)</td>
+<td>No</td>
+<td>Sí — quedan en el lakehouse</td>
+</tr>
+<tr class="even">
+<td><strong>Cuándo</strong></td>
+<td>Ad hoc, POCs, consultas esporádicas</td>
+<td>Consumo pesado + datos que deben quedarse on-prem</td>
+<td>Consumo pesado + la nube está permitida</td>
+</tr>
+</tbody>
+</table>
+<p>La regla corta: exploración esporádica → <strong>Federation</strong>; OLTP que proteger y regulación que ancla los datos on-prem → <strong>MinIO + OpenSharing</strong>; la nube está permitida → <strong>Lakeflow Connect</strong>. Y un atajo que aparece seguido: si ya tenés un proceso que baja las bases a Parquet, la mitad del costo del patrón MinIO ya está pagada — pasar de Parquet suelto a Delta y activar Table Sharing es el paso corto.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>¿Chau, Data Factory (y las herramientas de mover datos)?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Sumá las tres piezas: Federation consulta las bases sin copiarlas, Lakeflow Connect ingesta lo que sí hay que traer (SFTP incluido, y CDC administrado — captura incremental de cambios — desde SQL Server), y OpenSharing distribuye hacia afuera sin exports. El patrón “Copy Activity + Linked Services + triggers” de <strong>Azure Data Factory</strong> — que en la práctica es el 80% de los ADF productivos que existen — ya tiene reemplazo nativo completo dentro del lakehouse, con la gobernanza en un solo lugar.</p>
+<p>Y no es solo Data Factory: aplica a toda la categoría de herramientas que vivía de ese hueco. <strong>Fivetran</strong> — durante años el camino recomendado para conectores administrados hacia Databricks, hasta que Lakeflow Connect ocupó ese rol nativo — y también Airbyte, Stitch, o los jobs de Informatica y Talend que solo mueven tablas de un lado a otro. Todas siguen teniendo sentido para orquestar o ingestar por fuera del ecosistema; como <em>copiadoras oficiales de datos hacia y desde el lakehouse</em>, les llegó el retiro.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="gobernanza-unity-catalog-viaja-con-el-share" class="level2">
+<h2 class="anchored" data-anchor-id="gobernanza-unity-catalog-viaja-con-el-share">9. Gobernanza: Unity Catalog viaja con el share</h2>
+<p>Todo lo anterior sería inmanejable sin una capa de gobernanza única, y acá es donde se nota que OpenSharing nace integrado a Unity Catalog (lo vimos a fondo en <a href="../databricks-tips-02-unity-catalog/">Tips #3</a>):</p>
+<ul>
+<li><strong>Auditoría de cada acceso</strong>: quién leyó qué tabla de qué share y cuándo, en los system tables de auditoría que ya usás.</li>
+<li><strong>Controles a nivel fila y columna</strong> que viajan con el asset compartido — el receptor ve lo que su grant dice, no lo que el archivo contiene.</li>
+<li><strong>Read-only por diseño</strong>: el receptor no puede escribir, ni accidentalmente ni a propósito.</li>
+<li><strong>Tokens con expiración</strong> para recipients del protocolo abierto, rotables desde el proveedor.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Tratá los shares como productos de datos, no como favores puntuales: un share por dominio/partner, vistas (no tablas crudas) como interfaz, y el grant documentado. El día que el partner pida “una columna más”, modificás la vista sin tocar el share — la misma lógica de contratos de datos que aplicás puertas adentro.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="cuándo-usarlo-los-tres-casos-que-justifican-armarlo-hoy" class="level2">
+<h2 class="anchored" data-anchor-id="cuándo-usarlo-los-tres-casos-que-justifican-armarlo-hoy">10. Cuándo usarlo: los tres casos que justifican armarlo hoy</h2>
+<ol type="1">
+<li><strong>Compartir con partners externos</strong> — el caso obvio. Reemplaza SFTPs, exports programados y buckets espejo. Si hoy tenés un pipeline cuyo único trabajo es copiarle datos a alguien, es candidato directo.</li>
+<li><strong>Multi-org interna</strong> — grupos empresariales con varias unidades, cada una con su metastore o su nube. Compartir entre sedes respetando residencia de datos, sin replicación cruzada.</li>
+<li><strong>Monetización</strong> — publicar datasets (o agentes, ahora) en Databricks Marketplace, que corre sobre OpenSharing. El receptor accede sin fricción y la distribución la maneja la plataforma.</li>
+</ol>
+<hr>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">11. Gotchas</h2>
+<ol type="1">
+<li><strong>Zero-copy no es zero-cost: el egress existe.</strong> El receptor lee de <em>tu</em> storage — si está en otra región u otra nube, el egress de esas lecturas lo paga tu cuenta de storage. Para shares intensivos cross-cloud, hacé la cuenta antes; Global Distribution (preview) apunta justo a esto.</li>
+<li><strong>Sin <code>WITH HISTORY</code>, no hay time travel ni CDF del otro lado.</strong> Si el receptor necesita leer el change data feed o versiones anteriores, la tabla tiene que estar compartida con historia — y el CDF además tiene que estar habilitado en la tabla <em>antes</em> de compartirla. Ojo con el default: en DBR 16.2+ las tablas se agregan <code>WITH HISTORY</code> por defecto; en runtimes anteriores, sin historia.</li>
+<li><strong>El lifetime de los tokens se configura a nivel metastore — hacelo corto.</strong> En recipients del protocolo abierto los tokens valen como máximo un año, pero un año es una eternidad: definí un lifetime corto y rotá. Un token vigente en el mail de alguien que ya no trabaja en el partner es un incidente esperando fecha.</li>
+<li><strong>Features nuevas de Delta pueden romper clientes viejos.</strong> Una tabla con deletion vectors o column mapping habilitados exige clientes de sharing que soporten leer en formato Delta. Si tu receptor usa un conector viejo, coordiná versiones antes de habilitar features en la tabla compartida.</li>
+<li><strong>El estado de cada feature importa.</strong> De este post: Iceberg clients y credenciales vendidas son <strong>GA</strong>; SecureConnect y Lakebase sharing, <strong>Public Preview</strong>; Genie Agent Sharing, <strong>Beta</strong>; Global Distribution, <strong>Private Preview</strong>. No armes tu roadmap comercial sobre una private preview.</li>
+<li><strong>Vistas como interfaz, pero ojo con la lógica pesada.</strong> Compartir una vista con 14 joins le traslada ese costo de cómputo a cada query del receptor. Para interfaces estables sobre lógica compleja, materializá primero.</li>
+<li><strong>El nombre del share es parte del contrato.</strong> El receptor monta el share y referencia sus esquemas y tablas por nombre. Renombrar cosas adentro de un share rompe queries ajenas que no ves ni controlás.</li>
+</ol>
+<hr>
+</section>
+<section id="cuándo-no-usar-opensharing" class="level2">
+<h2 class="anchored" data-anchor-id="cuándo-no-usar-opensharing">12. Cuándo NO usar OpenSharing</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Situación</th>
+<th>Por qué</th>
+<th>Alternativa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Compartir dentro de la misma metastore</strong></td>
+<td>Es agregar una capa de indirección innecesaria</td>
+<td><code>GRANT</code> normal de Unity Catalog</td>
+</tr>
+<tr class="even">
+<td><strong>El receptor necesita escribir</strong></td>
+<td>El protocolo es read-only por diseño</td>
+<td>Acceso al workspace, o ingesta inversa como pipeline explícito</td>
+</tr>
+<tr class="odd">
+<td><strong>Transferencia one-shot con cambio de dueño</strong></td>
+<td>No querés un vínculo vivo, querés entregar y desconectar</td>
+<td><code>DEEP CLONE</code> o export puntual</td>
+</tr>
+<tr class="even">
+<td><strong>SLA de latencia estricto para un receptor en otra punta del mundo</strong></td>
+<td>Cada query cruza regiones; la física no negocia</td>
+<td>Réplica regional (o Global Distribution cuando salga de preview)</td>
+</tr>
+<tr class="odd">
+<td><strong>El partner solo acepta “mandame el archivo”</strong></td>
+<td>El protocolo requiere que el receptor consuma, no que reciba</td>
+<td>Export programado — y una charla sobre 2026</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="referencias" class="level2">
+<h2 class="anchored" data-anchor-id="referencias">Referencias</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/opensharing/">What is OpenSharing? — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/opensharing/create-share">Create shares for OpenSharing</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/opensharing/create-recipient">Create recipients for OpenSharing</a></li>
+<li><a href="https://www.databricks.com/blog/introducing-opensharing-next-evolution-delta-sharing-agentic-era">Introducing OpenSharing — Databricks Blog</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-new-opensharing-and-marketplace-capabilities-ai-era">New OpenSharing and Marketplace capabilities — Databricks Blog</a></li>
+<li><a href="https://www.databricks.com/blog/announcing-databricks-storage-ecosystem-governing-enterprise-data-estate-wherever-it-lives">Databricks storage ecosystem: zero-copy sobre datos on-premises — Databricks Blog</a></li>
+<li><a href="https://www.min.io/blog/the-on-premises-data-databricks-couldnt-reach-until-now">AIStor Table Sharing: tablas on-prem montadas en Databricks — MinIO Blog</a></li>
+<li><a href="https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing">Press release: Databricks announces OpenSharing</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/query-federation/">Lakehouse Federation — Azure Databricks</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/ingestion/sftp">Ingest files from SFTP servers — Azure Databricks</a></li>
+<li><a href="https://github.com/delta-io/delta-sharing">Delta Sharing en GitHub</a></li>
+</ul>
+</section>
+<section id="otros-posts-de-la-serie" class="level2">
+<h2 class="anchored" data-anchor-id="otros-posts-de-la-serie">Otros posts de la serie</h2>
+<p>Si te sirvió este post, mirá los anteriores de <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC para Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — las 7 cosas que te hubiera gustado saber</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — gobernanza que nadie implementa bien</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers y micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — del experimento al modelo</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features que sobreviven a producción</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker en Databricks</a> — contenedores custom</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming y triggers event-driven</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — el compute que se prende solo</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — governance centralizada para LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — pipelines declarativos con calidad built-in</li>
+<li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — el motor C++ que acelera tus queries sin cambiar código</li>
+</ul>
+<hr>
+<p><em>Próximo post de la serie: Liquid Clustering — el reemplazo de particiones y Z-ORDER que reordena tus datos solo.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copiado");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copiado");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "es";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>
