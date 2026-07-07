@@ -246,9 +246,9 @@ Si venís siguiendo la interna Delta vs. Iceberg, notá el movimiento: la pelea 
 
 Acá está el salto conceptual de OpenSharing: **lo que se comparte deja de ser solo datos**. El protocolo ahora contempla:
 
-- **Modelos de AI**: compartir un modelo registrado para que el partner lo use, sin mandarle los weights por WeTransfer.
-- **Agent skills**: la lógica reutilizable de un agente — herramientas, instrucciones, contexto semántico — empaquetada y compartible entre organizaciones.
-- **Genie Agents** (Beta): compartís una experiencia de chat en lenguaje natural sobre tus datos. El partner pregunta en su idioma y Genie responde con tus tablas por abajo — sin que el partner vea las tablas, ni las instrucciones del agente. Este anuncio lo habíamos anticipado en el [día 3 de DAIS](../dais-2026-day-3/).
+- **Modelos de AI**: compartir un modelo registrado en Unity Catalog para que el partner lo cargue y lo sirva del otro lado, sin mandarle los weights por WeTransfer. Esto no es promesa de keynote — [está documentado y operativo](https://learn.microsoft.com/en-us/azure/databricks/opensharing/create-share): el modelo se agrega al share como cualquier tabla (necesitás el privilegio `EXECUTE` sobre él, y mantenerlo) y el receptor lo carga para inferencia desde su catálogo montado.
+- **Agent skills**: la lógica reutilizable de un agente — herramientas, instrucciones, contexto semántico — empaquetada y compartible entre organizaciones. Esta es la parte más "protocolo" y menos "producto" por ahora: figura como capacidad del estándar en el [anuncio oficial](https://www.databricks.com/company/newsroom/press-releases/databricks-announces-opensharing), con el tooling llegando de a poco.
+- **Genie Agents** (Beta): compartís una experiencia de chat en lenguaje natural sobre tus datos ([doc oficial](https://learn.microsoft.com/en-us/azure/databricks/opensharing/share-genie-space)). El detalle técnico que no está en los keynotes: lo que se comparte es un **snapshot point-in-time** del Genie Space — los data assets y las instrucciones quedan congelados al momento de compartir, y si después modificás el space, el share **no** se actualiza (todos los receptores ven el mismo snapshot). El receptor monta el share y obtiene un Genie Space local precargado. Dos requisitos concretos: la preview de Genie Agent Sharing habilitada a nivel cuenta, y la configuración del space por debajo de **256 KB comprimida**. Este anuncio lo habíamos anticipado en el [día 3 de DAIS](../dais-2026-day-3/).
 
 Para el caso Genie, los controles del proveedor son el punto fuerte (y algo que conviene configurar desde el día uno):
 
@@ -389,6 +389,8 @@ Tratá los shares como productos de datos, no como favores puntuales: un share p
 - [What is OpenSharing? — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/opensharing/)
 - [Create shares for OpenSharing](https://learn.microsoft.com/en-us/azure/databricks/opensharing/create-share)
 - [Create recipients for OpenSharing](https://learn.microsoft.com/en-us/azure/databricks/opensharing/create-recipient)
+- [Share a Genie Space using OpenSharing (Beta)](https://learn.microsoft.com/en-us/azure/databricks/opensharing/share-genie-space)
+- [OpenSharing — página de producto](https://www.databricks.com/product/opensharing)
 - [Introducing OpenSharing — Databricks Blog](https://www.databricks.com/blog/introducing-opensharing-next-evolution-delta-sharing-agentic-era)
 - [New OpenSharing and Marketplace capabilities — Databricks Blog](https://www.databricks.com/blog/announcing-new-opensharing-and-marketplace-capabilities-ai-era)
 - [Databricks storage ecosystem: zero-copy sobre datos on-premises — Databricks Blog](https://www.databricks.com/blog/announcing-databricks-storage-ecosystem-governing-enterprise-data-estate-wherever-it-lives)
