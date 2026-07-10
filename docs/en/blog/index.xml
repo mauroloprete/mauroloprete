@@ -11,7 +11,1055 @@
 <description>Databricks tips, Data Engineering, MLOps and survey data processing.</description>
 <language>en</language>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Mon, 06 Jul 2026 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Thu, 09 Jul 2026 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Databricks Tips #14: Liquid Clustering — the replacement for partitions and Z-ORDER</title>
+  <dc:creator>Mauro Loprete</dc:creator>
+  <link>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>You picked the wrong partition column six months ago and today you have ten thousand 3 MB files, one folder per value, and queries that still scan half the table. Changing it means rewriting everything. You run <code>OPTIMIZE ZORDER</code> every night to patch the hole, and even so data skipping, the engine’s ability to skip files it doesn’t need, never quite delivers.</p>
+<p><strong>Liquid Clustering</strong> is Delta Lake’s answer to that pain: a physical data layout technique that <strong>replaces both partitioning and Z-ORDER</strong>, that you can redefine without rewriting the table, and that with <code>CLUSTER BY AUTO</code> can even pick the columns for you. In this post we cover what it does, the actual syntax, how it triggers, the requirements that matter, and a lab to measure how many files it actually skips.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Liquid Clustering reorganizes the files of a Delta table according to <strong>clustering keys</strong> so the engine can discard irrelevant files when filtering (<em>data skipping</em>). <strong>It replaces Hive-style partitioning and Z-ORDER</strong>, and they don’t combine.</li>
+<li>The base behavior is <strong>manual keys</strong> (<code>CLUSTER BY (col)</code>, up to 4 columns). You can <strong>redefine them without rewriting</strong> existing data, something impossible with partitioning.</li>
+<li>It’s <strong>incremental</strong>: enabling it doesn’t reorder history. You run <code>OPTIMIZE</code> (it only touches what’s needed) and, the first time or when changing keys, <code>OPTIMIZE FULL</code>.</li>
+<li><code>CLUSTER BY AUTO</code> (Databricks <strong>picks the columns</strong> for you) requires Unity Catalog and Predictive Optimization, and <strong>doesn’t exist in open-source Delta</strong>. Liquid itself is <strong>GA</strong> (Generally Available, meaning stable and supported) since <strong>DBR 15.4 LTS</strong>, and has been in open-source since Delta 3.1.0.</li>
+<li><strong>In the lab</strong> (200 million rows): the same query reads <strong>30 files</strong> on the partitioned table and <strong>1</strong> with Z-ORDER or Liquid Clustering. Reproducible experiment included.</li>
+<li>Watch out for the myth: on small tables (<strong>&lt;10 TB</strong>) more keys can make single-column filtering <strong>worse</strong>.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="the-problem-why-partitions-and-z-order-hurt" class="level2">
+<h2 class="anchored" data-anchor-id="the-problem-why-partitions-and-z-order-hurt">1. The problem: why partitions and Z-ORDER hurt</h2>
+<p>Delta Lake, the transactional table format Databricks runs on, stores data as Parquet files plus a transaction log. For a query to read little, the engine uses <strong>data skipping</strong>: it looks at each file’s statistics (min/max per column) and skips the ones that can’t contain what you’re looking for. The better <strong>grouped</strong> the values are across files, the more files it can discard.</p>
+<p>Historically there were two ways to improve that grouping, and both take their toll:</p>
+<ul>
+<li><strong>Hive-style partitioning</strong>: one folder per value of the partition column (<code>país=UY/</code>, <code>país=AR/</code>, …). It works with <strong>low-cardinality</strong> columns (few distinct values). Its two classic ailments: the <em>small files problem</em> (partitions with lots of tiny files, expensive to list and read) and <strong>high cardinality</strong> (partitioning by <code>user_id</code> gives you millions of folders). And there’s something worse: <strong>picked the wrong column → rewrite the whole table</strong> to change it.</li>
+<li><strong>Z-ORDER</strong>: a reordering that groups nearby values of several columns into the same files (it uses a <em>Z-order curve</em>, a way of traversing multi-dimensional space while preserving locality). It improves skipping, but you have to run <code>OPTIMIZE table ZORDER BY (cols)</code> <strong>by hand</strong> and it <strong>over-rewrites</strong> every time, because it’s not incremental: it recomputes over the whole touched range.</li>
+</ul>
+<p>In both cases you end up managing your data layout as a manual maintenance chore. Liquid Clustering exists to take that off your plate.</p>
+</section>
+<section id="what-liquid-clustering-is" class="level2">
+<h2 class="anchored" data-anchor-id="what-liquid-clustering-is">2. What Liquid Clustering is</h2>
+<p>Liquid Clustering is a <strong>data layout optimization</strong> technique in Delta Lake: you define <strong>clustering keys</strong> (up to 4 columns) and Delta organizes the files according to those keys to maximize data skipping. The fundamental difference from partitioning:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Same query filtering by cliente. Partitioned by fecha, the engine reads the whole table because it can’t skip any partition; clustered by cliente it reads only the fraction of files whose range crosses the filter."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="960" alt="Same query filtering by cliente. Partitioned by fecha, the engine reads the whole table because it can’t skip any partition; clustered by cliente it reads only the fraction of files whose range crosses the filter."></a></p>
+</figure>
+</div>
+<figcaption>Same query filtering by cliente. Partitioned by fecha, the engine reads the whole table because it can’t skip any partition; clustered by cliente it reads only the fraction of files whose range crosses the filter.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>That example filters by a single column. The real advantage shows when filtering by <strong>two</strong>: sorting files by one column forces you to read the entire stripe, while clustering in two dimensions lets you read only the file at the intersection.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-2-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="The same query filters by cliente and by fecha. Sorted only by cliente, you have to read the whole stripe (every fecha for that cliente); clustered in two dimensions, only the file at the intersection gets read."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/index_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="960" alt="The same query filters by cliente and by fecha. Sorted only by cliente, you have to read the whole stripe (every fecha for that cliente); clustered in two dimensions, only the file at the intersection gets read."></a></p>
+</figure>
+</div>
+<figcaption>The same query filters by cliente and by fecha. Sorted only by cliente, you have to read the whole stripe (every fecha for that cliente); clustered in two dimensions, only the file at the intersection gets read.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>What makes it different: <strong>you can change the clustering keys without rewriting</strong> existing data. Picked <code>fecha</code> and it turns out you almost always filter by <code>cliente</code>? Redefine the keys and, from the next <code>OPTIMIZE</code> on, the clustering settles around the new ones. With partitions that’s a <code>CREATE TABLE ... AS SELECT</code> of the whole table.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The automatic clustering myth
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A common misunderstanding (one my own documentation carried): the <strong>base</strong> behavior of Liquid Clustering does <strong>not</strong> “learn query patterns and adjust itself”. That’s exclusive to <code>CLUSTER BY AUTO</code> (section 5). In base mode, <strong>you</strong> pick the keys; what Delta does is maintain the grouping by those keys incrementally.</p>
+</div>
+</div>
+</section>
+<section id="syntax-the-three-flavors-of-cluster-by" class="level2">
+<h2 class="anchored" data-anchor-id="syntax-the-three-flavors-of-cluster-by">3. Syntax: the three flavors of <code>CLUSTER BY</code></h2>
+<p>The <code>CLUSTER BY</code> clause comes in three flavors. It applies to Databricks SQL and Databricks Runtime (DBR, the cluster’s image of Spark plus libraries) 13.3 LTS and above, Delta Lake only:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- New table</span></span>
+<span id="cb1-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> ventas (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">INT</span>, cliente STRING, fecha <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">DATE</span>)</span>
+<span id="cb1-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CLUSTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> (cliente, fecha);</span>
+<span id="cb1-4"></span>
+<span id="cb1-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Existing NON-partitioned table</span></span>
+<span id="cb1-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> ventas <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CLUSTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> (cliente, fecha);</span>
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Disable clustering (doesn't rewrite already clustered data)</span></span>
+<span id="cb1-9"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> ventas <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CLUSTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">NONE</span>;</span></code></pre></div></div>
+<p>Rules worth having clear:</p>
+<ul>
+<li>Up to <strong>4 clustering keys</strong> per table.</li>
+<li>Keys must be columns with <strong>collected statistics</strong>. By default Delta collects statistics for the <strong>first 32 columns</strong> of the table. A column beyond the 32nd can’t be a key without adjusting that configuration.</li>
+<li>You can’t cluster by complex types (<code>StructType</code>, <code>MapType</code>, <code>ArrayType</code>) or their elements. You can by a struct field with dot notation: <code>CLUSTER BY (datos.pais)</code>.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Partitioned table: different command
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>ALTER TABLE ... CLUSTER BY</code> works on <strong>non-partitioned</strong> tables. If your table is already partitioned, this doesn’t convert it: since DBR 18.1 direct conversion exists, but it’s a different command (<code>REPLACE PARTITIONED BY WITH CLUSTER BY</code>). See section 7 (migration).</p>
+</div>
+</div>
+</section>
+<section id="how-it-triggers-clustering-is-incremental" class="level2">
+<h2 class="anchored" data-anchor-id="how-it-triggers-clustering-is-incremental">4. How it triggers: clustering is incremental</h2>
+<p>Here’s the part that confuses people the most: <strong>enabling clustering doesn’t reorder history</strong>. You tell Delta what the keys are, but the data that was already there stays where it was until you run an <code>OPTIMIZE</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Clusters incrementally: only rewrites what's needed,</span></span>
+<span id="cb2-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- doesn't touch files whose keys already match</span></span>
+<span id="cb2-3">OPTIMIZE ventas;</span>
+<span id="cb2-4"></span>
+<span id="cb2-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- Forces reclustering of ALL records (DBR 16.4 LTS+)</span></span>
+<span id="cb2-6">OPTIMIZE ventas <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FULL</span>;</span></code></pre></div></div>
+<ul>
+<li><code>OPTIMIZE</code> is <strong>incremental</strong>: it doesn’t touch files that are already well grouped. Cheap to run often.</li>
+<li><code>OPTIMIZE FULL</code> forces a complete recluster. Databricks recommends it <strong>the first time you enable clustering</strong> (to settle the history) or <strong>when you change keys</strong>.</li>
+</ul>
+<p>If you have <strong>Predictive Optimization</strong> on (the managed service that runs <code>OPTIMIZE</code> and <code>VACUUM</code> on its own based on table usage), Databricks triggers the clustering for you. In that case, <strong>turn off any scheduled OPTIMIZE jobs</strong> so you don’t duplicate work.</p>
+<p>Here’s the real difference with Z-ORDER, which performed similarly on data skipping. When a new batch lands, <code>OPTIMIZE ZORDER</code> reorders the whole set to keep the ordering; Liquid Clustering’s <code>OPTIMIZE</code> touches only the affected files:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-3-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="A new batch lands. To keep the ordering, Z-ORDER rewrites all 16 files; Liquid Clustering’s incremental OPTIMIZE rewrites only the 3 the batch touches."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/index_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="A new batch lands. To keep the ordering, Z-ORDER rewrites all 16 files; Liquid Clustering’s incremental OPTIMIZE rewrites only the 3 the batch touches."></a></p>
+</figure>
+</div>
+<figcaption>A new batch lands. To keep the ordering, Z-ORDER rewrites all 16 files; Liquid Clustering’s incremental OPTIMIZE rewrites only the 3 the batch touches.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Under the hood: Hilbert curve and ZCubes
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Two pieces explain why Liquid Clustering skips better than Z-ORDER while rewriting little. The first is the <strong>Hilbert curve</strong>, a <em>space-filling curve</em> (a way of traversing a multi-dimensional grid keeping neighboring points close) that Delta uses instead of Z-ORDER’s Z curve, and which improves data skipping. The second is <strong>ZCubes</strong>: each <code>OPTIMIZE</code> produces a group of already-clustered files and tags them in the Delta log with a ZCube id; the next <code>OPTIMIZE</code> only rewrites the files not yet clustered. That’s why clustering is incremental and doesn’t trigger a full rewrite (<em>write amplification</em>).</p>
+</div>
+</div>
+</section>
+<section id="cluster-by-auto-let-databricks-pick-the-columns" class="level2">
+<h2 class="anchored" data-anchor-id="cluster-by-auto-let-databricks-pick-the-columns">5. <code>CLUSTER BY AUTO</code>: let Databricks pick the columns</h2>
+<p>The automatic mode. Instead of you picking the keys, Databricks picks them based on the table’s actual query patterns:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> ventas (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">INT</span>, cliente STRING, fecha <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">DATE</span>)</span>
+<span id="cb3-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CLUSTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> AUTO;</span></code></pre></div></div>
+<p>The requirements are the fine print that matters:</p>
+<ul>
+<li><strong>DBR 15.4 LTS+</strong>.</li>
+<li>Delta tables <strong>managed by Unity Catalog</strong> (UC, Databricks’ governance catalog; see <a href="../databricks-tips-02-unity-catalog/">Tips #3</a>).</li>
+<li><strong>Predictive Optimization</strong> enabled.</li>
+<li>It runs <strong>asynchronously</strong>: key adjustment isn’t instant, it settles over time.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>AUTO is Databricks-only
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>CLUSTER BY AUTO</code> <strong>doesn’t exist in open-source Delta Lake</strong>. Outside Databricks you always specify the columns by hand.</p>
+</div>
+</div>
+</section>
+<section id="predictive-optimization-the-maintenance-that-runs-itself" class="level2">
+<h2 class="anchored" data-anchor-id="predictive-optimization-the-maintenance-that-runs-itself">6. Predictive Optimization: the maintenance that runs itself</h2>
+<p>Running <code>OPTIMIZE</code>, <code>VACUUM</code> and <code>ANALYZE</code> by hand is the boring part of owning Delta tables. <strong>Predictive Optimization</strong> (PO) does it for you on Unity Catalog managed tables: Databricks identifies the tables that would benefit from maintenance and queues them, instead of running everything on a fixed schedule.</p>
+<p><strong>What it runs.</strong> <code>OPTIMIZE</code> (including the incremental clustering of Liquid tables), <code>VACUUM</code> (removes files the table no longer references, per its retention) and <code>ANALYZE</code> (collects statistics for the planner). A detail that plays in Liquid’s favor: when PO runs <code>OPTIMIZE</code>, it does <strong>not</strong> execute <code>ZORDER</code>. On a table with Z-order, PO ignores the already-ordered files; the rest of the maintenance (<code>VACUUM</code>, <code>ANALYZE</code>, compaction) keeps running, but the Z ordering doesn’t maintain itself.</p>
+<p><strong>How to enable it.</strong> It’s a property inherited in cascade: account → catalog → schema → table. Every managed table takes the account value unless you override it lower down.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ALTER</span> CATALOG mi_catalogo <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ENABLE</span> PREDICTIVE OPTIMIZATION;</span>
+<span id="cb4-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SCHEMA</span> mi_catalogo.ventas <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">DISABLE</span> PREDICTIVE OPTIMIZATION;</span>
+<span id="cb4-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ALTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> mi_catalogo.ventas.hechos INHERIT PREDICTIVE OPTIMIZATION;</span></code></pre></div></div>
+<p><code>INHERIT</code> goes back to the parent object’s value. To check whether it’s active on a table use <code>DESCRIBE TABLE EXTENDED mi_tabla</code>, where the <code>Predictive Optimization</code> field tells you whether it’s <code>ENABLE</code> and whether it was inherited. At the account level you turn it on in the account console, under Settings → Feature enablement. It comes <strong>enabled by default for accounts created on or after November 11, 2024</strong>; for older accounts the rollout is gradual.</p>
+<p><strong>Restrictions and requirements.</strong> It only applies to <strong>Unity Catalog managed tables</strong>. External tables and tables loaded as OpenSharing recipients are out. The work runs on <strong>serverless jobs compute</strong>, you need a workspace on the Premium plan in a supported region, and it’s billed as a serverless jobs SKU.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>PO + Liquid: don’t pay for the work twice
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you have Liquid Clustering and Predictive Optimization on, PO runs the <code>OPTIMIZE</code> for your clustered tables. Turn off any scheduled <code>OPTIMIZE</code> jobs so you don’t pay for the work twice. And remember that <code>CLUSTER BY AUTO</code> <strong>depends</strong> on PO: without PO it can’t pick keys or recluster. Also, PO changes keys only when the predicted savings from better data skipping outweigh the reclustering cost.</p>
+</div>
+</div>
+</section>
+<section id="migrating-from-z-order-and-from-partitioning" class="level2">
+<h2 class="anchored" data-anchor-id="migrating-from-z-order-and-from-partitioning">7. Migrating from Z-ORDER and from partitioning</h2>
+<ul>
+<li><strong>From Z-ORDER</strong>: use your <code>ZORDER BY</code> columns directly as clustering keys. It’s practically a one-to-one replacement.</li>
+<li><strong>From partitioning</strong>: the partition columns become the clustering keys. How depends on the runtime:
+<ul>
+<li><strong>DBR 18.1+</strong>: in-place conversion with <code>ALTER TABLE ventas REPLACE PARTITIONED BY WITH CLUSTER BY (cliente, fecha)</code> (or <code>... WITH CLUSTER BY AUTO</code>).</li>
+<li><strong>Earlier runtimes</strong>: you have to <strong>recreate</strong> the table with a <code>CREATE TABLE ... AS SELECT</code> (CTAS, meaning “create table from a SELECT”) that includes the <code>CLUSTER BY</code>.</li>
+</ul></li>
+</ul>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>No mixing: partitions or clustering
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Liquid Clustering does <strong>not combine</strong> with partitioning or Z-ORDER. It’s one or the other: when you migrate, you stop partitioning and stop running <code>ZORDER</code>.</p>
+</div>
+</div>
+</section>
+<section id="lab-cluster-by-vs-z-order-vs-partitioning-measuring-file-pruning" class="level2">
+<h2 class="anchored" data-anchor-id="lab-cluster-by-vs-z-order-vs-partitioning-measuring-file-pruning">8. Lab: <code>CLUSTER BY</code> vs Z-ORDER vs partitioning, measuring file pruning</h2>
+<p>The goal is to measure how many files the engine <strong>skips</strong> under each strategy for the same filtered query. We reuse the synthetic dataset pattern from the <a href="../databricks-tips-12-photon/">Photon lab (#12)</a>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 1. Synthetic dataset with realistic skew (same base, three tables)</span></span>
+<span id="cb5-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> pyspark.sql <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> functions <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> F</span>
+<span id="cb5-3"></span>
+<span id="cb5-4">base <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (spark.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200_000_000</span>)</span>
+<span id="cb5-5">        .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cliente"</span>, (F.rand() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50_000</span>).cast(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"int"</span>))</span>
+<span id="cb5-6">        .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fecha"</span>, F.expr(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"date_add('2024-01-01', cast(rand()*600 as int))"</span>))</span>
+<span id="cb5-7">        .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"monto"</span>, (F.rand() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>)))</span>
+<span id="cb5-8"></span>
+<span id="cb5-9">base.write.mode(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"overwrite"</span>).saveAsTable(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"lab.ventas_base"</span>)</span></code></pre></div></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 2. Three versions of the table</span></span>
+<span id="cb6-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- (a) Partitioned by fecha</span></span>
+<span id="cb6-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> lab.ventas_part</span>
+<span id="cb6-4">PARTITIONED <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> (fecha) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.ventas_base;</span>
+<span id="cb6-5"></span>
+<span id="cb6-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- (b) Z-ORDER by cliente, fecha</span></span>
+<span id="cb6-7"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> lab.ventas_zorder <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.ventas_base;</span>
+<span id="cb6-8">OPTIMIZE lab.ventas_zorder ZORDER <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> (cliente, fecha);</span>
+<span id="cb6-9"></span>
+<span id="cb6-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- (c) Liquid Clustering by cliente, fecha</span></span>
+<span id="cb6-11"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> lab.ventas_liquid</span>
+<span id="cb6-12"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CLUSTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> (cliente, fecha) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.ventas_base;</span>
+<span id="cb6-13">OPTIMIZE lab.ventas_liquid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FULL</span>;</span></code></pre></div></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 3. The same filtered query on all three, measuring files read</span></span>
+<span id="cb7-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.ventas_liquid</span>
+<span id="cb7-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHERE</span> cliente <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4242</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AND</span> fecha <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BETWEEN</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'2024-06-01'</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AND</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'2024-06-30'</span>;</span></code></pre></div></div>
+<p>To read how many files each one skipped, check the <strong>query profile</strong> (the <em>files pruned</em> / <em>files read</em> metrics) or <code>DESCRIBE DETAIL table</code> for the file count.</p>
+</section>
+<section id="results-reads" class="level2">
+<h2 class="anchored" data-anchor-id="results-reads">9. Results: reads</h2>
+<p>Measured on <strong>200 million rows</strong> on serverless with Photon, with the same query filtering by <code>cliente</code> <strong>and</strong> <code>fecha</code>. Files read and skipped come from the query history (<code>read_files_count</code> / <code>pruned_files_count</code>); total files, from <code>DESCRIBE DETAIL</code>. Skipped: the files data skipping avoided reading (the query profile calls the metric <em>Files pruned</em>).</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-4-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="Out of each table’s total files, how many the query read and how many it skipped. Partitioning doesn’t just read more: its layout has 600 files where clustering has 36."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/index_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Out of each table’s total files, how many the query read and how many it skipped. Partitioning doesn’t just read more: its layout has 600 files where clustering has 36."></a></p>
+</figure>
+</div>
+<figcaption>Out of each table’s total files, how many the query read and how many it skipped. Partitioning doesn’t just read more: its layout has 600 files where clustering has 36.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<table class="table-striped caption-top table">
+<caption>The time is the Scan node’s <em>Time spent</em> in this run (single run, cache in play)</caption>
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>Total files</th>
+<th>Files read</th>
+<th>Files skipped</th>
+<th>Bytes read</th>
+<th>Scan time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Partitioned by fecha</td>
+<td>600</td>
+<td>30</td>
+<td>570</td>
+<td>119 MB</td>
+<td>11.41 s</td>
+</tr>
+<tr class="even">
+<td>Z-ORDER (cliente, fecha)</td>
+<td>36</td>
+<td>1</td>
+<td>35</td>
+<td>20 MB</td>
+<td>3.31 s (3.4x faster)</td>
+</tr>
+<tr class="odd">
+<td>Liquid Clustering (cliente, fecha)</td>
+<td>36</td>
+<td>1</td>
+<td>35</td>
+<td>15 MB</td>
+<td>248 ms (46x faster)</td>
+</tr>
+</tbody>
+</table>
+<p>Two takeaways. First, <strong>partitioning by fecha exploded the layout into 600 files</strong> (one per day), the classic small-files problem; clustering left 36. Second, the query does skip files by fecha on the partitioned table (from 600 down to 30, the days of June), but since it can’t skip by <code>cliente</code> it reads them whole: 30 files and 119 MB. Z-ORDER and Liquid skip by both columns and drop to <strong>1 file</strong>; Liquid also reads fewer bytes (15 vs 20 MB) because it packs better with the Hilbert curve.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>The statistician doesn’t settle for one run
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Confession: I’m a statistician, and a single run doesn’t let me sleep. A measurement without a distribution is an anecdote. So I ran the same query <strong>100 times per strategy</strong>, interleaved (partitioned, Z-ORDER, Liquid, and around again) so the cache and cluster state affect all three equally:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>Median</th>
+<th>p25–p75</th>
+<th>Min</th>
+<th>Max</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Partitioned by fecha</td>
+<td>0.705 s</td>
+<td>0.662–0.734 s</td>
+<td>0.611 s</td>
+<td>1.02 s</td>
+</tr>
+<tr class="even">
+<td>Z-ORDER (cliente, fecha)</td>
+<td>0.645 s</td>
+<td>0.611–0.688 s</td>
+<td>0.556 s</td>
+<td>0.878 s</td>
+</tr>
+<tr class="odd">
+<td>Liquid Clustering (cliente, fecha)</td>
+<td>0.654 s</td>
+<td>0.615–0.698 s</td>
+<td>0.573 s</td>
+<td>0.809 s</td>
+</tr>
+</tbody>
+</table>
+<p>The honest reading: <strong>with a warm cache, all three converge</strong>. Z-ORDER and Liquid tie (9 ms of median difference, well within noise) and partitioning ends up ~8% slower, consistent with reading 30 files instead of 1. The layout doesn’t speed up what’s already in memory: it pays off on the <strong>first read</strong> (the cold scan in the table above), on the <strong>bytes moved</strong> and on maintenance. Double takeaway: measure with a distribution, and know which part of the time you’re measuring.</p>
+</div>
+</div>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-5-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5" title="Wall-clock distribution of 100 runs per strategy, warm cache. Each point is one run; the box marks the median and interquartile range."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/index_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Wall-clock distribution of 100 runs per strategy, warm cache. Each point is one run; the box marks the median and interquartile range."></a></p>
+</figure>
+</div>
+<figcaption>Wall-clock distribution of 100 runs per strategy, warm cache. Each point is one run; the box marks the median and interquartile range.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="results-writes" class="level2">
+<h2 class="anchored" data-anchor-id="results-writes">10. Results: writes</h2>
+<p>So far, all reads. The other side matters just as much: a <strong>new batch</strong> lands (10 million rows, 5% of the table) and you have to write it and then maintain each strategy’s ordering:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># The new batch: 10M rows with the same distribution.</span></span>
+<span id="cb8-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># It gets generated ONCE and the same batch is inserted into all</span></span>
+<span id="cb8-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># three tables, so the comparison is fair.</span></span>
+<span id="cb8-4">lote <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (spark.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10_000_000</span>)</span>
+<span id="cb8-5">        .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cliente"</span>, (F.rand() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50_000</span>).cast(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"int"</span>))</span>
+<span id="cb8-6">        .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fecha"</span>, F.expr(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"date_add('2024-01-01', cast(rand()*600 as int))"</span>))</span>
+<span id="cb8-7">        .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"monto"</span>, (F.rand() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>)))</span>
+<span id="cb8-8"></span>
+<span id="cb8-9">lote.write.saveAsTable(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"lab.ventas_lote"</span>)</span></code></pre></div></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- The same append on all three tables</span></span>
+<span id="cb9-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">INSERT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">INTO</span> lab.ventas_part   <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.ventas_lote;</span>
+<span id="cb9-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">INSERT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">INTO</span> lab.ventas_zorder <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.ventas_lote;</span>
+<span id="cb9-4"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">INSERT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">INTO</span> lab.ventas_liquid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.ventas_lote;</span>
+<span id="cb9-5"></span>
+<span id="cb9-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- The maintenance that follows for each strategy</span></span>
+<span id="cb9-7">OPTIMIZE lab.ventas_part;                               <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- compacts the partitions</span></span>
+<span id="cb9-8">OPTIMIZE lab.ventas_zorder ZORDER <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> (cliente, fecha);  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- re-sorts (not incremental)</span></span>
+<span id="cb9-9">OPTIMIZE lab.ventas_liquid;                             <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- incremental</span></span></code></pre></div></div>
+<p>Every operation leaves its metrics in the table history: files created by the append, files and MB rewritten by the maintenance.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb10-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- numFiles and numOutputBytes from the INSERT; numRemovedFiles,</span></span>
+<span id="cb10-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- numAddedFiles and numRemovedBytes from the OPTIMIZE</span></span>
+<span id="cb10-3">DESCRIBE HISTORY lab.ventas_liquid <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">LIMIT</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>;</span></code></pre></div></div>
+<p>This is how it went:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-6-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-6" title="MB rewritten by maintenance to absorb a new 113 MB batch. Z-ORDER rewrites the whole table; Liquid’s incremental OPTIMIZE rewrites nothing."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/index_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="MB rewritten by maintenance to absorb a new 113 MB batch. Z-ORDER rewrites the whole table; Liquid’s incremental OPTIMIZE rewrites nothing."></a></p>
+</figure>
+</div>
+<figcaption>MB rewritten by maintenance to absorb a new 113 MB batch. Z-ORDER rewrites the whole table; Liquid’s incremental OPTIMIZE rewrites nothing.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>Batch append</th>
+<th>Files created</th>
+<th>Maintenance</th>
+<th>MB rewritten</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Partitioned by fecha</td>
+<td>18.5 s</td>
+<td>600</td>
+<td><code>OPTIMIZE</code> · 40.8 s</td>
+<td>1,593 MB</td>
+</tr>
+<tr class="even">
+<td>Z-ORDER (cliente, fecha)</td>
+<td>2.5 s</td>
+<td>2</td>
+<td><code>OPTIMIZE ZORDER</code> · 29.3 s</td>
+<td><strong>2,288 MB (the whole table)</strong></td>
+</tr>
+<tr class="odd">
+<td>Liquid Clustering (cliente, fecha)</td>
+<td>1.9 s</td>
+<td>2</td>
+<td><code>OPTIMIZE</code> · 4.8 s</td>
+<td><strong>0 MB</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Three stories in one table:</p>
+<ul>
+<li><strong>Partitioning fragments the append</strong>: the same batch gets split into 600 tiny files (one folder per fecha), takes almost 10 times longer to write, and the follow-up compaction rewrites 1.6 GB.</li>
+<li><strong>Z-ORDER writes fast, but keeping the ordering costs the whole table</strong>: to absorb 113 MB of new data, <code>OPTIMIZE ZORDER</code> rewrote 2.3 GB. That’s the <em>write amplification</em> from the section 4 diagram, now measured.</li>
+<li><strong>Liquid writes fast and keeping the ordering cost nothing</strong>: the incremental <code>OPTIMIZE</code> finished in 4.8 seconds without rewriting a single file (0 files, 0 MB).</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The index analogy
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you come from relational databases, this will sound familiar. <strong>Liquid Clustering behaves like a good index: it speeds up reads without punishing writes.</strong> Z-ORDER is also a read “index”, but with the classic expensive-index problem: every write makes you pay for its maintenance, which here means rewriting the entire table. And partitioning is an index that also forces you to pick the column once and forever.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reproduce it yourself
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The full experiment is available as a Databricks Asset Bundle at <a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/liquid-clustering">spark-de-ideas-labs/tips/liquid-clustering</a>, and it runs on Free Edition:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> bundle deploy</span>
+<span id="cb11-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> bundle run liquid_clustering_benchmark</span></code></pre></div></div>
+<p>The notebook reports the total file count (<code>DESCRIBE DETAIL</code>), wall-clock, the repeated runs (<code>timings_raw</code>, adjustable with <code>--var bench_runs=N</code>) and the write metrics (append + maintenance). <strong>Files read and skipped</strong> can’t be read from the plan programmatically on serverless (Spark Connect). In the UI they are there: even in a serverless notebook you can open the query profile from the <strong>See performance</strong> link. To get them programmatically, I measured by running the queries on a SQL Warehouse and reading the query history:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> api get /api/2.0/sql/history/queries <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-2">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--json</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'{"include_metrics": true, "max_results": 20}'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-3">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">|</span> <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">jq</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-r</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'.res[] | select(.query_text | test("ventas_"))</span></span>
+<span id="cb12-4"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">      | "\(.query_text) read=\(.metrics.read_files_count) pruned=\(.metrics.pruned_files_count)"'</span></span></code></pre></div></div>
+<p>This is the actual output of that command, with all three layouts measured:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="query-history-pruning.png" class="lightbox" data-gallery="quarto-lightbox-gallery-7" title="The actual run: Liquid and Z-ORDER read 1 file and skip 35; partitioning reads 30 and skips 570."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/query-history-pruning.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="The actual run: Liquid and Z-ORDER read 1 file and skip 35; partitioning reads 30 and skips 570."></a></p>
+</figure>
+</div>
+<figcaption>The actual run: Liquid and Z-ORDER read 1 file and skip 35; partitioning reads 30 and skips 570.</figcaption>
+</figure>
+</div>
+<p>The same pair of numbers lives in each query’s <strong>query profile</strong>. To see it: open the query in Query History, enter the query profile and select the <strong>Scan</strong> node. In the metrics panel on the right you’ll find the <strong>Files pruned</strong> and <strong>Files read</strong> rows (highlighted in yellow in the screenshots), and above them the scan’s <strong>Time spent</strong>, which shows the layout’s direct effect:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="query-profile-part.png" class="lightbox" data-gallery="quarto-lightbox-gallery-8" title="Partitioned table: the scan reads 30 files and skips 570. Scan time spent: 11.41 s."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/query-profile-part.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="Partitioned table: the scan reads 30 files and skips 570. Scan time spent: 11.41 s."></a></p>
+</figure>
+</div>
+<figcaption>Partitioned table: the scan reads 30 files and skips 570. Scan time spent: 11.41 s.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="query-profile-zorder.png" class="lightbox" data-gallery="quarto-lightbox-gallery-9" title="Z-ORDER: 1 file read, 35 skipped. The scan drops to 3.31 s."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/query-profile-zorder.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="Z-ORDER: 1 file read, 35 skipped. The scan drops to 3.31 s."></a></p>
+</figure>
+</div>
+<figcaption>Z-ORDER: 1 file read, 35 skipped. The scan drops to 3.31 s.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="query-profile-liquid.png" class="lightbox" data-gallery="quarto-lightbox-gallery-10" title="Liquid Clustering: 1 file read, 35 skipped, and in this run the scan took 248 ms. Same files skipped as Z-ORDER; the time is a point result from this lab, where cache also plays a role."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/query-profile-liquid.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="Liquid Clustering: 1 file read, 35 skipped, and in this run the scan took 248 ms. Same files skipped as Z-ORDER; the time is a point result from this lab, where cache also plays a role."></a></p>
+</figure>
+</div>
+<figcaption>Liquid Clustering: 1 file read, 35 skipped, and in this run the scan took 248 ms. Same files skipped as Z-ORDER; the time is a point result from this lab, where cache also plays a role.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="requirements-compatibility-and-protocol" class="level2">
+<h2 class="anchored" data-anchor-id="requirements-compatibility-and-protocol">11. Requirements, compatibility and protocol</h2>
+<ul>
+<li><strong>Availability</strong>: GA for Delta with <strong>DBR 15.4 LTS+</strong>; Public Preview for Apache Iceberg with DBR 16.4 LTS+; in <strong>open-source Delta since 3.1.0</strong>.</li>
+<li><strong>Table protocol</strong>: it uses <strong>writer version 7 / reader version 3</strong>, and it <strong>can’t be downgraded</strong>. In practice: old Delta clients that don’t support those protocols <strong>won’t be able to read</strong> the table.</li>
+<li><strong>Incompatibilities</strong>: it doesn’t combine with partitioning or Z-ORDER.</li>
+<li><strong>DataFrame API</strong> (Python/Scala): keys can only be set when <strong>creating</strong> the table or in <code>overwrite</code> mode (<code>CREATE OR REPLACE</code>), <strong>never on <code>append</code></strong>. To change them while appending, use <code>ALTER TABLE</code> via SQL.</li>
+<li><strong>Materialized views and streaming tables</strong>: keys aren’t changed with <code>ALTER TABLE</code>; you adjust the pipeline/view definition.</li>
+</ul>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">12. Gotchas</h2>
+<ol type="1">
+<li><strong>Enabling ≠ reclustering.</strong> Setting <code>CLUSTER BY</code> doesn’t reorder history. The first time, run <code>OPTIMIZE FULL</code> or you’ll see little improvement and conclude it “doesn’t work”.</li>
+<li><strong><code>AUTO</code> is Databricks-only.</strong> It requires Unity Catalog + Predictive Optimization. In open-source Delta it doesn’t exist: you always specify columns.</li>
+<li><strong>More keys isn’t better.</strong> On tables <strong>&lt;10 TB</strong>, 4 keys can perform <strong>worse</strong> than 2 when filtering by a single column. Start with the columns you actually filter by.</li>
+<li><strong>Column 33 doesn’t cluster.</strong> Only columns with statistics (first 32 by default) work as keys. If your column falls beyond that, adjust the statistics config first.</li>
+<li><strong>Don’t mix it with partitions.</strong> If you’re coming from a partitioned table, migrate for real (section 7); don’t expect <code>CLUSTER BY</code> to coexist with <code>PARTITIONED BY</code>.</li>
+<li><strong>The protocol doesn’t go back down.</strong> Writer v7 / reader v3 is one-way: check that all your readers (connectors, external tools) support it before migrating shared tables.</li>
+</ol>
+</section>
+<section id="when-to-use-liquid-clustering-and-when-not-to" class="level2">
+<h2 class="anchored" data-anchor-id="when-to-use-liquid-clustering-and-when-not-to">13. When to use Liquid Clustering (and when not to)</h2>
+<p>Databricks recommends Liquid Clustering for <strong>all new tables</strong>. The cases that benefit most: filters on <strong>high-cardinality</strong> columns, tables with heavy <strong>skew</strong> (badly unbalanced values), <strong>fast growth</strong>, <strong>concurrent writes</strong> and access patterns that change over time.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Situation</th>
+<th>Liquid Clustering?</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>New table, any size</td>
+<td><strong>Yes</strong></td>
+<td>It’s Databricks’ default recommendation</td>
+</tr>
+<tr class="even">
+<td>You filter by a high-cardinality column</td>
+<td><strong>Yes</strong></td>
+<td>Where partitioning suffered, this shines</td>
+</tr>
+<tr class="odd">
+<td>You already use Z-ORDER</td>
+<td><strong>Yes, migrate</strong></td>
+<td>Almost a one-to-one replacement, and incremental on top</td>
+</tr>
+<tr class="even">
+<td>Readers with old Delta clients</td>
+<td><strong>Careful</strong></td>
+<td>v7/v3 protocol not downgradable: they may not be able to read it</td>
+</tr>
+<tr class="odd">
+<td>You need <code>AUTO</code> but you’re on open-source Delta</td>
+<td><strong>No (AUTO)</strong></td>
+<td>AUTO is Databricks-only; use manual keys</td>
+</tr>
+<tr class="even">
+<td>Small table always filtered by a single column</td>
+<td><strong>With 1-2 keys</strong></td>
+<td>4 keys can make data skipping worse</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/tables/clustering">Use liquid clustering for tables — Azure Databricks</a></li>
+<li><a href="https://docs.databricks.com/aws/en/tables/clustering">Use liquid clustering for tables — Databricks on AWS</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-syntax-ddl-cluster-by">CLUSTER BY clause (TABLE) — SQL reference</a></li>
+<li><a href="https://docs.delta.io/delta-clustering/">Use liquid clustering for Delta tables — Delta Lake open-source</a></li>
+<li><a href="https://delta.io/blog/delta-lake-3-1/">Delta Lake 3.1.0 release: Liquid Clustering with Hilbert curve and ZCubes</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/optimizations/predictive-optimization">Predictive optimization for Unity Catalog managed tables</a></li>
+</ul>
+</section>
+<section id="other-posts-in-the-series" class="level2">
+<h2 class="anchored" data-anchor-id="other-posts-in-the-series">Other posts in the series</h2>
+<p>If this post was useful, check out the previous <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC for Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — the 7 things you wish you’d known</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — governance nobody implements well</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers and micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — from experiment to model</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features that survive production</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker on Databricks</a> — custom containers</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming and event-driven triggers</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — the compute that turns itself on</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — centralized governance for LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — declarative pipelines with built-in quality</li>
+<li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — the C++ engine that speeds up your queries</li>
+<li><a href="../databricks-tips-13-opensharing/"><strong>Tips #13</strong>: OpenSharing</a> — sharing without copying</li>
+</ul>
+<hr>
+<p><em>Next in the series: SCD (Slowly Changing Dimensions) in Delta, and how a good layout makes Type 2 MERGEs cheaper.</em></p>
+
+
+</section>
+
+ ]]></description>
+  <category>Databricks Tips</category>
+  <category>Delta Lake</category>
+  <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/</guid>
+  <pubDate>Thu, 09 Jul 2026 22:00:00 GMT</pubDate>
+  <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/cover.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>Databricks Tips #13: OpenSharing — sharing without copying</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -823,7 +1871,7 @@ Tip
 <li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — the C++ engine that speeds up your queries without changing code</li>
 </ul>
 <hr>
-<p><em>Next in the series: Liquid Clustering — the replacement for partitions and Z-ORDER that reorders your data on its own.</em></p>
+<p><em>Next in the series: <a href="../databricks-tips-14-liquid-clustering/">Liquid Clustering, the replacement for partitions and Z-ORDER</a>.</em></p>
 
 
 </section>
@@ -1935,7 +2983,7 @@ Tip
 <li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — declarative pipelines with built-in quality</li>
 </ul>
 <hr>
-<p><em>Next post in the series: Liquid Clustering — the replacement for partitions and Z-ORDER that reorders your data on its own.</em></p>
+<p><em>Next post in the series: Liquid Clustering, the replacement for partitions and Z-ORDER.</em></p>
 
 
 </section>
@@ -22713,499 +23761,6 @@ font-style: inherit;"># At serving time, it looks them up automatically</span></
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-04-mlflow-unity-catalog/</guid>
   <pubDate>Mon, 23 Mar 2026 23:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-04-mlflow-unity-catalog/cover.png" medium="image" type="image/png" height="81" width="144"/>
-</item>
-<item>
-  <title>Databricks Tips #4: Structured Streaming — watermarks, triggers, and the micro-batch traps</title>
-  <dc:creator>Mauro Loprete</dc:creator>
-  <link>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-03-structured-streaming/</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>Fourth installment of <strong>Databricks Tips</strong>. Structured Streaming in Databricks looks simple until you lose data in production or get a compute bill you weren’t expecting.</p>
-<section id="trigger-modes-the-most-important-decision" class="level2">
-<h2 class="anchored" data-anchor-id="trigger-modes-the-most-important-decision">Trigger modes: the most important decision</h2>
-<p>The trigger defines <strong>when</strong> each micro-batch runs. Choosing poorly gets expensive:</p>
-<div id="lst-trigger-modes" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-trigger-modes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Trigger modes: processingTime vs availableNow depending on latency
-</figcaption>
-<div aria-describedby="lst-trigger-modes-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># BAD in production: processes continuously, burns cluster 24/7</span></span>
-<span id="cb1-2">df.writeStream <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-3">  .trigger(processingTime<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"0 seconds"</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-4">  .start()</span>
-<span id="cb1-5"></span>
-<span id="cb1-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># BETTER for most cases: every 5 minutes</span></span>
-<span id="cb1-7">df.writeStream <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-8">  .trigger(processingTime<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"5 minutes"</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-9">  .start()</span>
-<span id="cb1-10"></span>
-<span id="cb1-11"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># IDEAL for pipelines that don't need low latency:</span></span>
-<span id="cb1-12"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Process everything pending and stop</span></span>
-<span id="cb1-13">df.writeStream <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-14">  .trigger(availableNow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-15">  .start()</span>
-<span id="cb1-16"></span>
-<span id="cb1-17"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># For event-driven pipelines (e.g. every time a file arrives)</span></span>
-<span id="cb1-18">df.writeStream <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-19">  .trigger(availableNow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-20">  .start()</span>
-<span id="cb1-21"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Combined with a job triggered on file arrival</span></span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>The trap</strong>: <code>processingTime="0 seconds"</code> is the default and most people never touch it. A cluster running 24/7 processing zero data most of the time.</p>
-<p><strong>Rule of thumb</strong>:</p>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Required latency</th>
-<th>Trigger</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>&lt; 1 minute</td>
-<td><code>processingTime="10 seconds"</code></td>
-</tr>
-<tr class="even">
-<td>1-15 minutes</td>
-<td><code>processingTime="5 minutes"</code></td>
-</tr>
-<tr class="odd">
-<td>&gt; 15 minutes</td>
-<td><code>availableNow=True</code> + job schedule</td>
-</tr>
-<tr class="even">
-<td>Daily batch</td>
-<td><code>availableNow=True</code> + daily cron</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="watermarks-how-not-to-lose-late-data" class="level2">
-<h2 class="anchored" data-anchor-id="watermarks-how-not-to-lose-late-data">Watermarks: how not to lose late data</h2>
-<p>Without a watermark, Spark keeps <strong>all</strong> the state in memory for joins and aggregations. With large tables, this blows up:</p>
-<div id="lst-watermark" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-watermark-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Watermark: bounding in-memory state for aggregations
-</figcaption>
-<div aria-describedby="lst-watermark-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> pyspark.sql.functions <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> window, col</span>
-<span id="cb2-2"></span>
-<span id="cb2-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Without watermark: state grows forever</span></span>
-<span id="cb2-4">events <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb2-5">  .groupBy(window(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"event_time"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"1 hour"</span>)) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb2-6">  .count()</span>
-<span id="cb2-7"></span>
-<span id="cb2-8"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># With watermark: Spark discards state older than 2 hours</span></span>
-<span id="cb2-9">events <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb2-10">  .withWatermark(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"event_time"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"2 hours"</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb2-11">  .groupBy(window(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"event_time"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"1 hour"</span>)) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb2-12">  .count()</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>What happens to data arriving after the watermark?</strong> It gets discarded silently. No error, no log. It just disappears.</p>
-<p><strong>How to choose the watermark</strong>:</p>
-<ol type="1">
-<li>Measure your data’s real maximum delay (99th percentile)</li>
-<li>Add a safety margin (2x)</li>
-<li>Monitor it: if you see missing data, increase the watermark</li>
-</ol>
-</section>
-<section id="auto-loader-the-right-way-to-ingest-files" class="level2">
-<h2 class="anchored" data-anchor-id="auto-loader-the-right-way-to-ingest-files">Auto Loader: the right way to ingest files</h2>
-<p><code>spark.readStream.format("cloudFiles")</code> is the Auto Loader. It’s superior to <code>spark.readStream.format("parquet")</code> for several reasons:</p>
-<div id="lst-auto-loader" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-auto-loader-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Auto Loader vs file source: schema evolution and exactly-once
-</figcaption>
-<div aria-describedby="lst-auto-loader-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># BAD: basic file source</span></span>
-<span id="cb3-2">df <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (spark.readStream</span>
-<span id="cb3-3">  .<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"parquet"</span>)</span>
-<span id="cb3-4">  .schema(my_schema)</span>
-<span id="cb3-5">  .load(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"s3://bucket/landing/"</span>))</span>
-<span id="cb3-6"></span>
-<span id="cb3-7"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># GOOD: Auto Loader</span></span>
-<span id="cb3-8">df <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (spark.readStream</span>
-<span id="cb3-9">  .<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cloudFiles"</span>)</span>
-<span id="cb3-10">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cloudFiles.format"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"parquet"</span>)</span>
-<span id="cb3-11">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cloudFiles.schemaLocation"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"/checkpoints/schema/"</span>)</span>
-<span id="cb3-12">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cloudFiles.inferColumnTypes"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"true"</span>)</span>
-<span id="cb3-13">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cloudFiles.schemaEvolutionMode"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"addNewColumns"</span>)</span>
-<span id="cb3-14">  .load(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"s3://bucket/landing/"</span>))</span>
-<span id="cb3-15"></span>
-<span id="cb3-16"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Write with merge schema</span></span>
-<span id="cb3-17">df.writeStream <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb3-18">  .<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"delta"</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb3-19">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"checkpointLocation"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"/checkpoints/events/"</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb3-20">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"mergeSchema"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"true"</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb3-21">  .trigger(availableNow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb3-22">  .toTable(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.bronze.events"</span>)</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Auto Loader advantages</strong>:</p>
-<ul>
-<li><strong>Notification vs listing</strong>: it uses SNS/SQS (AWS) or Event Grid (Azure) to detect new files. In directories with millions of files, listing takes minutes; notification is instant.</li>
-<li><strong>Schema evolution</strong>: detects new columns automatically.</li>
-<li><strong>Rescue column</strong>: columns that don’t match the schema go to <code>_rescued_data</code> instead of failing.</li>
-<li><strong>Exactly-once</strong>: the checkpoint guarantees you never process a file twice.</li>
-</ul>
-<div id="lst-rescue-column" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-rescue-column-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Rescue column: capturing data that doesn’t match the schema
-</figcaption>
-<div aria-describedby="lst-rescue-column-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Enable rescue column for dirty data</span></span>
-<span id="cb4-2">df <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> (spark.readStream</span>
-<span id="cb4-3">  .<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cloudFiles"</span>)</span>
-<span id="cb4-4">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cloudFiles.format"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"json"</span>)</span>
-<span id="cb4-5">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"cloudFiles.schemaLocation"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"/checkpoints/schema/"</span>)</span>
-<span id="cb4-6">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"rescuedDataColumn"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"_rescued_data"</span>)</span>
-<span id="cb4-7">  .load(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"s3://bucket/raw/"</span>))</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="foreachbatch-the-escape-hatch" class="level2">
-<h2 class="anchored" data-anchor-id="foreachbatch-the-escape-hatch">foreachBatch: the escape hatch</h2>
-<p>When you need logic that can’t be expressed in pure streaming (upserts, API calls, multi-table writes):</p>
-<div id="lst-foreach-batch" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-foreach-batch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: foreachBatch with MERGE: idempotent upsert in streaming
-</figcaption>
-<div aria-describedby="lst-foreach-batch-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> upsert_to_delta(batch_df, batch_id):</span>
-<span id="cb5-2">    <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> delta.tables <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> DeltaTable</span>
-<span id="cb5-3"></span>
-<span id="cb5-4">    target <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> DeltaTable.forName(spark, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.silver.customers"</span>)</span>
-<span id="cb5-5"></span>
-<span id="cb5-6">    (target.alias(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"t"</span>)</span>
-<span id="cb5-7">     .merge(batch_df.alias(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"s"</span>), <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"t.customer_id = s.customer_id"</span>)</span>
-<span id="cb5-8">     .whenMatchedUpdateAll()</span>
-<span id="cb5-9">     .whenNotMatchedInsertAll()</span>
-<span id="cb5-10">     .execute())</span>
-<span id="cb5-11"></span>
-<span id="cb5-12"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Stream with upsert</span></span>
-<span id="cb5-13">(spark.readStream</span>
-<span id="cb5-14">  .table(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.bronze.customers"</span>)</span>
-<span id="cb5-15">  .writeStream</span>
-<span id="cb5-16">  .foreachBatch(upsert_to_delta)</span>
-<span id="cb5-17">  .option(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"checkpointLocation"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"/checkpoints/customers_upsert/"</span>)</span>
-<span id="cb5-18">  .trigger(availableNow<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
-<span id="cb5-19">  .start())</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Watch out with foreachBatch</strong>: if your function fails halfway through, the whole batch gets retried. Make sure the operation is <strong>idempotent</strong> (MERGE is, INSERT isn’t).</p>
-</section>
-<section id="monitoring-what-to-watch-in-production" class="level2">
-<h2 class="anchored" data-anchor-id="monitoring-what-to-watch-in-production">Monitoring: what to watch in production</h2>
-<div id="lst-stream-monitor" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-stream-monitor-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: StreamingQueryListener: monitoring batches and detecting lag
-</figcaption>
-<div aria-describedby="lst-stream-monitor-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Query listener for metrics</span></span>
-<span id="cb6-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> pyspark.sql.streaming <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> StreamingQueryListener</span>
-<span id="cb6-3"></span>
-<span id="cb6-4"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">class</span> StreamMonitor(StreamingQueryListener):</span>
-<span id="cb6-5">    <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> onQueryProgress(<span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">self</span>, event):</span>
-<span id="cb6-6">        progress <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> event.progress</span>
-<span id="cb6-7">        <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"""</span></span>
-<span id="cb6-8"><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">        Batch: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>progress<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>batchId<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span></span>
-<span id="cb6-9"><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">        Input rows: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>progress<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>numInputRows<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span></span>
-<span id="cb6-10"><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">        Processing time: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>progress<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>batchDuration<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">ms</span></span>
-<span id="cb6-11"><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">        Watermark: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>progress<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>eventTime<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>get(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'watermark'</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'N/A'</span>)<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span></span>
-<span id="cb6-12"><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">        """</span>)</span>
-<span id="cb6-13"></span>
-<span id="cb6-14">spark.streams.addListener(StreamMonitor())</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Key metrics</strong>:</p>
-<ul>
-<li><code>numInputRows = 0</code> for a long time → the trigger is running with no data (money down the drain)</li>
-<li><code>batchDuration</code> growing batch after batch → state is growing, you need a watermark</li>
-<li><code>inputRowsPerSecond</code> vs <code>processedRowsPerSecond</code> → if input &gt; processed, you’re accumulating lag</li>
-</ul>
-<hr>
-<p><em>Next week: MLflow in Unity Catalog — model registry, experiment lineage, and serving.</em></p>
-
-
-</section>
-
- ]]></description>
-  <category>Databricks Tips</category>
-  <category>Data Engineering</category>
-  <category>Streaming</category>
-  <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-03-structured-streaming/</guid>
-  <pubDate>Mon, 16 Mar 2026 23:00:00 GMT</pubDate>
-  <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-03-structured-streaming/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>

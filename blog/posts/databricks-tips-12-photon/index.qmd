@@ -25,7 +25,7 @@ Ese checkbox es **Photon**: el motor de ejecución vectorizado de Databricks, es
 - Las instancias Photon consumen DBUs a una tasa mayor: la cuenta cierra cuando el speedup supera el sobreprecio — y en workloads CPU-bound suele cerrar cómodo.
 :::
 
----
+------------------------------------------------------------------------
 
 ## 1. Qué es Photon y por qué existe
 
@@ -91,14 +91,14 @@ El punto clave de diseño: **Catalyst sigue siendo el optimizador**. Photon no r
 Según los benchmarks **TPC-DS** (el estándar de la industria para comparar motores analíticos: un set de queries de retail sobre datos sintéticos) que publica Databricks, Photon entrega hasta **5x mejor precio/performance** que otros data warehouses cloud. Como todo benchmark de vendor, tomalo como cota superior — más abajo armamos uno propio.
 :::
 
----
+------------------------------------------------------------------------
 
 ## 2. Dónde corre (y dónde ya lo estás usando sin saberlo)
 
 Photon no es un producto que contratás aparte: está integrado en el compute de Databricks. La diferencia es dónde viene activo por defecto y dónde es opt-in:
 
 | Compute | Photon |
-|---|---|
+|------------------------------------|------------------------------------|
 | **SQL Warehouses** (serverless, pro, classic) | Siempre activo — es el motor default |
 | **Serverless compute** (notebooks, jobs) | Siempre activo |
 | **Lakeflow Declarative Pipelines serverless** | Siempre activo |
@@ -113,7 +113,7 @@ Si creás clusters por **API** (Clusters API, Jobs API) o por **DABs**, Photon N
 
 En un Databricks Asset Bundle, el job cluster queda así:
 
-```{#lst-dabs .yaml lst-cap="DABs: habilitar Photon en un job cluster con runtime_engine"}
+``` {#lst-dabs .yaml lst-cap="DABs: habilitar Photon en un job cluster con runtime_engine"}
 resources:
   jobs:
     etl_ventas:
@@ -129,14 +129,14 @@ resources:
 
 Y en la Pipelines API, el flag es `photon: true`.
 
----
+------------------------------------------------------------------------
 
 ## 3. Qué acelera: operadores y expresiones cubiertas
 
 Photon no cubre el 100% de Spark. Cubre los operadores que dominan el tiempo de ejecución de un workload analítico típico:
 
 | Categoría | Cobertura |
-|---|---|
+|------------------------------------|------------------------------------|
 | **Scan** | Parquet, Delta, CSV, JSON — con filter pushdown, dictionary pruning y row-group skipping |
 | **Joins** | Hash join (reemplaza sort-merge), nested-loop, null-aware anti join, spatial joins |
 | **Aggregations** | Hash aggregate, incluyendo Min/Max/MinBy/MaxBy sobre tipos anidados |
@@ -156,7 +156,7 @@ Dos detalles que valen la pena subrayar:
 La lista de expresiones es representativa, no exhaustiva, y crece con cada runtime. Si una función puntual te importa, verificala con `EXPLAIN` (sección 5) en tu versión de DBR en lugar de confiar en listas de blogs — incluido este.
 :::
 
----
+------------------------------------------------------------------------
 
 ## 4. El fallback transparente: tu query nunca falla por Photon
 
@@ -170,12 +170,12 @@ El fallback es silencioso. No hay error, no hay warning en el notebook — solo 
 
 Los sospechosos habituales que fuerzan fallback:
 
-1. **UDFs** (*User Defined Functions*: funciones que escribís vos en Python o Scala para usar dentro de una query) en el medio del plan
-2. **RDD API** o **Dataset API** (los lambdas tipados de Scala)
-3. Operadores de **streaming stateful**
-4. Expresiones puntuales aún no cubiertas
+1.  **UDFs** (*User Defined Functions*: funciones que escribís vos en Python o Scala para usar dentro de una query) en el medio del plan
+2.  **RDD API** o **Dataset API** (los lambdas tipados de Scala)
+3.  Operadores de **streaming stateful**
+4.  Expresiones puntuales aún no cubiertas
 
----
+------------------------------------------------------------------------
 
 ## 5. Cómo medir cuánto Photon usa tu query
 
@@ -187,7 +187,7 @@ No adivines: Databricks te muestra exactamente qué parte del plan corrió en Ph
 
 **En código — EXPLAIN.** Los nodos Photon aparecen con prefijo en el plan físico:
 
-```{#lst-explain .python lst-cap="EXPLAIN: los nodos Photon aparecen con prefijo Photon en el plan físico"}
+``` {#lst-explain .python lst-cap="EXPLAIN: los nodos Photon aparecen con prefijo Photon en el plan físico"}
 spark.sql("""
     SELECT categoria, SUM(monto) AS total
     FROM ventas
@@ -207,7 +207,7 @@ spark.sql("""
 
 Si en lugar de `PhotonScan` ves `FileScan`, o aparece un `ColumnarToRow` en el medio del plan, ahí tenés la transición a JVM.
 
----
+------------------------------------------------------------------------
 
 ## 6. Cómo leer un query plan de Spark (sin llorar)
 
@@ -221,7 +221,7 @@ El `EXPLAIN` de la sección anterior no sirve de nada si el plan te parece jerog
 
 Veamos un join típico con su plan anotado:
 
-```{#lst-plan-join .python lst-cap="Query plan de un join + aggregation, leído de abajo hacia arriba"}
+``` {#lst-plan-join .python lst-cap="Query plan de un join + aggregation, leído de abajo hacia arriba"}
 spark.sql("""
     SELECT s.region, SUM(v.monto) AS total
     FROM ventas v
@@ -247,7 +247,7 @@ spark.sql("""
 Lo que este plan te está contando:
 
 | Qué mirás | Qué te dice |
-|---|---|
+|------------------------------------|------------------------------------|
 | `PhotonScan` + `requiredSchema` | *Column pruning*: solo lee las columnas que la query necesita. Si ves 40 columnas para un `SUM` de una, algo anda mal (típico `SELECT *` intermedio). |
 | `filters:` / `PushedFilters:` en el scan | Los filtros bajaron al scan: se descartan row groups enteros sin leerlos. Si tu `WHERE` no aparece acá, lo estás filtrando *después* de leer todo. |
 | `BroadcastHashJoin` | La tabla chica viaja entera a cada worker — no hay shuffle de la grande. Es el join barato; Spark lo elige si la chica está bajo el umbral de broadcast. |
@@ -263,15 +263,15 @@ En runtimes con Photon, el `EXPLAIN` incluye al final una sección **Photon Expl
 Para planes largos, `df.explain("formatted")` es mucho más legible que el default: numera los operadores, muestra el árbol compacto arriba y el detalle de cada nodo abajo. Y para ver el plan final post-AQE con métricas reales (filas por stage, spill, tiempos), el lugar es la pestaña **SQL/DataFrame** del Spark UI — donde además los nodos Photon aparecen en naranja.
 :::
 
----
+------------------------------------------------------------------------
 
 ## 7. Lab: benchmark con/sin Photon
 
 Basta de teoría. El experimento es simple: **mismo cluster, mismo código, con y sin el checkbox**. Armamos una tabla estilo TPC-DS (ventas con dimensiones) lo suficientemente grande para que la CPU sea el cuello de botella, y le tiramos una query con join + aggregation + window.
 
-**Paso 1 — generar datos** (~200M de filas, unos 6 GB en Delta):
+**Paso 1 — generar datos** (\~200M de filas, unos 6 GB en Delta):
 
-```{#lst-datagen .python lst-cap="Generar dataset sintético estilo TPC-DS con spark.range"}
+``` {#lst-datagen .python lst-cap="Generar dataset sintético estilo TPC-DS con spark.range"}
 from pyspark.sql import functions as F
 
 (
@@ -288,7 +288,7 @@ from pyspark.sql import functions as F
 
 **Paso 2 — la query** (scan + filtro + join implícito por agregación + window, todo territorio Photon):
 
-```{#lst-benchquery .python lst-cap="Query de benchmark: aggregation pesada + window function, con timing"}
+``` {#lst-benchquery .python lst-cap="Query de benchmark: aggregation pesada + window function, con timing"}
 import time
 
 query = """
@@ -329,10 +329,10 @@ El sink `noop` es el truco del benchmark honesto: ejecuta todo el plan (scan, sh
 
 Lo corrí en Azure Databricks: dos job clusters idénticos (driver + 1 worker `Standard_D4s_v3`, DBR 17.3 LTS), la única diferencia el `runtime_engine`. Cinco corridas por motor:
 
-| Motor | Corridas (s) | Mediana |
-|---|---|---|
+| Motor              | Corridas (s)                     | Mediana   |
+|--------------------|----------------------------------|-----------|
 | **STANDARD** (JVM) | 26.3 · 11.0 · 11.4 · 10.4 · 10.9 | **11.0s** |
-| **PHOTON** | 15.5 · 6.8 · 6.7 · 6.5 · 6.2 | **6.7s** |
+| **PHOTON**         | 15.5 · 6.8 · 6.7 · 6.5 · 6.2     | **6.7s**  |
 
 ```{r}
 #| echo: false
@@ -375,13 +375,13 @@ ggplot(bench, aes(x = corrida, y = segundos, fill = motor)) +
 
 **Speedup: 1.64x** para esta query, en este hardware. Tres cosas para leer de ahí:
 
-1. **La primera corrida miente en los dos motores** (26.3s y 15.5s): paga el *warm-up* del JIT, las conexiones al storage y la inicialización del shuffle. Por eso la mediana y no el promedio.
-2. **1.64x es menos que los 2x-4x de los benchmarks de marketing** — y está bien que así sea: es un cluster chico, una query de ~10 segundos y un dataset de 6 GB. El speedup de Photon crece con el tamaño del scan y la complejidad de las aggregations. Este número es *tu piso*, no tu techo.
-3. **Ojo con la cuenta del DBU** (sección 11): con un multiplicador de ~2x, un speedup de 1.64x en *este* workload no se paga solo en plata — aunque sí en tiempo. Exactamente el tipo de decisión por-job de la que hablamos.
+1.  **La primera corrida miente en los dos motores** (26.3s y 15.5s): paga el *warm-up* del JIT, las conexiones al storage y la inicialización del shuffle. Por eso la mediana y no el promedio.
+2.  **1.64x es menos que los 2x-4x de los benchmarks de marketing** — y está bien que así sea: es un cluster chico, una query de \~10 segundos y un dataset de 6 GB. El speedup de Photon crece con el tamaño del scan y la complejidad de las aggregations. Este número es *tu piso*, no tu techo.
+3.  **Ojo con la cuenta del DBU** (sección 11): con un multiplicador de \~2x, un speedup de 1.64x en *este* workload no se paga solo en plata — aunque sí en tiempo. Exactamente el tipo de decisión por-job de la que hablamos.
 
 Y los planes de ejecución que devolvieron los dos runs — la misma query, dos mundos:
 
-```{#lst-plan-standard .default lst-cap="Plan de ejecución del run STANDARD: HashAggregate + Exchange clásicos de Spark"}
+``` {#lst-plan-standard .default lst-cap="Plan de ejecución del run STANDARD: HashAggregate + Exchange clásicos de Spark"}
 Sort [store_id ASC, fecha ASC]
 +- Exchange rangepartitioning(store_id, fecha, 200)
    +- Window [avg(revenue) windowspecdefinition(...) AS revenue_7d]
@@ -394,7 +394,7 @@ Sort [store_id ASC, fecha ASC]
                         +- Filter (fecha >= 2025-06-01)
 ```
 
-```{#lst-plan-photon .default lst-cap="Plan de ejecución del run PHOTON: los mismos pasos, todos los nodos en Photon"}
+``` {#lst-plan-photon .default lst-cap="Plan de ejecución del run PHOTON: los mismos pasos, todos los nodos en Photon"}
 PhotonResultStage
 +- PhotonColumnarToRow
    +- PhotonSort [store_id ASC, fecha ASC]
@@ -415,11 +415,11 @@ Mismo árbol, mismos pasos — pero en el segundo hasta el shuffle es Photon (`P
 
 Si nunca entraste: el **Spark UI** es la consola web que trae todo cluster de Spark, con el detalle de lo que pasó adentro del motor. En Databricks la encontrás en la página del cluster (o del job run), pestaña **Spark UI**. Adentro tiene tabs de Jobs, Stages, Executors... y la que nos importa acá: **SQL/DataFrame**, que lista cada query ejecutada con su duración, y al hacerle click te muestra el **DAG del plan con métricas reales por operador** — cuántas filas procesó cada nodo, cuánto tardó cada stage. Y en Databricks los nodos vienen pintados: **azul = JVM, naranja = Photon**. Es literalmente ver el fallback (o su ausencia) con los ojos.
 
-![**La puerta de entrada.** El tab SQL/DataFrame del cluster del benchmark: cada ejecución aparece como una fila con su duración — ahí se distinguen las 5 corridas de ~6 s de la query pesada entre las queries auxiliares de milisegundos (el `CLEAR CACHE`, el `count`). Clic en cualquiera y se abre el DAG con sus métricas.](spark_ui.png)
+![**La puerta de entrada.** El tab SQL/DataFrame del cluster del benchmark: cada ejecución aparece como una fila con su duración — ahí se distinguen las 5 corridas de \~6 s de la query pesada entre las queries auxiliares de milisegundos (el `CLEAR CACHE`, el `count`). Clic en cualquiera y se abre el DAG con sus métricas.](spark_ui.png)
 
 Esto es lo que devolvieron los dos runs del benchmark:
 
-::: {layout-ncol=2}
+::: {layout-ncol="2"}
 ![**STANDARD — 10 s.** El DAG entero en azul: ni un nodo Photon. Se lee de abajo hacia arriba (regla 1 de la sección 6): scan, aggregation en dos fases con sus `Exchange`, y el `Window` arriba.](no_photon_1.png)
 
 ![**PHOTON — 6 s.** La misma query, todo el plan en naranja: `PhotonResultStage`, `PhotonSort`, `PhotonShuffleExchangeSource`. El único bloque azul es el `ColumnarToRow` del final — la única conversión a filas, donde corresponde.](photon_1.png)
@@ -427,10 +427,10 @@ Esto es lo que devolvieron los dos runs del benchmark:
 
 Y acercándose al detalle de cada plan, los números por operador cuentan la historia completa:
 
-::: {layout-ncol=2}
+::: {layout-ncol="2"}
 ![**STANDARD.** El `Filter` recibe **200,000,000** filas del scan y deja pasar **144,073,979**: primero lee todo, después filtra. El `WholeStageCodegen` que envuelve al `HashAggregate` acumula **36.2 s de task time** — eso es la JVM generando código para procesar fila por fila.](no_photon_2.png)
 
-![**PHOTON.** No hay nodo `Filter`: el filtro va embebido en el `PhotonScan`, que ya entrega las **144,073,979** filas filtradas. El `PhotonGroupingAgg` las reduce a **116,700 grupos** (500 stores × ~233 días) antes del shuffle — por la red viaja lo mínimo.](photon_3.png)
+![**PHOTON.** No hay nodo `Filter`: el filtro va embebido en el `PhotonScan`, que ya entrega las **144,073,979** filas filtradas. El `PhotonGroupingAgg` las reduce a **116,700 grupos** (500 stores × \~233 días) antes del shuffle — por la red viaja lo mínimo.](photon_3.png)
 :::
 
 Dos datos escondidos en esas capturas que valen el zoom:
@@ -444,7 +444,7 @@ Bonus del lab: en una corrida anterior, por un tema de cuota de Azure, el cluste
 
 Mientras corre, abrí el Spark UI y mirá el DAG: en el cluster con Photon todo el plan debería estar en naranja. Si algo aparece en azul, encontraste un fallback — y una oportunidad de entender por qué.
 
----
+------------------------------------------------------------------------
 
 ## 8. Escrituras: donde Photon sorprende
 
@@ -455,7 +455,7 @@ Dos casos donde esto se nota fuerte:
 - **Tablas anchas**: con cientos o miles de columnas, la mejora de escritura es especialmente significativa. Si laburás con feature tables desnormalizadas o extractos de sistemas legacy con 800 columnas, esto es para vos.
 - **MERGE pesados**: el MERGE de tu pipeline de CDC (Change Data Capture: replicar los cambios — inserts, updates, deletes — de un sistema fuente; lo vimos con AUTO CDC en [Tips #11](../databricks-tips-11-lakeflow-declarative-pipelines/)) combina scan + join + write — las tres cosas que Photon acelera a la vez.
 
----
+------------------------------------------------------------------------
 
 ## 9. Las features que directamente NO existen sin Photon
 
@@ -468,18 +468,18 @@ Photon no es solo "lo mismo pero más rápido": hay optimizaciones del platform 
 Este es el argumento que suele faltar en la discusión de costos: apagar Photon en un job con MERGEs grandes no solo te saca el speedup de ejecución — te apaga dynamic file pruning en el MERGE. El job no vuelve a "la velocidad normal de Spark": vuelve a algo peor que lo que mediste antes de optimizar.
 :::
 
----
+------------------------------------------------------------------------
 
 ## 10. Lo que Photon no hace (y no va a hacer por ahora)
 
 La lista corta pero importante:
 
-1. **UDFs**: ni Python ni Scala. Una UDF en el medio del plan corta la ejecución Photon y fuerza el paso a JVM (con la conversión columnar → filas incluida). Antes de escribir una UDF, agotá las funciones built-in — la sección de expresiones de Photon cubre muchísimo más de lo que la gente cree.
-2. **RDD API y Dataset API**: si tenés código Scala con lambdas tipados (`ds.map(x => ...)`), Photon no participa. El costo de la "type safety" del Dataset API ahora también se mide en DBUs.
-3. **Streaming stateful**: aggregations con estado, `mapGroupsWithState`, joins stream-stream — no soportados. Photon solo acelera **streaming stateless** (transformaciones + write a Delta/Parquet, con sources Delta, Parquet, CSV, JSON, Kafka y Kinesis).
-4. **Queries de menos de 2 segundos**: el tiempo se va en planning y scheduling, no en ejecución. Photon no puede acelerar lo que no domina el runtime.
+1.  **UDFs**: ni Python ni Scala. Una UDF en el medio del plan corta la ejecución Photon y fuerza el paso a JVM (con la conversión columnar → filas incluida). Antes de escribir una UDF, agotá las funciones built-in — la sección de expresiones de Photon cubre muchísimo más de lo que la gente cree.
+2.  **RDD API y Dataset API**: si tenés código Scala con lambdas tipados (`ds.map(x => ...)`), Photon no participa. El costo de la "type safety" del Dataset API ahora también se mide en DBUs.
+3.  **Streaming stateful**: aggregations con estado, `mapGroupsWithState`, joins stream-stream — no soportados. Photon solo acelera **streaming stateless** (transformaciones + write a Delta/Parquet, con sources Delta, Parquet, CSV, JSON, Kafka y Kinesis).
+4.  **Queries de menos de 2 segundos**: el tiempo se va en planning y scheduling, no en ejecución. Photon no puede acelerar lo que no domina el runtime.
 
----
+------------------------------------------------------------------------
 
 ## 11. La cuenta: cuándo el DBU extra se paga solo
 
@@ -497,33 +497,33 @@ Nuestro lab de la sección 7 es el ejemplo perfecto de la zona gris: speedup de 
 No decidas Photon "a nivel empresa": decidilo **por job**. El benchmark de la sección 7 tarda 20 minutos en armarse y te da la respuesta real para *tu* workload. Jobs cortos, livianos o llenos de UDFs → sin Photon. Jobs pesados de SQL/DataFrame → con Photon, casi siempre.
 :::
 
----
+------------------------------------------------------------------------
 
 ## 12. Gotchas
 
-1. **Clusters por API/DABs no activan Photon solos.** La UI lo tilda por defecto, la API no: `runtime_engine: PHOTON` o corrés en JVM sin enterarte. Auditá tus bundles hoy.
-2. **El fallback es silencioso.** Una UDF nueva en un pipeline que venía volando puede duplicar el runtime sin que nada falle. Metric a vigilar: % de task time en Photon en el query profile.
-3. **`ColumnarToRow` en el plan = peaje.** Cada transición Photon ↔ JVM convierte formatos. Muchas transiciones pequeñas pueden comerse el speedup completo.
-4. **Photon no arregla el small files problem.** El scan es más eficiente incluso con archivos chicos, pero seguís pagando listing y overhead por archivo. `OPTIMIZE` sigue siendo tu amigo.
-5. **No esperes nada en queries sub-2-segundos.** Si tu dashboard hace 40 queries de 300ms, Photon no es tu palanca — mirá el disk cache y el diseño de las queries.
-6. **El disk cache te miente en los benchmarks.** La segunda corrida siempre da mejor. `CLEAR CACHE` o cluster fresco entre mediciones.
-7. **Spot the engine: el plan te lo dice.** `PhotonScan` vs `FileScan` en el `EXPLAIN` es el smoke test más rápido para saber si estás corriendo donde creés que estás corriendo.
-8. **Streaming: revisá si tu pipeline es stateful antes de asumir speedup.** Un `dropDuplicates` o una window aggregation en el stream lo vuelven stateful — y ahí Photon no juega.
+1.  **Clusters por API/DABs no activan Photon solos.** La UI lo tilda por defecto, la API no: `runtime_engine: PHOTON` o corrés en JVM sin enterarte. Auditá tus bundles hoy.
+2.  **El fallback es silencioso.** Una UDF nueva en un pipeline que venía volando puede duplicar el runtime sin que nada falle. Metric a vigilar: % de task time en Photon en el query profile.
+3.  **`ColumnarToRow` en el plan = peaje.** Cada transición Photon ↔ JVM convierte formatos. Muchas transiciones pequeñas pueden comerse el speedup completo.
+4.  **Photon no arregla el small files problem.** El scan es más eficiente incluso con archivos chicos, pero seguís pagando listing y overhead por archivo. `OPTIMIZE` sigue siendo tu amigo.
+5.  **No esperes nada en queries sub-2-segundos.** Si tu dashboard hace 40 queries de 300ms, Photon no es tu palanca — mirá el disk cache y el diseño de las queries.
+6.  **El disk cache te miente en los benchmarks.** La segunda corrida siempre da mejor. `CLEAR CACHE` o cluster fresco entre mediciones.
+7.  **Spot the engine: el plan te lo dice.** `PhotonScan` vs `FileScan` en el `EXPLAIN` es el smoke test más rápido para saber si estás corriendo donde creés que estás corriendo.
+8.  **Streaming: revisá si tu pipeline es stateful antes de asumir speedup.** Un `dropDuplicates` o una window aggregation en el stream lo vuelven stateful — y ahí Photon no juega.
 
----
+------------------------------------------------------------------------
 
 ## 13. Cuándo NO usar Photon
 
 | Situación | Por qué | Alternativa |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | **Jobs dominados por UDFs** | Fallback constante, pagás el multiplicador sin speedup | Refactor a built-ins primero, Photon después |
-| **Queries cortas (<2s)** | Planning domina el tiempo, no la ejecución | Disk cache, SQL warehouse serverless |
+| **Queries cortas (\<2s)** | Planning domina el tiempo, no la ejecución | Disk cache, SQL warehouse serverless |
 | **Streaming stateful** | No soportado — corre todo en JVM | Structured Streaming clásico ([Tips #4](../databricks-tips-03-structured-streaming/)) |
 | **Código RDD / Dataset API** | Photon no participa | Migrar a DataFrame API (y después Photon) |
 | **Jobs I/O-bound** (mover archivos, ingesta simple) | El cuello es la red/storage, no la CPU | Compute barato sin Photon |
 | **Presupuesto de migración cero y jobs ya rápidos** | Sin dolor no hay ROI que justifique re-testing | Dejalo para el próximo ciclo |
 
----
+------------------------------------------------------------------------
 
 ## Referencias
 
@@ -550,6 +550,6 @@ Si te sirvió este post, mirá los anteriores de **Databricks Tips**:
 - [**Tips #10**: AI Gateway](../databricks-tips-10-ai-gateway/) — governance centralizada para LLMs
 - [**Tips #11**: Lakeflow Declarative Pipelines](../databricks-tips-11-lakeflow-declarative-pipelines/) — pipelines declarativos con calidad built-in
 
----
+------------------------------------------------------------------------
 
-*Siguiente post de la serie: [OpenSharing — compartir sin copiar](../databricks-tips-13-opensharing/). Y después: Liquid Clustering, el reemplazo de particiones y Z-ORDER que reordena tus datos solo.*
+*Siguiente post de la serie: [OpenSharing — compartir sin copiar](../databricks-tips-13-opensharing/). Y después: Liquid Clustering, el reemplazo de particiones y Z-ORDER.*

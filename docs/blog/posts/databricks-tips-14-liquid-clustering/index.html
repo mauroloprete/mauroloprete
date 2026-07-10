@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="description" content="Qué es Liquid Clustering, por qué reemplaza al particionado y a Z-ORDER, la sintaxis de CLUSTER BY (incluido AUTO), cómo se dispara con OPTIMIZE, y un lab reproducible donde la misma query pasa de leer 30 archivos a 1.">
+
+<title>Databricks Tips #14: Liquid Clustering — el reemplazo de particiones y Z-ORDER – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<link href="../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No se han encontrado resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar",
+    "search-label": "Buscar"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../../styles.css">
+<meta property="og:title" content="Databricks Tips #14: Liquid Clustering — el reemplazo de particiones y Z-ORDER – Mauro Loprete">
+<meta property="og:description" content="Qué es Liquid Clustering, por qué reemplaza al particionado y a Z-ORDER, la sintaxis de CLUSTER BY (incluido AUTO), cómo se dispara con OPTIMIZE, y un lab reproducible donde la misma query pasa de leer 30 archivos a 1.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-14-liquid-clustering/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #14: Liquid Clustering — el reemplazo de particiones y Z-ORDER – Mauro Loprete">
+<meta name="twitter:description" content="Qué es Liquid Clustering, por qué reemplaza al particionado y a Z-ORDER, la sintaxis de CLUSTER BY (incluido AUTO), cómo se dispara con OPTIMIZE, y un lab reproducible donde la misma query pasa de leer 30 archivos a 1.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/blog/posts/databricks-tips-14-liquid-clustering/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Buscar"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Navegación de palanca" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">En esta página</h2>
+   
+  <ul>
+  <li><a href="#el-problema-por-qué-duelen-las-particiones-y-z-order" id="toc-el-problema-por-qué-duelen-las-particiones-y-z-order" class="nav-link active" data-scroll-target="#el-problema-por-qué-duelen-las-particiones-y-z-order">1. El problema: por qué duelen las particiones y Z-ORDER</a></li>
+  <li><a href="#qué-es-liquid-clustering" id="toc-qué-es-liquid-clustering" class="nav-link" data-scroll-target="#qué-es-liquid-clustering">2. Qué es Liquid Clustering</a></li>
+  <li><a href="#sintaxis-los-tres-caminos-de-cluster-by" id="toc-sintaxis-los-tres-caminos-de-cluster-by" class="nav-link" data-scroll-target="#sintaxis-los-tres-caminos-de-cluster-by">3. Sintaxis: los tres caminos de <code>CLUSTER BY</code></a></li>
+  <li><a href="#cómo-se-dispara-el-clustering-es-incremental" id="toc-cómo-se-dispara-el-clustering-es-incremental" class="nav-link" data-scroll-target="#cómo-se-dispara-el-clustering-es-incremental">4. Cómo se dispara: el clustering es incremental</a></li>
+  <li><a href="#cluster-by-auto-que-databricks-elija-las-columnas" id="toc-cluster-by-auto-que-databricks-elija-las-columnas" class="nav-link" data-scroll-target="#cluster-by-auto-que-databricks-elija-las-columnas">5. <code>CLUSTER BY AUTO</code>: que Databricks elija las columnas</a></li>
+  <li><a href="#predictive-optimization-el-mantenimiento-que-se-corre-solo" id="toc-predictive-optimization-el-mantenimiento-que-se-corre-solo" class="nav-link" data-scroll-target="#predictive-optimization-el-mantenimiento-que-se-corre-solo">6. Predictive Optimization: el mantenimiento que se corre solo</a></li>
+  <li><a href="#migrar-desde-z-order-y-desde-particionado" id="toc-migrar-desde-z-order-y-desde-particionado" class="nav-link" data-scroll-target="#migrar-desde-z-order-y-desde-particionado">7. Migrar desde Z-ORDER y desde particionado</a></li>
+  <li><a href="#lab-cluster-by-vs-z-order-vs-particionado-midiendo-file-pruning" id="toc-lab-cluster-by-vs-z-order-vs-particionado-midiendo-file-pruning" class="nav-link" data-scroll-target="#lab-cluster-by-vs-z-order-vs-particionado-midiendo-file-pruning">8. Lab: <code>CLUSTER BY</code> vs Z-ORDER vs particionado, midiendo file pruning</a></li>
+  <li><a href="#resultados-lectura" id="toc-resultados-lectura" class="nav-link" data-scroll-target="#resultados-lectura">9. Resultados: lectura</a></li>
+  <li><a href="#resultados-escritura" id="toc-resultados-escritura" class="nav-link" data-scroll-target="#resultados-escritura">10. Resultados: escritura</a></li>
+  <li><a href="#requisitos-compatibilidad-y-protocolo" id="toc-requisitos-compatibilidad-y-protocolo" class="nav-link" data-scroll-target="#requisitos-compatibilidad-y-protocolo">11. Requisitos, compatibilidad y protocolo</a></li>
+  <li><a href="#gotchas" id="toc-gotchas" class="nav-link" data-scroll-target="#gotchas">12. Gotchas</a></li>
+  <li><a href="#cuándo-usar-liquid-clustering-y-cuándo-no" id="toc-cuándo-usar-liquid-clustering-y-cuándo-no" class="nav-link" data-scroll-target="#cuándo-usar-liquid-clustering-y-cuándo-no">13. Cuándo usar Liquid Clustering (y cuándo no)</a></li>
+  <li><a href="#referencias" id="toc-referencias" class="nav-link" data-scroll-target="#referencias">Referencias</a></li>
+  <li><a href="#otros-posts-de-la-serie" id="toc-otros-posts-de-la-serie" class="nav-link" data-scroll-target="#otros-posts-de-la-serie">Otros posts de la serie</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #14: Liquid Clustering — el reemplazo de particiones y Z-ORDER</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Delta Lake</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Qué es Liquid Clustering, por qué reemplaza al particionado y a Z-ORDER, la sintaxis de CLUSTER BY (incluido AUTO), cómo se dispara con OPTIMIZE, y un lab reproducible donde la misma query pasa de leer 30 archivos a 1.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Autor</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Publicado</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">10 de julio de 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Elegiste mal la columna de partición hace seis meses y hoy tenés diez mil archivos de 3 MB, una carpeta por cada valor y queries que igual escanean media tabla. Cambiarla implica reescribir todo. Corrés <code>OPTIMIZE ZORDER</code> cada noche para tapar el agujero, y aun así el data skipping, la capacidad del motor de saltarse los archivos que no le sirven, nunca termina de rendir.</p>
+<p><strong>Liquid Clustering</strong> es la respuesta de Delta Lake a ese dolor: una técnica de organización física de los datos que <strong>reemplaza tanto al particionado como a Z-ORDER</strong>, que podés redefinir sin reescribir la tabla, y que con <code>CLUSTER BY AUTO</code> hasta puede elegir las columnas por vos. En este post vemos qué hace, la sintaxis, cómo se ejecuta, los requisitos que importan y un laboratorio para medir cuántos archivos saltea de verdad.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Nota</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Liquid Clustering reorganiza los archivos de una tabla Delta según unas <strong>clustering keys</strong> para que el motor descarte archivos irrelevantes al filtrar (<em>data skipping</em>). <strong>Reemplaza al particionado Hive-style y a Z-ORDER</strong>, y no se combinan.</li>
+<li>El comportamiento base son <strong>keys manuales</strong> (<code>CLUSTER BY (col)</code>, hasta 4 columnas). Podés <strong>redefinirlas sin reescribir</strong> los datos existentes, algo imposible con el particionado.</li>
+<li>Es <strong>incremental</strong>: habilitarlo no reordena el histórico. Corrés <code>OPTIMIZE</code> (solo toca lo necesario) y, la primera vez o al cambiar keys, <code>OPTIMIZE FULL</code>.</li>
+<li><code>CLUSTER BY AUTO</code> (Databricks <strong>elige las columnas</strong> por vos) pide Unity Catalog y Predictive Optimization, y <strong>no existe en Delta open-source</strong>. Liquid en sí es <strong>GA</strong> (Generally Available, o sea estable y soportado) desde <strong>DBR 15.4 LTS</strong>, y está en open-source desde Delta 3.1.0.</li>
+<li><strong>En el lab</strong> (200 millones de filas): la misma query lee <strong>30 archivos</strong> en la tabla particionada y <strong>1</strong> con Z-ORDER o Liquid Clustering. Experimento reproducible incluido.</li>
+<li>Ojo con el mito: en tablas chicas (<strong>&lt;10 TB</strong>) meter más keys puede <strong>empeorar</strong> el filtrado por una sola columna.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="el-problema-por-qué-duelen-las-particiones-y-z-order" class="level2">
+<h2 class="anchored" data-anchor-id="el-problema-por-qué-duelen-las-particiones-y-z-order">1. El problema: por qué duelen las particiones y Z-ORDER</h2>
+<p>Delta Lake, el formato de tablas transaccional sobre el que corre Databricks, guarda los datos en archivos Parquet más un log de transacciones. Para que una query lea poco, el motor usa <strong>data skipping</strong>: mira las estadísticas (mínimo/máximo por columna) de cada archivo y se saltea los que no pueden contener lo que buscás. Cuanto mejor <strong>agrupados</strong> estén los valores en los archivos, más archivos puede descartar.</p>
+<p>Históricamente había dos formas de mejorar ese agrupamiento, y las dos tienen su peaje:</p>
+<ul>
+<li><strong>Particionado Hive-style</strong>: una carpeta por cada valor de la columna de partición (<code>país=UY/</code>, <code>país=AR/</code>, …). Funciona con columnas de <strong>baja cardinalidad</strong> (pocos valores distintos). Sus dos males clásicos: el <em>small files problem</em> (particiones con muchos archivos chicos, caros de listar y leer) y la <strong>alta cardinalidad</strong> (particionar por <code>user_id</code> te da millones de carpetas). Y hay algo peor: <strong>elegiste mal la columna → reescribir toda la tabla</strong> para cambiarla.</li>
+<li><strong>Z-ORDER</strong>: un reordenamiento que agrupa en los mismos archivos los valores cercanos de varias columnas a la vez (usa una <em>curva de orden Z</em>, una forma de recorrer el espacio multidimensional preservando cercanía). Mejora el skipping, pero hay que correr <code>OPTIMIZE tabla ZORDER BY (cols)</code> <strong>a mano</strong> y <strong>reescribe de más</strong> cada vez, porque no es incremental: recalcula sobre todo el rango tocado.</li>
+</ul>
+<p>En los dos casos terminás administrando el layout de tus datos como una tarea de mantenimiento manual. Liquid Clustering existe para sacarte eso de encima.</p>
+</section>
+<section id="qué-es-liquid-clustering" class="level2">
+<h2 class="anchored" data-anchor-id="qué-es-liquid-clustering">2. Qué es Liquid Clustering</h2>
+<p>Liquid Clustering es una técnica de <strong>optimización de layout de datos</strong> de Delta Lake: definís unas <strong>clustering keys</strong> (hasta 4 columnas) y Delta organiza los archivos según esas keys para maximizar el data skipping. La diferencia de fondo con el particionado:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Misma query filtrando por cliente. Particionando por fecha, el motor lee toda la tabla porque no puede saltear ninguna partición; clusterizando por cliente lee solo la fracción de archivos cuyo rango cruza el filtro."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="960" alt="Misma query filtrando por cliente. Particionando por fecha, el motor lee toda la tabla porque no puede saltear ninguna partición; clusterizando por cliente lee solo la fracción de archivos cuyo rango cruza el filtro."></a></p>
+</figure>
+</div>
+<figcaption>Misma query filtrando por cliente. Particionando por fecha, el motor lee toda la tabla porque no puede saltear ninguna partición; clusterizando por cliente lee solo la fracción de archivos cuyo rango cruza el filtro.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Ese ejemplo filtra por una sola columna. La ventaja de fondo se ve al filtrar por <strong>dos</strong>: ordenar los archivos por una columna te obliga a leer la franja entera, mientras que clusterizar en dos dimensiones deja leer solo el archivo del cruce.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-2-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="La misma query filtra por cliente y por fecha. Ordenando solo por cliente hay que leer la franja entera (todas las fechas de ese cliente); clusterizando en dos dimensiones se lee solo el archivo del cruce."><img src="index_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="960" alt="La misma query filtra por cliente y por fecha. Ordenando solo por cliente hay que leer la franja entera (todas las fechas de ese cliente); clusterizando en dos dimensiones se lee solo el archivo del cruce."></a></p>
+</figure>
+</div>
+<figcaption>La misma query filtra por cliente y por fecha. Ordenando solo por cliente hay que leer la franja entera (todas las fechas de ese cliente); clusterizando en dos dimensiones se lee solo el archivo del cruce.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Lo que lo hace distinto: <strong>podés cambiar las clustering keys sin reescribir</strong> los datos existentes. ¿Elegiste <code>fecha</code> y resulta que casi siempre filtrás por <code>cliente</code>? Redefinís las keys y, a partir del próximo <code>OPTIMIZE</code>, el clustering se acomoda a las nuevas. Con particiones eso es un <code>CREATE TABLE ... AS SELECT</code> de toda la tabla.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Importante</span>El mito del clustering automático
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Un malentendido común (que hasta yo arrastré en mi blog): el comportamiento <strong>base</strong> de Liquid Clustering <strong>no</strong> “aprende los patrones de consulta y se ajusta solo”. Eso es exclusivo de <code>CLUSTER BY AUTO</code> (sección 5). En el modo base, <strong>vos</strong> elegís las keys; lo que Delta hace es mantener el agrupamiento según esas keys de forma incremental.</p>
+</div>
+</div>
+</section>
+<section id="sintaxis-los-tres-caminos-de-cluster-by" class="level2">
+<h2 class="anchored" data-anchor-id="sintaxis-los-tres-caminos-de-cluster-by">3. Sintaxis: los tres caminos de <code>CLUSTER BY</code></h2>
+<p>La cláusula <code>CLUSTER BY</code> tiene tres formas. Aplica a Databricks SQL y a Databricks Runtime (DBR, la imagen de Spark + librerías del cluster) 13.3 LTS y superior, solo sobre Delta Lake:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Tabla nueva</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> ventas (<span class="kw">id</span> <span class="dt">INT</span>, cliente STRING, fecha <span class="dt">DATE</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (cliente, fecha);</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">-- Tabla existente NO particionada</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> ventas <span class="kw">CLUSTER</span> <span class="kw">BY</span> (cliente, fecha);</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- Desactivar clustering (no reescribe lo ya clusterizado)</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> ventas <span class="kw">CLUSTER</span> <span class="kw">BY</span> <span class="kw">NONE</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Reglas que conviene tener claras:</p>
+<ul>
+<li>Hasta <strong>4 clustering keys</strong> por tabla.</li>
+<li>Las keys tienen que ser columnas con <strong>estadísticas recolectadas</strong>. Por defecto Delta junta estadísticas de las <strong>primeras 32 columnas</strong> de la tabla. Una columna más allá de la 32 no sirve como key sin ajustar esa configuración.</li>
+<li>No podés clusterizar por tipos complejos (<code>StructType</code>, <code>MapType</code>, <code>ArrayType</code>) ni por sus elementos. Sí por un campo de struct con notación de punto: <code>CLUSTER BY (datos.pais)</code>.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Advertencia</span>Tabla particionada: otro comando
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>ALTER TABLE ... CLUSTER BY</code> funciona sobre tablas <strong>no particionadas</strong>. Si tu tabla ya está particionada, esto no la convierte: desde DBR 18.1 la conversión directa existe, pero es otro comando (<code>REPLACE PARTITIONED BY WITH CLUSTER BY</code>). Mirá la sección 7 (migración).</p>
+</div>
+</div>
+</section>
+<section id="cómo-se-dispara-el-clustering-es-incremental" class="level2">
+<h2 class="anchored" data-anchor-id="cómo-se-dispara-el-clustering-es-incremental">4. Cómo se dispara: el clustering es incremental</h2>
+<p>Acá está la parte que más confunde: <strong>habilitar el clustering no reordena el histórico</strong>. Le decís a Delta cuáles son las keys, pero los datos que ya estaban siguen donde estaban hasta que corras un <code>OPTIMIZE</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Clusteriza de forma incremental: solo reescribe lo necesario,</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- no toca archivos cuyas keys ya coinciden</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>OPTIMIZE ventas;</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">-- Fuerza el recluster de TODOS los registros (DBR 16.4 LTS+)</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>OPTIMIZE ventas <span class="kw">FULL</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li><code>OPTIMIZE</code> es <strong>incremental</strong>: no toca los archivos que ya están bien agrupados. Barato de correr seguido.</li>
+<li><code>OPTIMIZE FULL</code> fuerza el recluster completo. Databricks lo recomienda <strong>la primera vez que habilitás el clustering</strong> (para acomodar el histórico) o <strong>cuando cambiás las keys</strong>.</li>
+</ul>
+<p>Si tenés <strong>Predictive Optimization</strong> activo (el servicio gestionado que corre <code>OPTIMIZE</code> y <code>VACUUM</code> solo según el uso de la tabla), Databricks dispara el clustering por vos. En ese caso, <strong>apagá los jobs de OPTIMIZE que tengas agendados</strong> para no duplicar trabajo.</p>
+<p>Acá está la diferencia real con Z-ORDER, que en el data skipping rendía parecido. Cuando llega un lote nuevo, <code>OPTIMIZE ZORDER</code> reordena todo el conjunto para no romper el orden; el <code>OPTIMIZE</code> de Liquid Clustering toca solo los archivos afectados:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-3-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Llega un lote nuevo. Para mantener el orden, Z-ORDER reescribe los 16 archivos; el OPTIMIZE incremental de Liquid Clustering reescribe solo los 3 que el lote toca."><img src="index_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Llega un lote nuevo. Para mantener el orden, Z-ORDER reescribe los 16 archivos; el OPTIMIZE incremental de Liquid Clustering reescribe solo los 3 que el lote toca."></a></p>
+</figure>
+</div>
+<figcaption>Llega un lote nuevo. Para mantener el orden, Z-ORDER reescribe los 16 archivos; el OPTIMIZE incremental de Liquid Clustering reescribe solo los 3 que el lote toca.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Nota</span>Por dentro: curva de Hilbert y ZCubes
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Dos piezas explican por qué Liquid Clustering saltea más archivos que Z-ORDER y a la vez reescribe poco. La primera es la <strong>curva de Hilbert</strong>, una <em>curva de relleno de espacio</em> (una forma de recorrer una grilla de varias dimensiones manteniendo cerca a los puntos vecinos) que Delta usa en lugar de la curva Z de Z-ORDER, y que mejora el data skipping. La segunda son los <strong>ZCubes</strong>: cada <code>OPTIMIZE</code> produce un grupo de archivos ya clusterizados y los marca en el log de Delta con un id de ZCube; el siguiente <code>OPTIMIZE</code> solo reescribe los archivos que todavía no están clusterizados. Por eso el clustering es incremental y no dispara la reescritura completa (<em>write amplification</em>).</p>
+</div>
+</div>
+</section>
+<section id="cluster-by-auto-que-databricks-elija-las-columnas" class="level2">
+<h2 class="anchored" data-anchor-id="cluster-by-auto-que-databricks-elija-las-columnas">5. <code>CLUSTER BY AUTO</code>: que Databricks elija las columnas</h2>
+<p>El modo automático. En vez de vos elegir las keys, Databricks las elige según los patrones de consulta reales sobre la tabla:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> ventas (<span class="kw">id</span> <span class="dt">INT</span>, cliente STRING, fecha <span class="dt">DATE</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> AUTO;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Los requisitos son la letra chica que importa:</p>
+<ul>
+<li><strong>DBR 15.4 LTS+</strong>.</li>
+<li>Tablas Delta <strong>gestionadas por Unity Catalog</strong> (UC, el catálogo de gobernanza de Databricks; ver <a href="../databricks-tips-02-unity-catalog/">Tips #3</a>).</li>
+<li><strong>Predictive Optimization</strong> habilitado.</li>
+<li>Corre <strong>asíncrono</strong>: el ajuste de keys no es instantáneo, se acomoda con el tiempo.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Advertencia</span>AUTO es Databricks-only
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>CLUSTER BY AUTO</code> <strong>no existe en Delta Lake open-source</strong>. Fuera de Databricks siempre especificás las columnas a mano.</p>
+</div>
+</div>
+</section>
+<section id="predictive-optimization-el-mantenimiento-que-se-corre-solo" class="level2">
+<h2 class="anchored" data-anchor-id="predictive-optimization-el-mantenimiento-que-se-corre-solo">6. Predictive Optimization: el mantenimiento que se corre solo</h2>
+<p>Correr <code>OPTIMIZE</code>, <code>VACUUM</code> y <code>ANALYZE</code> a mano es la parte aburrida de tener tablas Delta. <strong>Predictive Optimization</strong> (PO) lo hace por vos sobre las tablas gestionadas de Unity Catalog: Databricks identifica las tablas que se beneficiarían de mantenimiento y las encola, en vez de correr todo a ciclo fijo.</p>
+<p><strong>Qué corre.</strong> <code>OPTIMIZE</code> (incluido el clustering incremental de las tablas con Liquid), <code>VACUUM</code> (borra archivos que ya no referencia la tabla, según su retención) y <code>ANALYZE</code> (recolecta estadísticas para el planner). Un detalle que juega a favor de Liquid: cuando PO corre <code>OPTIMIZE</code>, <strong>no</strong> ejecuta <code>ZORDER</code>. En una tabla con Z-order, PO ignora los archivos ya ordenados; el resto del mantenimiento (<code>VACUUM</code>, <code>ANALYZE</code>, compactación) sigue corriendo, pero el orden Z no se mantiene solo.</p>
+<p><strong>Cómo se activa.</strong> Es una propiedad que se hereda en cascada: cuenta → catálogo → esquema → tabla. Cada tabla gestionada toma el valor de la cuenta salvo que lo pises más abajo.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> CATALOG mi_catalogo <span class="kw">ENABLE</span> PREDICTIVE OPTIMIZATION;</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">SCHEMA</span> mi_catalogo.ventas <span class="kw">DISABLE</span> PREDICTIVE OPTIMIZATION;</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> mi_catalogo.ventas.hechos INHERIT PREDICTIVE OPTIMIZATION;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>INHERIT</code> vuelve al valor del objeto padre. Para ver si está activo en una tabla usás <code>DESCRIBE TABLE EXTENDED mi_tabla</code>, donde el campo <code>Predictive Optimization</code> te dice si está en <code>ENABLE</code> y si lo heredó. A nivel cuenta se prende en la consola de cuenta, en Settings → Feature enablement. Viene <strong>habilitado por defecto en las cuentas creadas desde el 11 de noviembre de 2024</strong>; para las cuentas más viejas el despliegue es gradual.</p>
+<p><strong>Restricciones y requisitos.</strong> Solo aplica a <strong>tablas gestionadas de Unity Catalog</strong>. Quedan afuera las external tables y las tablas cargadas como recipient de OpenSharing. El trabajo corre en <strong>serverless jobs compute</strong>, necesitás un workspace en plan Premium en una región soportada, y se factura como un SKU de serverless jobs.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>PO + Liquid: no pagues el trabajo dos veces
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si tenés Liquid Clustering y Predictive Optimization activos, PO corre el <code>OPTIMIZE</code> de tus tablas clusterizadas por vos. Apagá los jobs de <code>OPTIMIZE</code> que tengas agendados para no pagar el trabajo dos veces. Y acordate de que <code>CLUSTER BY AUTO</code> <strong>depende</strong> de PO: sin PO no puede elegir keys ni reclusterizar. Además PO cambia las keys solo cuando el ahorro previsto por mejor data skipping supera el costo de reclusterizar.</p>
+</div>
+</div>
+</section>
+<section id="migrar-desde-z-order-y-desde-particionado" class="level2">
+<h2 class="anchored" data-anchor-id="migrar-desde-z-order-y-desde-particionado">7. Migrar desde Z-ORDER y desde particionado</h2>
+<ul>
+<li><strong>Desde Z-ORDER</strong>: usá directamente las columnas de tu <code>ZORDER BY</code> como clustering keys. Es prácticamente un reemplazo uno a uno.</li>
+<li><strong>Desde particionado</strong>: las columnas de partición pasan a ser las clustering keys. Acá el cómo depende del runtime:
+<ul>
+<li><strong>DBR 18.1+</strong>: conversión in-place con <code>ALTER TABLE ventas REPLACE PARTITIONED BY WITH CLUSTER BY (cliente, fecha)</code> (o <code>... WITH CLUSTER BY AUTO</code>).</li>
+<li><strong>Runtimes anteriores</strong>: hay que <strong>recrear</strong> la tabla con un <code>CREATE TABLE ... AS SELECT</code> (CTAS, o sea “crear tabla a partir de un SELECT”) que incluya el <code>CLUSTER BY</code>.</li>
+</ul></li>
+</ul>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Importante</span>Sin mezclas: particiones o clustering
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Liquid Clustering <strong>no se combina</strong> con particionado ni con Z-ORDER. Es uno o el otro: al migrar, dejás de particionar y de correr <code>ZORDER</code>.</p>
+</div>
+</div>
+</section>
+<section id="lab-cluster-by-vs-z-order-vs-particionado-midiendo-file-pruning" class="level2">
+<h2 class="anchored" data-anchor-id="lab-cluster-by-vs-z-order-vs-particionado-midiendo-file-pruning">8. Lab: <code>CLUSTER BY</code> vs Z-ORDER vs particionado, midiendo file pruning</h2>
+<p>El objetivo es medir cuántos archivos <strong>se saltea</strong> el motor en cada estrategia sobre la misma query filtrada. Reutilizamos el patrón de dataset sintético del <a href="../databricks-tips-12-photon/">lab de Photon (#12)</a>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Dataset sintético con skew realista (misma base, tres tablas)</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>base <span class="op">=</span> (spark.<span class="bu">range</span>(<span class="dv">0</span>, <span class="dv">200_000_000</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"cliente"</span>, (F.rand() <span class="op">*</span> <span class="dv">50_000</span>).cast(<span class="st">"int"</span>))</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"fecha"</span>, F.expr(<span class="st">"date_add('2024-01-01', cast(rand()*600 as int))"</span>))</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"monto"</span>, (F.rand() <span class="op">*</span> <span class="dv">1000</span>)))</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>base.write.mode(<span class="st">"overwrite"</span>).saveAsTable(<span class="st">"lab.ventas_base"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- 2. Tres versiones de la tabla</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- (a) Particionada por fecha</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> lab.ventas_part</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>PARTITIONED <span class="kw">BY</span> (fecha) <span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> lab.ventas_base;</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co">-- (b) Z-ORDER por cliente, fecha</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> lab.ventas_zorder <span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> lab.ventas_base;</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>OPTIMIZE lab.ventas_zorder ZORDER <span class="kw">BY</span> (cliente, fecha);</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co">-- (c) Liquid Clustering por cliente, fecha</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> lab.ventas_liquid</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (cliente, fecha) <span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> lab.ventas_base;</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>OPTIMIZE lab.ventas_liquid <span class="kw">FULL</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- 3. La misma query filtrada sobre las tres, midiendo archivos leídos</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="fu">count</span>(<span class="op">*</span>) <span class="kw">FROM</span> lab.ventas_liquid</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> cliente <span class="op">=</span> <span class="dv">4242</span> <span class="kw">AND</span> fecha <span class="kw">BETWEEN</span> <span class="st">'2024-06-01'</span> <span class="kw">AND</span> <span class="st">'2024-06-30'</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Para leer cuántos archivos salteó cada una, mirá el <strong>query profile</strong> (métrica <em>files pruned</em> / <em>files read</em>) o <code>DESCRIBE DETAIL tabla</code> para el conteo de archivos.</p>
+</section>
+<section id="resultados-lectura" class="level2">
+<h2 class="anchored" data-anchor-id="resultados-lectura">9. Resultados: lectura</h2>
+<p>Medido sobre <strong>200 millones de filas</strong> en serverless con Photon, con la misma query filtrando por <code>cliente</code> <strong>y</strong> <code>fecha</code>. Los archivos leídos y salteados salen del query history (<code>read_files_count</code> / <code>pruned_files_count</code>); el total de archivos, de <code>DESCRIBE DETAIL</code>. Salteados: los archivos que el data skipping evitó leer (la métrica del query profile los llama <em>Files pruned</em>).</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-4-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="Del total de archivos de cada tabla, cuántos leyó la query y cuántos salteó. El particionado no solo lee más: su layout tiene 600 archivos donde el clustering tiene 36."><img src="index_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Del total de archivos de cada tabla, cuántos leyó la query y cuántos salteó. El particionado no solo lee más: su layout tiene 600 archivos donde el clustering tiene 36."></a></p>
+</figure>
+</div>
+<figcaption>Del total de archivos de cada tabla, cuántos leyó la query y cuántos salteó. El particionado no solo lee más: su layout tiene 600 archivos donde el clustering tiene 36.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<table class="table-striped caption-top table">
+<caption>El tiempo es el <em>Time spent</em> del nodo Scan en esta corrida (corrida única, con caché en juego)</caption>
+<colgroup>
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Estrategia</th>
+<th>Archivos totales</th>
+<th>Archivos leídos</th>
+<th>Archivos salteados</th>
+<th>Bytes leídos</th>
+<th>Tiempo del scan</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Particionado por fecha</td>
+<td>600</td>
+<td>30</td>
+<td>570</td>
+<td>119 MB</td>
+<td>11.41 s</td>
+</tr>
+<tr class="even">
+<td>Z-ORDER (cliente, fecha)</td>
+<td>36</td>
+<td>1</td>
+<td>35</td>
+<td>20 MB</td>
+<td>3.31 s (3.4x más rápido)</td>
+</tr>
+<tr class="odd">
+<td>Liquid Clustering (cliente, fecha)</td>
+<td>36</td>
+<td>1</td>
+<td>35</td>
+<td>15 MB</td>
+<td>248 ms (46x más rápido)</td>
+</tr>
+</tbody>
+</table>
+<p>Dos lecturas. Primero, <strong>particionar por fecha explotó el layout en 600 archivos</strong> (uno por día), el clásico small-files; clusterizar dejó 36. Segundo, la query saltea archivos por fecha en el particionado (de 600 baja a 30, los días de junio), pero como no puede saltear por <code>cliente</code> los lee enteros: 30 archivos y 119 MB. Z-ORDER y Liquid saltean por las dos columnas y bajan a <strong>1 archivo</strong>; Liquid encima lee menos bytes (15 contra 20 MB) porque empaqueta mejor con la curva de Hilbert.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Nota</span>El estadístico no se queda con una corrida
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Confesión: soy estadístico, y una sola corrida no me deja dormir. Una medición sin distribución es una anécdota. Así que corrí la misma query <strong>100 veces por estrategia</strong>, intercaladas (particionado, Z-ORDER, Liquid, y de vuelta) para que el caché y el estado del cluster afecten a las tres por igual:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Estrategia</th>
+<th>Mediana</th>
+<th>p25–p75</th>
+<th>Mín</th>
+<th>Máx</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Particionado por fecha</td>
+<td>0.705 s</td>
+<td>0.662–0.734 s</td>
+<td>0.611 s</td>
+<td>1.02 s</td>
+</tr>
+<tr class="even">
+<td>Z-ORDER (cliente, fecha)</td>
+<td>0.645 s</td>
+<td>0.611–0.688 s</td>
+<td>0.556 s</td>
+<td>0.878 s</td>
+</tr>
+<tr class="odd">
+<td>Liquid Clustering (cliente, fecha)</td>
+<td>0.654 s</td>
+<td>0.615–0.698 s</td>
+<td>0.573 s</td>
+<td>0.809 s</td>
+</tr>
+</tbody>
+</table>
+<p>La lectura honesta: <strong>con el caché caliente las tres convergen</strong>. Z-ORDER y Liquid empatan (9 ms de mediana, adentro del ruido) y el particionado queda ~8% más lento, consistente con leer 30 archivos en vez de 1. El layout no acelera lo que ya está en memoria: paga en la <strong>primera lectura</strong> (el scan frío de la tabla de arriba), en los <strong>bytes movidos</strong> y en el mantenimiento. Moraleja doble: medí con distribución, y sabé qué parte del tiempo estás midiendo.</p>
+</div>
+</div>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-5-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-5" title="Distribución del wall-clock de 100 corridas por estrategia, con caché caliente. Cada punto es una corrida; la caja marca mediana y rango intercuartílico."><img src="index_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="Distribución del wall-clock de 100 corridas por estrategia, con caché caliente. Cada punto es una corrida; la caja marca mediana y rango intercuartílico."></a></p>
+</figure>
+</div>
+<figcaption>Distribución del wall-clock de 100 corridas por estrategia, con caché caliente. Cada punto es una corrida; la caja marca mediana y rango intercuartílico.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="resultados-escritura" class="level2">
+<h2 class="anchored" data-anchor-id="resultados-escritura">10. Resultados: escritura</h2>
+<p>Hasta acá, todo lectura. El otro lado importa igual: llega un <strong>lote nuevo</strong> (10 millones de filas, el 5% de la tabla) y hay que escribirlo y después mantener el orden de cada estrategia:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># El lote nuevo: 10M filas con la misma distribución.</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Se genera UNA sola vez y se inserta el mismo lote en las tres tablas,</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># para que la comparación sea justa.</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>lote <span class="op">=</span> (spark.<span class="bu">range</span>(<span class="dv">0</span>, <span class="dv">10_000_000</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"cliente"</span>, (F.rand() <span class="op">*</span> <span class="dv">50_000</span>).cast(<span class="st">"int"</span>))</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"fecha"</span>, F.expr(<span class="st">"date_add('2024-01-01', cast(rand()*600 as int))"</span>))</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"monto"</span>, (F.rand() <span class="op">*</span> <span class="dv">1000</span>)))</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>lote.write.saveAsTable(<span class="st">"lab.ventas_lote"</span>)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- El mismo append en las tres tablas</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> lab.ventas_part   <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> lab.ventas_lote;</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> lab.ventas_zorder <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> lab.ventas_lote;</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> lab.ventas_liquid <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> lab.ventas_lote;</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co">-- El mantenimiento que le sigue a cada estrategia</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>OPTIMIZE lab.ventas_part;                               <span class="co">-- compacta las particiones</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>OPTIMIZE lab.ventas_zorder ZORDER <span class="kw">BY</span> (cliente, fecha);  <span class="co">-- re-ordena (no es incremental)</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>OPTIMIZE lab.ventas_liquid;                             <span class="co">-- incremental</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Cada operación deja sus métricas en el historial de la tabla: archivos creados en el append, archivos y MB reescritos en el mantenimiento.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- numFiles y numOutputBytes del INSERT; numRemovedFiles,</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- numAddedFiles y numRemovedBytes del OPTIMIZE</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>DESCRIBE HISTORY lab.ventas_liquid <span class="kw">LIMIT</span> <span class="dv">2</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Así quedó:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-6-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-6" title="MB reescritos por el mantenimiento para incorporar un lote nuevo de 113 MB. Z-ORDER reescribe la tabla entera; el OPTIMIZE incremental de Liquid no reescribe nada."><img src="index_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864" alt="MB reescritos por el mantenimiento para incorporar un lote nuevo de 113 MB. Z-ORDER reescribe la tabla entera; el OPTIMIZE incremental de Liquid no reescribe nada."></a></p>
+</figure>
+</div>
+<figcaption>MB reescritos por el mantenimiento para incorporar un lote nuevo de 113 MB. Z-ORDER reescribe la tabla entera; el OPTIMIZE incremental de Liquid no reescribe nada.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Estrategia</th>
+<th>Append del lote</th>
+<th>Archivos creados</th>
+<th>Mantenimiento</th>
+<th>MB reescritos</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Particionado por fecha</td>
+<td>18.5 s</td>
+<td>600</td>
+<td><code>OPTIMIZE</code> · 40.8 s</td>
+<td>1,593 MB</td>
+</tr>
+<tr class="even">
+<td>Z-ORDER (cliente, fecha)</td>
+<td>2.5 s</td>
+<td>2</td>
+<td><code>OPTIMIZE ZORDER</code> · 29.3 s</td>
+<td><strong>2,288 MB (la tabla entera)</strong></td>
+</tr>
+<tr class="odd">
+<td>Liquid Clustering (cliente, fecha)</td>
+<td>1.9 s</td>
+<td>2</td>
+<td><code>OPTIMIZE</code> · 4.8 s</td>
+<td><strong>0 MB</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Tres historias en una tabla:</p>
+<ul>
+<li><strong>El particionado fragmenta el append</strong>: el mismo lote se parte en 600 archivos chicos (una carpeta por fecha), tarda casi 10 veces más en escribirse, y la compactación posterior reescribe 1.6 GB.</li>
+<li><strong>Z-ORDER escribe rápido, pero mantener el orden cuesta la tabla entera</strong>: para incorporar 113 MB nuevos, <code>OPTIMIZE ZORDER</code> reescribió 2.3 GB. Esa es la <em>write amplification</em> del diagrama de la sección 4, ahora medida.</li>
+<li><strong>Liquid escribe rápido y mantener el orden no costó nada</strong>: el <code>OPTIMIZE</code> incremental terminó en 4.8 segundos sin reescribir un solo archivo (0 archivos, 0 MB).</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>La analogía del índice
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Si venís de bases de datos relacionales, esto te va a sonar. <strong>Liquid Clustering se comporta como un buen índice: acelera la lectura sin castigar la escritura.</strong> Z-ORDER también es un “índice” para leer, pero con el problema clásico del índice caro: cada escritura te obliga a pagar su mantenimiento, que acá es reescribir la tabla completa. Y el particionado es un índice que encima te hace elegir la columna una sola vez y para siempre.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reproducilo vos
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>El experimento completo está como Databricks Asset Bundle en <a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/liquid-clustering">spark-de-ideas-labs/tips/liquid-clustering</a>, y corre en Free Edition:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> bundle deploy</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> bundle run liquid_clustering_benchmark</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>El notebook reporta el total de archivos (<code>DESCRIBE DETAIL</code>), el wall-clock, las corridas repetidas (<code>timings_raw</code>, ajustables con <code>--var bench_runs=N</code>) y las métricas de escritura (append + mantenimiento). Los <strong>archivos leídos y salteados</strong> no se pueden leer del plan de forma programática en serverless (Spark Connect). En la UI sí están: incluso en un notebook serverless podés abrir el query profile desde el link <strong>See performance</strong>. Para sacarlos de forma programática, los medí corriendo las queries en un SQL Warehouse y leyendo el query history:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> api get /api/2.0/sql/history/queries <span class="dt">\</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> <span class="st">'{"include_metrics": true, "max_results": 20}'</span> <span class="dt">\</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">jq</span> <span class="at">-r</span> <span class="st">'.res[] | select(.query_text | test("ventas_"))</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="st">      | "\(.query_text) read=\(.metrics.read_files_count) pruned=\(.metrics.pruned_files_count)"'</span></span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Así se ve la salida real del comando, con los tres layouts medidos:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="query-history-pruning.png" class="lightbox" data-gallery="quarto-lightbox-gallery-7" title="La corrida real: Liquid y Z-ORDER leen 1 archivo y saltean 35; el particionado lee 30 y saltea 570."><img src="query-history-pruning.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="La corrida real: Liquid y Z-ORDER leen 1 archivo y saltean 35; el particionado lee 30 y saltea 570."></a></p>
+</figure>
+</div>
+<figcaption>La corrida real: Liquid y Z-ORDER leen 1 archivo y saltean 35; el particionado lee 30 y saltea 570.</figcaption>
+</figure>
+</div>
+<p>El mismo par de números está en el <strong>query profile</strong> de cada query. Para verlo: abrí la query en Query History, entrá al query profile y seleccioná el nodo <strong>Scan</strong>. En el panel de métricas de la derecha están las filas <strong>Files pruned</strong> y <strong>Files read</strong> (resaltadas en amarillo en las capturas), y arriba el <strong>Time spent</strong> del scan, que muestra el efecto directo del layout:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="query-profile-part.png" class="lightbox" data-gallery="quarto-lightbox-gallery-8" title="Tabla particionada: el scan lee 30 archivos y saltea 570. Time spent del scan: 11.41 s."><img src="query-profile-part.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="Tabla particionada: el scan lee 30 archivos y saltea 570. Time spent del scan: 11.41 s."></a></p>
+</figure>
+</div>
+<figcaption>Tabla particionada: el scan lee 30 archivos y saltea 570. Time spent del scan: 11.41 s.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="query-profile-zorder.png" class="lightbox" data-gallery="quarto-lightbox-gallery-9" title="Z-ORDER: 1 archivo leído, 35 salteados. El scan baja a 3.31 s."><img src="query-profile-zorder.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="Z-ORDER: 1 archivo leído, 35 salteados. El scan baja a 3.31 s."></a></p>
+</figure>
+</div>
+<figcaption>Z-ORDER: 1 archivo leído, 35 salteados. El scan baja a 3.31 s.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="query-profile-liquid.png" class="lightbox" data-gallery="quarto-lightbox-gallery-10" title="Liquid Clustering: 1 archivo leído, 35 salteados, y en esta corrida el scan tardó 248 ms. Mismos archivos salteados que Z-ORDER; el tiempo es un resultado puntual de este lab, donde también juega el caché."><img src="query-profile-liquid.png" class="img-fluid quarto-figure quarto-figure-center figure-img" alt="Liquid Clustering: 1 archivo leído, 35 salteados, y en esta corrida el scan tardó 248 ms. Mismos archivos salteados que Z-ORDER; el tiempo es un resultado puntual de este lab, donde también juega el caché."></a></p>
+</figure>
+</div>
+<figcaption>Liquid Clustering: 1 archivo leído, 35 salteados, y en esta corrida el scan tardó 248 ms. Mismos archivos salteados que Z-ORDER; el tiempo es un resultado puntual de este lab, donde también juega el caché.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="requisitos-compatibilidad-y-protocolo" class="level2">
+<h2 class="anchored" data-anchor-id="requisitos-compatibilidad-y-protocolo">11. Requisitos, compatibilidad y protocolo</h2>
+<ul>
+<li><strong>Disponibilidad</strong>: GA para Delta con <strong>DBR 15.4 LTS+</strong>; Public Preview para Apache Iceberg con DBR 16.4 LTS+; en <strong>Delta open-source desde la 3.1.0</strong>.</li>
+<li><strong>Protocolo de tabla</strong>: usa <strong>writer version 7 / reader version 3</strong>, y <strong>no se puede degradar</strong>. Traducción práctica: clientes Delta viejos que no soporten esos protocolos <strong>no van a poder leer</strong> la tabla.</li>
+<li><strong>Incompatibilidades</strong>: no se combina con particionado ni con Z-ORDER.</li>
+<li><strong>DataFrame API</strong> (Python/Scala): las keys solo se fijan al <strong>crear</strong> la tabla o en modo <code>overwrite</code> (<code>CREATE OR REPLACE</code>), <strong>nunca en <code>append</code></strong>. Para cambiarlas mientras hacés append, usá <code>ALTER TABLE</code> por SQL.</li>
+<li><strong>Materialized views y streaming tables</strong>: no se les cambian las keys con <code>ALTER TABLE</code>; se ajusta la definición del pipeline/vista.</li>
+</ul>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">12. Gotchas</h2>
+<ol type="1">
+<li><strong>Habilitar ≠ reclusterizar.</strong> Poner <code>CLUSTER BY</code> no reordena el histórico. La primera vez corré <code>OPTIMIZE FULL</code> o vas a ver poca mejora y creer que “no sirve”.</li>
+<li><strong><code>AUTO</code> es Databricks-only.</strong> Requiere Unity Catalog + predictive optimization. En Delta open-source no existe: especificás columnas siempre.</li>
+<li><strong>Más keys no es mejor.</strong> En tablas <strong>&lt;10 TB</strong>, usar 4 keys puede rendir <strong>peor</strong> que 2 cuando filtrás por una sola columna. Empezá con las columnas que realmente filtrás.</li>
+<li><strong>La columna 33 no clusteriza.</strong> Solo las columnas con estadísticas (primeras 32 por defecto) sirven como key. Si tu columna cae más allá, ajustá la config de estadísticas primero.</li>
+<li><strong>No lo mezcles con particiones.</strong> Si venís de una tabla particionada, migrá de verdad (sección 7); no esperes que <code>CLUSTER BY</code> conviva con <code>PARTITIONED BY</code>.</li>
+<li><strong>El protocolo no se baja.</strong> Writer v7 / reader v3 es de ida: verificá que todos tus lectores (conectores, herramientas externas) lo soporten antes de migrar tablas compartidas.</li>
+</ol>
+</section>
+<section id="cuándo-usar-liquid-clustering-y-cuándo-no" class="level2">
+<h2 class="anchored" data-anchor-id="cuándo-usar-liquid-clustering-y-cuándo-no">13. Cuándo usar Liquid Clustering (y cuándo no)</h2>
+<p>Databricks recomienda Liquid Clustering para <strong>todas las tablas nuevas</strong>. Los casos que más se benefician: filtros sobre columnas de <strong>alta cardinalidad</strong>, tablas con <strong>skew</strong> fuerte (valores muy desbalanceados), <strong>crecimiento rápido</strong>, <strong>escrituras concurrentes</strong> y patrones de acceso que cambian con el tiempo.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Situación</th>
+<th>¿Liquid Clustering?</th>
+<th>Por qué</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Tabla nueva, cualquier tamaño</td>
+<td><strong>Sí</strong></td>
+<td>Es la recomendación por defecto de Databricks</td>
+</tr>
+<tr class="even">
+<td>Filtrás por columna de alta cardinalidad</td>
+<td><strong>Sí</strong></td>
+<td>Donde el particionado sufría, esto brilla</td>
+</tr>
+<tr class="odd">
+<td>Ya usás Z-ORDER</td>
+<td><strong>Sí, migrá</strong></td>
+<td>Reemplazo casi uno a uno, y encima incremental</td>
+</tr>
+<tr class="even">
+<td>Lectores con clientes Delta viejos</td>
+<td><strong>Cuidado</strong></td>
+<td>Protocolo v7/v3 no degradable: pueden no leerla</td>
+</tr>
+<tr class="odd">
+<td>Necesitás <code>AUTO</code> pero estás en Delta open-source</td>
+<td><strong>No (AUTO)</strong></td>
+<td>AUTO es Databricks-only; usá keys manuales</td>
+</tr>
+<tr class="even">
+<td>Tabla chica y filtrás siempre por una sola columna</td>
+<td><strong>Con 1-2 keys</strong></td>
+<td>Meter 4 keys puede empeorar el data skipping</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="referencias" class="level2">
+<h2 class="anchored" data-anchor-id="referencias">Referencias</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/tables/clustering">Use liquid clustering for tables — Azure Databricks</a></li>
+<li><a href="https://docs.databricks.com/aws/en/tables/clustering">Use liquid clustering for tables — Databricks on AWS</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/sql/language-manual/sql-ref-syntax-ddl-cluster-by">CLUSTER BY clause (TABLE) — SQL reference</a></li>
+<li><a href="https://docs.delta.io/delta-clustering/">Use liquid clustering for Delta tables — Delta Lake open-source</a></li>
+<li><a href="https://delta.io/blog/delta-lake-3-1/">Delta Lake 3.1.0 release: Liquid Clustering con curva de Hilbert y ZCubes</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/optimizations/predictive-optimization">Predictive optimization for Unity Catalog managed tables</a></li>
+</ul>
+</section>
+<section id="otros-posts-de-la-serie" class="level2">
+<h2 class="anchored" data-anchor-id="otros-posts-de-la-serie">Otros posts de la serie</h2>
+<p>Si te sirvió este post, mirá los anteriores de <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC para Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — las 7 cosas que te hubiera gustado saber</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — gobernanza que nadie implementa bien</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers y micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — del experimento al modelo</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features que sobreviven a producción</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker en Databricks</a> — contenedores custom</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming y triggers event-driven</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — el compute que se prende solo</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — governance centralizada para LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — pipelines declarativos con calidad built-in</li>
+<li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — el motor C++ que acelera tus queries</li>
+<li><a href="../databricks-tips-13-opensharing/"><strong>Tips #13</strong>: OpenSharing</a> — compartir sin copiar</li>
+</ul>
+<hr>
+<p><em>Siguiente post de la serie: SCD (Slowly Changing Dimensions) en Delta, y cómo un buen layout abarata los MERGE de Type 2.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copiado");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copiado");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "es";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

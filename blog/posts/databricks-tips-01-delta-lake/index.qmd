@@ -14,7 +14,13 @@ Segunda entrega de la serie **Databricks Tips**, donde cada semana comparto algo
 
 ## 1. Liquid Clustering reemplaza a Z-ORDER
 
-Si todavía estás usando `OPTIMIZE table ZORDER BY (col)` a mano, pará. Desde DBR 13.3+, **Liquid Clustering** hace esto automático y adaptativo:
+::: callout-warning
+## Revisión 2026-07-10 · corregido en Tips #14
+
+Cuando publiqué esto afirmé que Liquid Clustering "se adapta a los patrones de consulta" como comportamiento base. No es exacto. Esa adaptación automática es exclusiva de `CLUSTER BY AUTO`. En el modo base vos elegís las clustering keys y Delta mantiene el agrupamiento de forma incremental. Abajo dejo el texto original tachado y la corrección al lado. El detalle completo está en [Tips #14: Liquid Clustering](../databricks-tips-14-liquid-clustering/).
+:::
+
+Si todavía estás usando `OPTIMIZE table ZORDER BY (col)` a mano, pará. Desde DBR 13.3+, **Liquid Clustering** ~~hace esto automático y adaptativo~~ **reemplaza a Z-ORDER con clustering incremental que configurás con `CLUSTER BY`**:
 
 ```{#lst-liquid-clustering .sql lst-cap="Liquid Clustering: crear tabla, alterar existente y optimizar"}
 -- Crear tabla con liquid clustering
@@ -35,7 +41,7 @@ CLUSTER BY (event_date, user_id);
 OPTIMIZE catalog.schema.events;
 ```
 
-La diferencia clave: Z-ORDER es estático (siempre ordena por las mismas columnas), Liquid Clustering se adapta a los patrones de consulta reales. Además podés cambiar las columnas de clustering sin reescribir la tabla.
+La diferencia clave: Z-ORDER es estático (siempre ordena por las mismas columnas) y hay que reordenar a mano. ~~Liquid Clustering se adapta a los patrones de consulta reales.~~ **Con Liquid Clustering definís las clustering keys y Delta mantiene ese orden de forma incremental; si querés que Databricks elija las keys por vos, existe `CLUSTER BY AUTO`.** Además podés cambiar las columnas de clustering sin reescribir la tabla.
 
 **Cuándo seguir con Z-ORDER**: tablas donde necesitás control exacto del orden físico y tenés un patrón de consulta que nunca cambia.
 

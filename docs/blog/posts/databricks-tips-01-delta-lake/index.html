@@ -254,7 +254,20 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <p>Segunda entrega de la serie <strong>Databricks Tips</strong>, donde cada semana comparto algo avanzado que descubrí en producción. Esta vez: Delta Lake.</p>
 <section id="liquid-clustering-reemplaza-a-z-order" class="level2">
 <h2 class="anchored" data-anchor-id="liquid-clustering-reemplaza-a-z-order">1. Liquid Clustering reemplaza a Z-ORDER</h2>
-<p>Si todavía estás usando <code>OPTIMIZE table ZORDER BY (col)</code> a mano, pará. Desde DBR 13.3+, <strong>Liquid Clustering</strong> hace esto automático y adaptativo:</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Advertencia</span>Revisión 2026-07-10 · corregido en Tips #14
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Cuando publiqué esto afirmé que Liquid Clustering “se adapta a los patrones de consulta” como comportamiento base. No es exacto. Esa adaptación automática es exclusiva de <code>CLUSTER BY AUTO</code>. En el modo base vos elegís las clustering keys y Delta mantiene el agrupamiento de forma incremental. Abajo dejo el texto original tachado y la corrección al lado. El detalle completo está en <a href="../databricks-tips-14-liquid-clustering/">Tips #14: Liquid Clustering</a>.</p>
+</div>
+</div>
+<p>Si todavía estás usando <code>OPTIMIZE table ZORDER BY (col)</code> a mano, pará. Desde DBR 13.3+, <strong>Liquid Clustering</strong> <del>hace esto automático y adaptativo</del> <strong>reemplaza a Z-ORDER con clustering incremental que configurás con <code>CLUSTER BY</code></strong>:</p>
 <div id="lst-liquid-clustering" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
 <figure class="quarto-float quarto-float-lst figure">
 <figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-liquid-clustering-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -280,7 +293,7 @@ Listado&nbsp;1: Liquid Clustering: crear tabla, alterar existente y optimizar
 </div>
 </figure>
 </div>
-<p>La diferencia clave: Z-ORDER es estático (siempre ordena por las mismas columnas), Liquid Clustering se adapta a los patrones de consulta reales. Además podés cambiar las columnas de clustering sin reescribir la tabla.</p>
+<p>La diferencia clave: Z-ORDER es estático (siempre ordena por las mismas columnas) y hay que reordenar a mano. <del>Liquid Clustering se adapta a los patrones de consulta reales.</del> <strong>Con Liquid Clustering definís las clustering keys y Delta mantiene ese orden de forma incremental; si querés que Databricks elija las keys por vos, existe <code>CLUSTER BY AUTO</code>.</strong> Además podés cambiar las columnas de clustering sin reescribir la tabla.</p>
 <p><strong>Cuándo seguir con Z-ORDER</strong>: tablas donde necesitás control exacto del orden físico y tenés un patrón de consulta que nunca cambia.</p>
 </section>
 <section id="optimize-no-es-lo-que-pensás" class="level2">
