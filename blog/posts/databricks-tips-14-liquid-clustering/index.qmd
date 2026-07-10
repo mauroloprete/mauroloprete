@@ -638,7 +638,7 @@ El mismo par de números está en el **query profile** de cada query. Para verlo
 2.  **`AUTO` es Databricks-only.** Requiere Unity Catalog + predictive optimization. En Delta open-source no existe: especificás columnas siempre.
 3.  **Más keys no es mejor.** En tablas **\<10 TB**, usar 4 keys puede rendir **peor** que 2 cuando filtrás por una sola columna. Empezá con las columnas que realmente filtrás.
 4.  **La columna 33 no clusteriza.** Solo las columnas con estadísticas (primeras 32 por defecto) sirven como key. Si tu columna cae más allá, ajustá la config de estadísticas primero.
-5.  **No lo mezcles con particiones.** Si venís de una tabla particionada, migrá de verdad (sección 7); no esperes que `CLUSTER BY` conviva con `PARTITIONED BY`.
+5.  **Con particiones no es que convenga evitarlo: no se puede.** Es incompatibilidad dura: una tabla es particionada o clusterizada, nunca las dos cosas, y `ALTER TABLE ... CLUSTER BY` falla sobre una tabla particionada. Si venís de una, migrá de verdad (sección 7).
 6.  **El protocolo no se baja.** Writer v7 / reader v3 es de ida: verificá que todos tus lectores (conectores, herramientas externas) lo soporten antes de migrar tablas compartidas.
 
 ## 13. Cuándo usar Liquid Clustering (y cuándo no)

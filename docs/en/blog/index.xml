@@ -963,7 +963,7 @@ font-style: inherit;">      | "\(.query_text) read=\(.metrics.read_files_count) 
 <li><strong><code>AUTO</code> is Databricks-only.</strong> It requires Unity Catalog + Predictive Optimization. In open-source Delta it doesn’t exist: you always specify columns.</li>
 <li><strong>More keys isn’t better.</strong> On tables <strong>&lt;10 TB</strong>, 4 keys can perform <strong>worse</strong> than 2 when filtering by a single column. Start with the columns you actually filter by.</li>
 <li><strong>Column 33 doesn’t cluster.</strong> Only columns with statistics (first 32 by default) work as keys. If your column falls beyond that, adjust the statistics config first.</li>
-<li><strong>Don’t mix it with partitions.</strong> If you’re coming from a partitioned table, migrate for real (section 7); don’t expect <code>CLUSTER BY</code> to coexist with <code>PARTITIONED BY</code>.</li>
+<li><strong>With partitions it’s not that you shouldn’t: you can’t.</strong> It’s a hard incompatibility: a table is either partitioned or clustered, never both, and <code>ALTER TABLE ... CLUSTER BY</code> fails on a partitioned table. If you’re coming from one, migrate for real (section 7).</li>
 <li><strong>The protocol doesn’t go back down.</strong> Writer v7 / reader v3 is one-way: check that all your readers (connectors, external tools) support it before migrating shared tables.</li>
 </ol>
 </section>

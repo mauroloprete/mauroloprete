@@ -638,7 +638,7 @@ The same pair of numbers lives in each query's **query profile**. To see it: ope
 2.  **`AUTO` is Databricks-only.** It requires Unity Catalog + Predictive Optimization. In open-source Delta it doesn't exist: you always specify columns.
 3.  **More keys isn't better.** On tables **\<10 TB**, 4 keys can perform **worse** than 2 when filtering by a single column. Start with the columns you actually filter by.
 4.  **Column 33 doesn't cluster.** Only columns with statistics (first 32 by default) work as keys. If your column falls beyond that, adjust the statistics config first.
-5.  **Don't mix it with partitions.** If you're coming from a partitioned table, migrate for real (section 7); don't expect `CLUSTER BY` to coexist with `PARTITIONED BY`.
+5.  **With partitions it's not that you shouldn't: you can't.** It's a hard incompatibility: a table is either partitioned or clustered, never both, and `ALTER TABLE ... CLUSTER BY` fails on a partitioned table. If you're coming from one, migrate for real (section 7).
 6.  **The protocol doesn't go back down.** Writer v7 / reader v3 is one-way: check that all your readers (connectors, external tools) support it before migrating shared tables.
 
 ## 13. When to use Liquid Clustering (and when not to)
