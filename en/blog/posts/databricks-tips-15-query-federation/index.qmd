@@ -1,0 +1,341 @@
+---
+title: "Databricks Tips #15: Query Federation — querying Postgres and MySQL without moving data"
+author:
+  - name: "Mauro Loprete"
+    url: https://mauroloprete.github.io/mauroloprete/en/experience.html
+date: "2026-07-18"
+draft: false
+categories: [Databricks Tips, Data Architecture]
+description: "How to query Postgres and MySQL from Databricks without moving data: connections and foreign catalogs in Unity Catalog, which part of the query gets pushed down to the source database and how to verify it with EXPLAIN FORMATTED, plus the criteria for federating, ingesting, or materializing."
+image: cover.png
+---
+
+You get asked to join the lakehouse sales data with the customers table that lives in a transactional Postgres nobody is ever going to migrate. Today that gets solved in one of two ways, both bad: a nightly dump that always arrives stale, or a `spark.read.jdbc` with the credentials pasted into the notebook, invisible to governance and to the colleague who inherits the pipeline.
+
+**Lakehouse Federation** is the third option: that Postgres (or MySQL, Oracle, SQL Server, Redshift, Snowflake, BigQuery) shows up in Unity Catalog as just another catalog. You query it with regular SQL, apply the same `GRANT`s as any other table, and don't move a single byte. In this post we cover how to set it up in three commands, what happens under the hood when you run a query, which part of the work gets pushed down to the source database, and the criteria for deciding when to federate and when not to.
+
+::: callout-note
+## TL;DR
+
+- Lakehouse Federation mirrors an external database as a **foreign catalog** in Unity Catalog: you query it like any table, with fine-grained per-table permissions, always **read-only**.
+- The setup is **three commands**: `CREATE CONNECTION` (credentials via `secret()`, as the docs recommend), `CREATE FOREIGN CATALOG`, and the usual `GRANT`s.
+- The engine **pushes** filters, projections and aggregates down to the source database (*pushdown*) and processes the rest on its side. `EXPLAIN FORMATTED` even shows the literal SQL that travels to the database (the `External engine query` line).
+- **There is no caching**: every query hits the source database, and the result comes back through **a single stream to a single executor**. With large result sets that means OOM risk (*out of memory*).
+- Federation shines for exploration and ad hoc queries. For recurring volume you're better off **ingesting** with Lakeflow Connect, and the middle ground is **materialized views** on top of federated tables.
+:::
+
+------------------------------------------------------------------------
+
+## 1. The problem: the data you need lives in another database
+
+Almost every company has an operational system (the ERP, the core system, the homegrown CRM) sitting on a Postgres or MySQL that works fine, has an owner, and is on nobody's migration roadmap. But the analyses you're asked for need that data today.
+
+The classic solutions have aged badly:
+
+- **The scheduled dump**: a job copies the tables every night into the bronze zone. It works, but it duplicates storage, arrives hours late, and every new table means a pipeline change. For data you query twice a month, that's paying a toll every single day.
+- **Direct `spark.read.jdbc`**: the classic notebook with `host`, `user` and `password` hardcoded. No governance, no control over who accesses what, credentials scattered across the workspace, and every consumer reinvents the connection.
+
+Lakehouse Federation attacks exactly that gap: live, governed, declarative access to databases you're not going to move.
+
+## 2. What Lakehouse Federation is: two modes that are not synonyms
+
+Under the "Lakehouse Federation" umbrella live two distinct mechanisms, and it pays not to mix them up:
+
+- **Query federation** is the one that applies to Postgres and MySQL: your query (or its pushable part) travels to the source database over JDBC (*Java Database Connectivity*, the standard protocol applications use to talk to databases) and runs there. The work is split between the source database and your warehouse.
+- **Catalog federation** sends no queries to any external engine: it reads the table's files straight from object storage using Databricks compute. It's designed for incremental migrations from a legacy Hive Metastore (HMS, the catalog of the pre Unity Catalog era), AWS Glue, or Snowflake.
+
+Everything that follows in this post is **query federation**. The available connectors: MySQL, PostgreSQL, Oracle, SQL Server, Teradata, Amazon Redshift, Azure Synapse, Snowflake, Google BigQuery, Salesforce Data 360, and even another Databricks workspace.
+
+::: callout-tip
+## The flip side of OpenSharing
+
+Federation brings data in from outside without copying it; [Delta Sharing and the open formats](../databricks-tips-13-opensharing/) share it outward without copying it. They're two halves of the same idea: the data stays where it lives, and it's the query that travels, not the file.
+:::
+
+## 3. Setup in three commands
+
+The setup creates two Unity Catalog securable objects: a **connection** (host, port and credentials) and a **foreign catalog** that mirrors the external database. From there on, the usual `GRANT`s govern, [the same ones you already use for the rest of your catalog](../databricks-tips-02-unity-catalog/).
+
+```sql
+-- 1. The connection: host + credentials. Databricks recommends
+--    passing credentials with secret(), not as plain text.
+CREATE CONNECTION pg_operacional TYPE postgresql
+OPTIONS (
+  host 'ep-cool-water-123456.us-east-2.aws.neon.tech',
+  port '5432',
+  user secret('lab-federation', 'pg-user'),
+  password secret('lab-federation', 'pg-password')
+);
+
+-- 2. The foreign catalog: mirrors ONE database from the server.
+CREATE FOREIGN CATALOG pg_ventas
+USING CONNECTION pg_operacional
+OPTIONS (database 'neondb');
+
+-- 3. Fine-grained permissions, like in any UC catalog.
+GRANT USE CATALOG, USE SCHEMA, SELECT
+ON CATALOG pg_ventas TO `data-analysts`;
+```
+
+Done: `SELECT * FROM pg_ventas.public.orders LIMIT 10` and you're reading the Postgres live.
+
+::: callout-important
+## The Postgres vs MySQL trap
+
+In **Postgres**, the foreign catalog mirrors **one** database (the `database` option in step 2 is required); if you need another database from the same server, that's another catalog on the same connection. In **MySQL** that option isn't needed and the documented syntax doesn't even include it, because MySQL uses a two-layer namespace: in practice, the server's databases end up exposed as schemas of the catalog. The only documented catalog option for MySQL is `tinyInt1isBit` (how to interpret `tinyint(1)` columns), and on top of that **SSL is mandatory** (*Secure Sockets Layer*, the encrypted connection) to create the connection.
+:::
+
+::: callout-warning
+## Names get flattened to lowercase
+
+Unity Catalog lowercases schema and table names when mirroring them. Two silent consequences: if the source database has both `Orders` and `orders`, **there's no guarantee which one survives**; and names that are invalid for UC are simply **ignored with no warning** when the catalog is created. If a table "doesn't show up", start here.
+:::
+
+## 4. How it works inside: one remote subquery and a single stream
+
+When you run a query that touches a foreign table, Databricks doesn't "copy the table and then filter": it builds a **remote subquery** for each foreign table in the plan, sends it over JDBC, and the source database resolves it. Whatever the database returns comes back to the warehouse for the rest of the plan.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-width: 10
+#| fig-height: 4.6
+#| fig-align: center
+#| fig-cap: "The plan splits in two: the pushable part travels as SQL to the source database and runs there; the result comes back through a single stream to a single executor, and the rest of the plan runs in the warehouse."
+
+library(ggplot2)
+
+navy <- "#1e293b"; orange <- "#FFA166"; purple <- "#593196"
+bg <- "#f8fafc"; gray <- "#64748b"
+
+ggplot() +
+  geom_rect(aes(xmin = 2, xmax = 40, ymin = 10, ymax = 54),
+            fill = navy, color = NA) +
+  geom_rect(aes(xmin = 62, xmax = 98, ymin = 10, ymax = 54),
+            fill = purple, color = NA) +
+  annotate("text", x = 21, y = 49, label = "SQL Warehouse · Databricks",
+           color = "white", fontface = "bold", size = 4.6) +
+  annotate("text", x = 21, y = 37,
+           label = "Your full query:\nfilter + aggregate + levenshtein",
+           color = "white", size = 3.6, lineheight = 1.1) +
+  annotate("text", x = 21, y = 19,
+           label = "What does NOT get pushed runs here:\nfunctions with no SQL translation\nand the rest of the plan",
+           color = orange, size = 3.4, lineheight = 1.1) +
+  annotate("text", x = 80, y = 49, label = "PostgreSQL · source database",
+           color = "white", fontface = "bold", size = 4.6) +
+  annotate("text", x = 80, y = 30,
+           label = "Remote subquery:\nWHERE fecha >= '2026-01-01'\ncolumn projection\npushable aggregates",
+           color = "white", size = 3.6, lineheight = 1.15) +
+  geom_segment(aes(x = 41, xend = 61, y = 44, yend = 44),
+               color = orange, linewidth = 1.1,
+               arrow = arrow(length = unit(0.25, "cm"), type = "closed")) +
+  annotate("text", x = 51, y = 48.5, label = "the pushable part\ntravels as SQL (JDBC)",
+           color = gray, size = 3.2, lineheight = 1) +
+  geom_segment(aes(x = 61, xend = 41, y = 20, yend = 20),
+               color = gray, linewidth = 1.1,
+               arrow = arrow(length = unit(0.25, "cm"), type = "closed")) +
+  annotate("text", x = 51, y = 14.5, label = "result: a single stream\nto a single executor",
+           color = gray, size = 3.2, lineheight = 1) +
+  xlim(0, 100) + ylim(6, 58) +
+  labs(caption = "⚡ Spark de Ideas · mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = bg, color = NA),
+        plot.caption = element_text(color = gray, size = 8))
+```
+
+Three practical consequences of this design:
+
+1. **The result comes back through a single stream to a single executor.** If the remote subquery returns millions of rows, that executor can run out of memory. Scaling up the cluster doesn't help: the bottleneck is the stream, not the compute.
+2. **There is no caching.** Neither the Result Cache nor the Disk Cache applies to federated queries: **every execution hits the source database**. The dashboard that refreshes every 5 minutes hits your transactional Postgres every 5 minutes.
+3. **Performance is set by the source database, not the warehouse.** [Photon](../databricks-tips-12-photon/) accelerates whatever runs on your side of the JDBC: in the lab in section 6, the local stages of the plan show up as `PhotonFilter` and `PhotonProject`. But no cluster can speed up how long the database takes to resolve the remote subquery.
+
+## 5. Pushdown: what travels to the database and what stays
+
+*Pushdown* is what makes this usable: instead of pulling the table and filtering here, the engine translates everything it can into the source database's SQL and pushes it there. For Postgres and MySQL, on any compute, the following get pushed:
+
+- **Filters** (`WHERE`) and **projections** (reading only the columns you ask for)
+- **Aggregates** (`GROUP BY`, `count`, `sum`, ...)
+- **`LIMIT`** and **`OFFSET`**, plus sorting when it goes with a limit
+- **Boolean and arithmetic operators** (arithmetic ones require ANSI mode enabled)
+- **Functions** for strings, dates and math, with partial support and **only inside filter expressions**
+
+And what doesn't? Whatever the engine can't translate into the database's SQL. But be careful about taking the doc's lists at face value: the docs' own example of a non-pushable filter is `ILIKE`, the case-insensitive `LIKE`, and when running this post's lab the engine rewrote it as `LOWER(cliente) LIKE '%tech%'` and pushed it anyway. Pushdown improves with every warehouse channel; the real list, the only one you can trust, is the one your query's plan shows you.
+
+An example that today does stay on the Databricks side: `levenshtein()`, the edit distance between two strings (how many letters you have to change to turn one into the other). Spark ships it built-in, but Postgres only has it via an extension, so there's no possible translation.
+
+::: callout-tip
+## The AND trick
+
+Pushdown is not all-or-nothing: in a compound filter with `AND`, **the pushable part travels even if the other doesn't**. In the lab, `WHERE fecha >= '2026-01-01' AND levenshtein(cliente, 'cliente_42') <= 1` produces a remote subquery carrying the date filter (the database returns only those rows) and a local `PhotonFilter` that keeps the `levenshtein`. Arranging your filters so the selective part is pushable changes how much data crosses the wire.
+:::
+
+## 6. Lab: a Postgres on Neon and two queries with EXPLAIN FORMATTED
+
+To try this hands-on you don't need to ask anyone's permission: [Neon](https://neon.com) gives you a free serverless Postgres with a public endpoint, it's enough for this lab, and it doesn't ask for a credit card. The full lab is at [spark-de-ideas-labs/tips/query-federation](https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/query-federation), with the Neon database creation via UI and via CLI, the SQL ready to run, and the reference outputs.
+
+**Step 1: the database.** Create a project on Neon and, in its SQL editor, generate an orders table with synthetic data:
+
+```sql
+CREATE TABLE orders AS
+SELECT
+  g AS order_id,
+  'cliente_' || (g % 1000) AS cliente,
+  (ARRAY['web','app','tienda'])[1 + g % 3] AS canal,
+  DATE '2025-01-01' + (g % 540) AS fecha,
+  round((random() * 900 + 100)::numeric, 2) AS monto
+FROM generate_series(1, 5000000) AS g;
+```
+
+**Step 2: secrets and connection.** Store the Neon credentials in a secret scope and create the connection and the catalog with the DDL from section 3 (Neon requires SSL, same as MySQL).
+
+```bash
+databricks secrets create-scope lab-federation
+databricks secrets put-secret lab-federation pg-user
+databricks secrets put-secret lab-federation pg-password
+```
+
+**Step 3: the two queries.** One with a pushable filter and aggregate, and one with `levenshtein`, which has no translation:
+
+```sql
+-- A: the date filter and the aggregate get pushed down
+EXPLAIN FORMATTED
+SELECT canal, count(*) AS ordenes
+FROM pg_ventas.public.orders
+WHERE fecha >= '2026-01-01'
+GROUP BY canal;
+
+-- B: levenshtein has no translation; the filter runs on this side
+EXPLAIN FORMATTED
+SELECT *
+FROM pg_ventas.public.orders
+WHERE levenshtein(cliente, 'cliente_42') <= 1;
+```
+
+The plan for query A, run against the lab's Neon on a serverless warehouse (trimmed output):
+
+```default
+== Physical Plan ==
+PhotonResultStage (5)
++- PhotonColumnarToRow (4)
+   +- PhotonProject (3)
+      +- PhotonRowToColumnar (2)
+         +- * Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders (1)
+
+External engine query: SELECT "canal",COUNT(*) FROM "public"."orders"  WHERE ("fecha" IS NOT NULL) AND ("fecha" >= '2026-01-01') GROUP BY "canal"
+
+== Photon Explanation ==
+The query is fully supported by Photon.
+```
+
+The line worth the whole post is `External engine query`: the literal SQL that travels to Postgres. Filter **and aggregate** went over entirely: Postgres aggregated 1.6 million rows on its side and **three rows** crossed the wire:
+
+```default
+tienda | 546281
+app    | 537022
+web    | 537022
+```
+
+In query B the plan changes shape: a local `PhotonFilter` appears carrying the `levenshtein`, and the remote subquery travels almost naked, with the `WHERE` reduced to the only translatable bit:
+
+```default
+(3) PhotonFilter
+    Arguments: (levenshtein(cliente#13548, cliente_42, None) <= 1)
+
+External engine query: SELECT "order_id","cliente","canal","fecha","monto" FROM "public"."orders"  WHERE ("cliente" IS NOT NULL)
+```
+
+Here Postgres returns **the entire table** (5 million rows through the single stream from section 4) and the warehouse filters afterwards. Same table, same catalog, and one query costs three rows of traffic while the other costs five million. The same information is in the UI's **Query Profile**, on the scan node: it's the first place to look when a federated query "feels slow".
+
+::: callout-note
+## The docs say one thing; your plan knows the truth
+
+This lab originally had query B written with `ILIKE`, which is the docs' own example of a non-pushable filter. On running it, the engine rewrote it as `LOWER("cliente") LIKE '%tech%'` and pushed it anyway. Pushdown quietly improves with every channel; verify against your plan, not against the docs.
+:::
+
+## 7. Tuning: fetchSize, parallel reads and join pushdown
+
+Three knobs, in order of impact per effort:
+
+- **`fetchSize`**: how many rows each JDBC round trip brings back. By default, most JDBC connectors fetch the result **all at once** (atomic fetch), the exact recipe for the OOM from section 4; setting a `fetchSize` splits it into batches, and the docs recommend a large one (for example `100000`). It's set per query: `SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)`. Requires DBR 16.1+ (*Databricks Runtime*, the engine version on clusters) or a warehouse on channel 2024.50+.
+- **Parallel reads**: with `numPartitions`, `partitionColumn`, `lowerBound` and `upperBound` the remote scan splits into several concurrent subqueries, each with its own range. Requires DBR 17.1+ or channel 2025.25+, and beware: **it doesn't work through views** that reference federated tables.
+- **Join pushdown**: pushing the entire join so the source database resolves it. For Postgres and MySQL it's in **Public Preview** (for Redshift, Snowflake and BigQuery it's already GA, *Generally Available*, stable and supported): it requires DBR 17.2+ or channel 2025.30+, enabling the *Join Pushdown for Federated Queries* preview in the workspace, and it only covers inner, left outer and right outer joins.
+
+::: callout-warning
+## Don't mix up the requirements
+
+Federation itself works from DBR 13.3 LTS or warehouse channel 2023.40+. The 17.x/2025.x requirements above belong **only** to each tuning knob. If you read "requires 17.2" in the docs, that's the join pushdown, not federating.
+:::
+
+## 8. Requirements and permissions
+
+The minimum for this to work:
+
+- Workspace with **Unity Catalog** enabled
+- Compute: **DBR 13.3 LTS+** (Standard or Dedicated access mode) or a **Pro or Serverless SQL warehouse** on channel 2023.40+ ([warehouse types refresher in Tips #9](../databricks-tips-09-sql-warehouses/))
+- **Network connectivity** from the compute to the source database (with serverless and private databases this is a chapter of its own: allowlists, stable IPs, Private Link)
+- Permissions: `CREATE CONNECTION` on the metastore for the connection; `CREATE CATALOG` plus ownership of the connection (or `CREATE FOREIGN CATALOG` on it) for the catalog
+
+## 9. Gotchas
+
+1. **For databases it's read-only, no exceptions.** The only write path in all of Lakehouse Federation exists in catalog federation over the workspace's internal Hive metastore. If you need to write to the remote Postgres, this isn't the tool: the docs point you to the Spark Data Source API with classic JDBC.
+2. **No caching of any kind.** Every query, including the one your dashboard repeats, executes on the source database. Be kind to your Postgres: point at a read replica if one exists.
+3. **The single stream can take down an executor with OOM.** `SELECT *` on a large federated table is the exact recipe. Always filter and project; that's what pushdown is for.
+4. **Lowercasing and silent discards.** Names go lowercase, collisions have no guaranteed winner, invalid names are ignored with no warning (section 3).
+5. **Concurrency is capped by the warehouse, not the connection.** Throttling is determined by the Databricks SQL concurrent query limit: you queue up by saturating the warehouse, not by many users pointing at the same foreign catalog. Across different warehouses there's no per-connection limit.
+6. **Metadata refreshes itself on every query, with one caveat.** Unity Catalog fetches the latest metadata at query time: new tables and schema changes are picked up without doing anything. `REFRESH FOREIGN CATALOG pg_ventas` is left for external engines that read the catalog without going through Databricks Runtime (those accesses don't trigger the refresh) or for proactively warming the cached metadata for performance.
+7. **MySQL has its own rules.** SSL mandatory, the `database` option doesn't apply to the catalog, and `tinyint(1)` interpreted as boolean unless you configure `tinyInt1isBit`.
+
+## 10. When to federate and when not to
+
+The real question isn't "can I federate?" but "how many times a day am I going to pay the toll of reading live?". The decision table:
+
+| Situation | Best option |
+|-----------|-------------|
+| Exploration, PoC (proof of concept), ad hoc query | **Federate**: zero infrastructure, fresh data |
+| The same data queried many times a day | **Ingest** with Lakeflow Connect: you pay for the copy once, not per query |
+| Heavy, recurring query on federated tables | **Materialized view** on the federated table: the middle ground, precomputed result with a scheduled refresh |
+| You need to write to the source database | **Spark Data Source API** (JDBC): Federation is read-only |
+| You're creating a new Postgres inside the ecosystem | **Lakebase**: the managed Postgres from Databricks, no JDBC in between |
+| Sharing data outside your organization | **Delta Sharing** ([Tips #13](../databricks-tips-13-opensharing/)) |
+
+::: callout-tip
+## The rule of thumb
+
+Federate what you query rarely and changes a lot; ingest what you query a lot and changes rarely. And when "rarely" turns into "a lot", the materialized view buys you time before building the ingestion.
+:::
+
+------------------------------------------------------------------------
+
+## References
+
+- [Connect to external databases and catalogs — Databricks on AWS](https://docs.databricks.com/aws/en/query-federation/)
+- [What is query federation? — Databricks on AWS](https://docs.databricks.com/aws/en/query-federation/database-federation)
+- [Run federated queries on PostgreSQL](https://docs.databricks.com/aws/en/query-federation/postgresql)
+- [Run federated queries on MySQL](https://docs.databricks.com/aws/en/query-federation/mysql)
+- [Federated queries — SQL reference](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-federated-queries)
+- [Performance recommendations](https://docs.databricks.com/aws/en/query-federation/performance-recommendations)
+- [Lakehouse Federation — Azure Databricks](https://learn.microsoft.com/en-us/azure/databricks/query-federation/)
+
+## More from this series
+
+If this post helped, check out the previous **Databricks Tips**:
+
+- [**Tips #1**: Databricks Asset Bundles](../databricks-asset-bundles-advanced/) — IaC for Databricks
+- [**Tips #2**: Delta Lake](../databricks-tips-01-delta-lake/) — the 7 things you wish you'd known
+- [**Tips #3**: Unity Catalog](../databricks-tips-02-unity-catalog/) — governance nobody implements well
+- [**Tips #4**: Structured Streaming](../databricks-tips-03-structured-streaming/) — watermarks, triggers and micro-batch
+- [**Tips #5**: MLflow + Unity Catalog](../databricks-tips-04-mlflow-unity-catalog/) — from experiment to model
+- [**Tips #6**: Feature Engineering](../databricks-tips-05-feature-engineering/) — features that survive production
+- [**Tips #7**: Docker on Databricks](../databricks-tips-06-docker-containers/) — custom containers
+- [**Tips #8**: Jobs & Workflows](../databricks-tips-08-jobs-workflows/) — streaming and event-driven triggers
+- [**Tips #9**: SQL Warehouses](../databricks-tips-09-sql-warehouses/) — the compute that turns itself on
+- [**Tips #10**: AI Gateway](../databricks-tips-10-ai-gateway/) — centralized governance for LLMs
+- [**Tips #11**: Lakeflow Declarative Pipelines](../databricks-tips-11-lakeflow-declarative-pipelines/) — declarative pipelines with built-in quality
+- [**Tips #12**: Photon](../databricks-tips-12-photon/) — the C++ engine that speeds up your queries
+- [**Tips #13**: OpenSharing](../databricks-tips-13-opensharing/) — sharing without copying
+- [**Tips #14**: Liquid Clustering](../databricks-tips-14-liquid-clustering/) — the replacement for partitions and Z-ORDER
+
+------------------------------------------------------------------------
+
+*Next in the series: R + Databricks with sparklyr, or how to query all of this (foreign catalogs included) without leaving R.*

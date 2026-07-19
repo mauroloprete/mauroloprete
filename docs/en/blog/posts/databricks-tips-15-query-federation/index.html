@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-07-18">
+<meta name="description" content="How to query Postgres and MySQL from Databricks without moving data: connections and foreign catalogs in Unity Catalog, which part of the query gets pushed down to the source database and how to verify it with EXPLAIN FORMATTED, plus the criteria for federating, ingesting, or materializing.">
+
+<title>Databricks Tips #15: Query Federation — querying Postgres and MySQL without moving data – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../../">
+<link href="../../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../../../styles.css">
+<meta property="og:title" content="Databricks Tips #15: Query Federation — querying Postgres and MySQL without moving data – Mauro Loprete">
+<meta property="og:description" content="How to query Postgres and MySQL from Databricks without moving data: connections and foreign catalogs in Unity Catalog, which part of the query gets pushed down to the source database and how to verify it with EXPLAIN FORMATTED, plus the criteria for federating, ingesting, or materializing.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-15-query-federation/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #15: Query Federation — querying Postgres and MySQL without moving data – Mauro Loprete">
+<meta name="twitter:description" content="How to query Postgres and MySQL from Databricks without moving data: connections and foreign catalogs in Unity Catalog, which part of the query gets pushed down to the source database and how to verify it with EXPLAIN FORMATTED, plus the criteria for federating, ingesting, or materializing.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-15-query-federation/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-problem-the-data-you-need-lives-in-another-database" id="toc-the-problem-the-data-you-need-lives-in-another-database" class="nav-link active" data-scroll-target="#the-problem-the-data-you-need-lives-in-another-database">1. The problem: the data you need lives in another database</a></li>
+  <li><a href="#what-lakehouse-federation-is-two-modes-that-are-not-synonyms" id="toc-what-lakehouse-federation-is-two-modes-that-are-not-synonyms" class="nav-link" data-scroll-target="#what-lakehouse-federation-is-two-modes-that-are-not-synonyms">2. What Lakehouse Federation is: two modes that are not synonyms</a></li>
+  <li><a href="#setup-in-three-commands" id="toc-setup-in-three-commands" class="nav-link" data-scroll-target="#setup-in-three-commands">3. Setup in three commands</a></li>
+  <li><a href="#how-it-works-inside-one-remote-subquery-and-a-single-stream" id="toc-how-it-works-inside-one-remote-subquery-and-a-single-stream" class="nav-link" data-scroll-target="#how-it-works-inside-one-remote-subquery-and-a-single-stream">4. How it works inside: one remote subquery and a single stream</a></li>
+  <li><a href="#pushdown-what-travels-to-the-database-and-what-stays" id="toc-pushdown-what-travels-to-the-database-and-what-stays" class="nav-link" data-scroll-target="#pushdown-what-travels-to-the-database-and-what-stays">5. Pushdown: what travels to the database and what stays</a></li>
+  <li><a href="#lab-a-postgres-on-neon-and-two-queries-with-explain-formatted" id="toc-lab-a-postgres-on-neon-and-two-queries-with-explain-formatted" class="nav-link" data-scroll-target="#lab-a-postgres-on-neon-and-two-queries-with-explain-formatted">6. Lab: a Postgres on Neon and two queries with EXPLAIN FORMATTED</a></li>
+  <li><a href="#tuning-fetchsize-parallel-reads-and-join-pushdown" id="toc-tuning-fetchsize-parallel-reads-and-join-pushdown" class="nav-link" data-scroll-target="#tuning-fetchsize-parallel-reads-and-join-pushdown">7. Tuning: fetchSize, parallel reads and join pushdown</a></li>
+  <li><a href="#requirements-and-permissions" id="toc-requirements-and-permissions" class="nav-link" data-scroll-target="#requirements-and-permissions">8. Requirements and permissions</a></li>
+  <li><a href="#gotchas" id="toc-gotchas" class="nav-link" data-scroll-target="#gotchas">9. Gotchas</a></li>
+  <li><a href="#when-to-federate-and-when-not-to" id="toc-when-to-federate-and-when-not-to" class="nav-link" data-scroll-target="#when-to-federate-and-when-not-to">10. When to federate and when not to</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#more-from-this-series" id="toc-more-from-this-series" class="nav-link" data-scroll-target="#more-from-this-series">More from this series</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #15: Query Federation — querying Postgres and MySQL without moving data</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Data Architecture</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    How to query Postgres and MySQL from Databricks without moving data: connections and foreign catalogs in Unity Catalog, which part of the query gets pushed down to the source database and how to verify it with EXPLAIN FORMATTED, plus the criteria for federating, ingesting, or materializing.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/en/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">July 18, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>You get asked to join the lakehouse sales data with the customers table that lives in a transactional Postgres nobody is ever going to migrate. Today that gets solved in one of two ways, both bad: a nightly dump that always arrives stale, or a <code>spark.read.jdbc</code> with the credentials pasted into the notebook, invisible to governance and to the colleague who inherits the pipeline.</p>
+<p><strong>Lakehouse Federation</strong> is the third option: that Postgres (or MySQL, Oracle, SQL Server, Redshift, Snowflake, BigQuery) shows up in Unity Catalog as just another catalog. You query it with regular SQL, apply the same <code>GRANT</code>s as any other table, and don’t move a single byte. In this post we cover how to set it up in three commands, what happens under the hood when you run a query, which part of the work gets pushed down to the source database, and the criteria for deciding when to federate and when not to.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Lakehouse Federation mirrors an external database as a <strong>foreign catalog</strong> in Unity Catalog: you query it like any table, with fine-grained per-table permissions, always <strong>read-only</strong>.</li>
+<li>The setup is <strong>three commands</strong>: <code>CREATE CONNECTION</code> (credentials via <code>secret()</code>, as the docs recommend), <code>CREATE FOREIGN CATALOG</code>, and the usual <code>GRANT</code>s.</li>
+<li>The engine <strong>pushes</strong> filters, projections and aggregates down to the source database (<em>pushdown</em>) and processes the rest on its side. <code>EXPLAIN FORMATTED</code> even shows the literal SQL that travels to the database (the <code>External engine query</code> line).</li>
+<li><strong>There is no caching</strong>: every query hits the source database, and the result comes back through <strong>a single stream to a single executor</strong>. With large result sets that means OOM risk (<em>out of memory</em>).</li>
+<li>Federation shines for exploration and ad hoc queries. For recurring volume you’re better off <strong>ingesting</strong> with Lakeflow Connect, and the middle ground is <strong>materialized views</strong> on top of federated tables.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="the-problem-the-data-you-need-lives-in-another-database" class="level2">
+<h2 class="anchored" data-anchor-id="the-problem-the-data-you-need-lives-in-another-database">1. The problem: the data you need lives in another database</h2>
+<p>Almost every company has an operational system (the ERP, the core system, the homegrown CRM) sitting on a Postgres or MySQL that works fine, has an owner, and is on nobody’s migration roadmap. But the analyses you’re asked for need that data today.</p>
+<p>The classic solutions have aged badly:</p>
+<ul>
+<li><strong>The scheduled dump</strong>: a job copies the tables every night into the bronze zone. It works, but it duplicates storage, arrives hours late, and every new table means a pipeline change. For data you query twice a month, that’s paying a toll every single day.</li>
+<li><strong>Direct <code>spark.read.jdbc</code></strong>: the classic notebook with <code>host</code>, <code>user</code> and <code>password</code> hardcoded. No governance, no control over who accesses what, credentials scattered across the workspace, and every consumer reinvents the connection.</li>
+</ul>
+<p>Lakehouse Federation attacks exactly that gap: live, governed, declarative access to databases you’re not going to move.</p>
+</section>
+<section id="what-lakehouse-federation-is-two-modes-that-are-not-synonyms" class="level2">
+<h2 class="anchored" data-anchor-id="what-lakehouse-federation-is-two-modes-that-are-not-synonyms">2. What Lakehouse Federation is: two modes that are not synonyms</h2>
+<p>Under the “Lakehouse Federation” umbrella live two distinct mechanisms, and it pays not to mix them up:</p>
+<ul>
+<li><strong>Query federation</strong> is the one that applies to Postgres and MySQL: your query (or its pushable part) travels to the source database over JDBC (<em>Java Database Connectivity</em>, the standard protocol applications use to talk to databases) and runs there. The work is split between the source database and your warehouse.</li>
+<li><strong>Catalog federation</strong> sends no queries to any external engine: it reads the table’s files straight from object storage using Databricks compute. It’s designed for incremental migrations from a legacy Hive Metastore (HMS, the catalog of the pre Unity Catalog era), AWS Glue, or Snowflake.</li>
+</ul>
+<p>Everything that follows in this post is <strong>query federation</strong>. The available connectors: MySQL, PostgreSQL, Oracle, SQL Server, Teradata, Amazon Redshift, Azure Synapse, Snowflake, Google BigQuery, Salesforce Data 360, and even another Databricks workspace.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The flip side of OpenSharing
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Federation brings data in from outside without copying it; <a href="../databricks-tips-13-opensharing/">Delta Sharing and the open formats</a> share it outward without copying it. They’re two halves of the same idea: the data stays where it lives, and it’s the query that travels, not the file.</p>
+</div>
+</div>
+</section>
+<section id="setup-in-three-commands" class="level2">
+<h2 class="anchored" data-anchor-id="setup-in-three-commands">3. Setup in three commands</h2>
+<p>The setup creates two Unity Catalog securable objects: a <strong>connection</strong> (host, port and credentials) and a <strong>foreign catalog</strong> that mirrors the external database. From there on, the usual <code>GRANT</code>s govern, <a href="../databricks-tips-02-unity-catalog/">the same ones you already use for the rest of your catalog</a>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- 1. The connection: host + credentials. Databricks recommends</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">--    passing credentials with secret(), not as plain text.</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> CONNECTION pg_operacional <span class="kw">TYPE</span> postgresql</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>OPTIONS (</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  host <span class="st">'ep-cool-water-123456.us-east-2.aws.neon.tech'</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  port <span class="st">'5432'</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">user</span> secret(<span class="st">'lab-federation'</span>, <span class="st">'pg-user'</span>),</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">password</span> secret(<span class="st">'lab-federation'</span>, <span class="st">'pg-password'</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>);</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co">-- 2. The foreign catalog: mirrors ONE database from the server.</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">FOREIGN</span> CATALOG pg_ventas</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="kw">USING</span> CONNECTION pg_operacional</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>OPTIONS (<span class="kw">database</span> <span class="st">'neondb'</span>);</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="co">-- 3. Fine-grained permissions, like in any UC catalog.</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="kw">GRANT</span> <span class="kw">USE</span> CATALOG, <span class="kw">USE</span> <span class="kw">SCHEMA</span>, <span class="kw">SELECT</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="kw">ON</span> CATALOG pg_ventas <span class="kw">TO</span> `data<span class="op">-</span>analysts`;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Done: <code>SELECT * FROM pg_ventas.public.orders LIMIT 10</code> and you’re reading the Postgres live.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The Postgres vs MySQL trap
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>In <strong>Postgres</strong>, the foreign catalog mirrors <strong>one</strong> database (the <code>database</code> option in step 2 is required); if you need another database from the same server, that’s another catalog on the same connection. In <strong>MySQL</strong> that option isn’t needed and the documented syntax doesn’t even include it, because MySQL uses a two-layer namespace: in practice, the server’s databases end up exposed as schemas of the catalog. The only documented catalog option for MySQL is <code>tinyInt1isBit</code> (how to interpret <code>tinyint(1)</code> columns), and on top of that <strong>SSL is mandatory</strong> (<em>Secure Sockets Layer</em>, the encrypted connection) to create the connection.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Names get flattened to lowercase
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Unity Catalog lowercases schema and table names when mirroring them. Two silent consequences: if the source database has both <code>Orders</code> and <code>orders</code>, <strong>there’s no guarantee which one survives</strong>; and names that are invalid for UC are simply <strong>ignored with no warning</strong> when the catalog is created. If a table “doesn’t show up”, start here.</p>
+</div>
+</div>
+</section>
+<section id="how-it-works-inside-one-remote-subquery-and-a-single-stream" class="level2">
+<h2 class="anchored" data-anchor-id="how-it-works-inside-one-remote-subquery-and-a-single-stream">4. How it works inside: one remote subquery and a single stream</h2>
+<p>When you run a query that touches a foreign table, Databricks doesn’t “copy the table and then filter”: it builds a <strong>remote subquery</strong> for each foreign table in the plan, sends it over JDBC, and the source database resolves it. Whatever the database returns comes back to the warehouse for the rest of the plan.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="The plan splits in two: the pushable part travels as SQL to the source database and runs there; the result comes back through a single stream to a single executor, and the rest of the plan runs in the warehouse."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="960" alt="The plan splits in two: the pushable part travels as SQL to the source database and runs there; the result comes back through a single stream to a single executor, and the rest of the plan runs in the warehouse."></a></p>
+</figure>
+</div>
+<figcaption>The plan splits in two: the pushable part travels as SQL to the source database and runs there; the result comes back through a single stream to a single executor, and the rest of the plan runs in the warehouse.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Three practical consequences of this design:</p>
+<ol type="1">
+<li><strong>The result comes back through a single stream to a single executor.</strong> If the remote subquery returns millions of rows, that executor can run out of memory. Scaling up the cluster doesn’t help: the bottleneck is the stream, not the compute.</li>
+<li><strong>There is no caching.</strong> Neither the Result Cache nor the Disk Cache applies to federated queries: <strong>every execution hits the source database</strong>. The dashboard that refreshes every 5 minutes hits your transactional Postgres every 5 minutes.</li>
+<li><strong>Performance is set by the source database, not the warehouse.</strong> <a href="../databricks-tips-12-photon/">Photon</a> accelerates whatever runs on your side of the JDBC: in the lab in section 6, the local stages of the plan show up as <code>PhotonFilter</code> and <code>PhotonProject</code>. But no cluster can speed up how long the database takes to resolve the remote subquery.</li>
+</ol>
+</section>
+<section id="pushdown-what-travels-to-the-database-and-what-stays" class="level2">
+<h2 class="anchored" data-anchor-id="pushdown-what-travels-to-the-database-and-what-stays">5. Pushdown: what travels to the database and what stays</h2>
+<p><em>Pushdown</em> is what makes this usable: instead of pulling the table and filtering here, the engine translates everything it can into the source database’s SQL and pushes it there. For Postgres and MySQL, on any compute, the following get pushed:</p>
+<ul>
+<li><strong>Filters</strong> (<code>WHERE</code>) and <strong>projections</strong> (reading only the columns you ask for)</li>
+<li><strong>Aggregates</strong> (<code>GROUP BY</code>, <code>count</code>, <code>sum</code>, …)</li>
+<li><strong><code>LIMIT</code></strong> and <strong><code>OFFSET</code></strong>, plus sorting when it goes with a limit</li>
+<li><strong>Boolean and arithmetic operators</strong> (arithmetic ones require ANSI mode enabled)</li>
+<li><strong>Functions</strong> for strings, dates and math, with partial support and <strong>only inside filter expressions</strong></li>
+</ul>
+<p>And what doesn’t? Whatever the engine can’t translate into the database’s SQL. But be careful about taking the doc’s lists at face value: the docs’ own example of a non-pushable filter is <code>ILIKE</code>, the case-insensitive <code>LIKE</code>, and when running this post’s lab the engine rewrote it as <code>LOWER(cliente) LIKE '%tech%'</code> and pushed it anyway. Pushdown improves with every warehouse channel; the real list, the only one you can trust, is the one your query’s plan shows you.</p>
+<p>An example that today does stay on the Databricks side: <code>levenshtein()</code>, the edit distance between two strings (how many letters you have to change to turn one into the other). Spark ships it built-in, but Postgres only has it via an extension, so there’s no possible translation.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The AND trick
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Pushdown is not all-or-nothing: in a compound filter with <code>AND</code>, <strong>the pushable part travels even if the other doesn’t</strong>. In the lab, <code>WHERE fecha &gt;= '2026-01-01' AND levenshtein(cliente, 'cliente_42') &lt;= 1</code> produces a remote subquery carrying the date filter (the database returns only those rows) and a local <code>PhotonFilter</code> that keeps the <code>levenshtein</code>. Arranging your filters so the selective part is pushable changes how much data crosses the wire.</p>
+</div>
+</div>
+</section>
+<section id="lab-a-postgres-on-neon-and-two-queries-with-explain-formatted" class="level2">
+<h2 class="anchored" data-anchor-id="lab-a-postgres-on-neon-and-two-queries-with-explain-formatted">6. Lab: a Postgres on Neon and two queries with EXPLAIN FORMATTED</h2>
+<p>To try this hands-on you don’t need to ask anyone’s permission: <a href="https://neon.com">Neon</a> gives you a free serverless Postgres with a public endpoint, it’s enough for this lab, and it doesn’t ask for a credit card. The full lab is at <a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/query-federation">spark-de-ideas-labs/tips/query-federation</a>, with the Neon database creation via UI and via CLI, the SQL ready to run, and the reference outputs.</p>
+<p><strong>Step 1: the database.</strong> Create a project on Neon and, in its SQL editor, generate an orders table with synthetic data:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> orders <span class="kw">AS</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  g <span class="kw">AS</span> order_id,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">'cliente_'</span> <span class="op">||</span> (g % <span class="dv">1000</span>) <span class="kw">AS</span> cliente,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  (<span class="dt">ARRAY</span>[<span class="st">'web'</span>,<span class="st">'app'</span>,<span class="st">'tienda'</span>])[<span class="dv">1</span> <span class="op">+</span> g % <span class="dv">3</span>] <span class="kw">AS</span> canal,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">DATE</span> <span class="st">'2025-01-01'</span> <span class="op">+</span> (g % <span class="dv">540</span>) <span class="kw">AS</span> fecha,</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">round</span>((<span class="kw">random</span>() <span class="op">*</span> <span class="dv">900</span> <span class="op">+</span> <span class="dv">100</span>):<span class="ch">:numeric</span>, <span class="dv">2</span>) <span class="kw">AS</span> monto</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> generate_series(<span class="dv">1</span>, <span class="dv">5000000</span>) <span class="kw">AS</span> g;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Step 2: secrets and connection.</strong> Store the Neon credentials in a secret scope and create the connection and the catalog with the DDL from section 3 (Neon requires SSL, same as MySQL).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> secrets create-scope lab-federation</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> secrets put-secret lab-federation pg-user</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">databricks</span> secrets put-secret lab-federation pg-password</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Step 3: the two queries.</strong> One with a pushable filter and aggregate, and one with <code>levenshtein</code>, which has no translation:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- A: the date filter and the aggregate get pushed down</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">EXPLAIN</span> FORMATTED</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> canal, <span class="fu">count</span>(<span class="op">*</span>) <span class="kw">AS</span> ordenes</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> pg_ventas.<span class="kw">public</span>.orders</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> fecha <span class="op">&gt;=</span> <span class="st">'2026-01-01'</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> canal;</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co">-- B: levenshtein has no translation; the filter runs on this side</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="kw">EXPLAIN</span> FORMATTED</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> pg_ventas.<span class="kw">public</span>.orders</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> levenshtein(cliente, <span class="st">'cliente_42'</span>) <span class="op">&lt;=</span> <span class="dv">1</span>;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The plan for query A, run against the lab’s Neon on a serverless warehouse (trimmed output):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>== Physical Plan ==</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>PhotonResultStage (5)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>+- PhotonColumnarToRow (4)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>   +- PhotonProject (3)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>      +- PhotonRowToColumnar (2)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>         +- * Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders (1)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>External engine query: SELECT "canal",COUNT(*) FROM "public"."orders"  WHERE ("fecha" IS NOT NULL) AND ("fecha" &gt;= '2026-01-01') GROUP BY "canal"</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>== Photon Explanation ==</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>The query is fully supported by Photon.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The line worth the whole post is <code>External engine query</code>: the literal SQL that travels to Postgres. Filter <strong>and aggregate</strong> went over entirely: Postgres aggregated 1.6 million rows on its side and <strong>three rows</strong> crossed the wire:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>tienda | 546281</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>app    | 537022</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>web    | 537022</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>In query B the plan changes shape: a local <code>PhotonFilter</code> appears carrying the <code>levenshtein</code>, and the remote subquery travels almost naked, with the <code>WHERE</code> reduced to the only translatable bit:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>(3) PhotonFilter</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    Arguments: (levenshtein(cliente#13548, cliente_42, None) &lt;= 1)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>External engine query: SELECT "order_id","cliente","canal","fecha","monto" FROM "public"."orders"  WHERE ("cliente" IS NOT NULL)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Here Postgres returns <strong>the entire table</strong> (5 million rows through the single stream from section 4) and the warehouse filters afterwards. Same table, same catalog, and one query costs three rows of traffic while the other costs five million. The same information is in the UI’s <strong>Query Profile</strong>, on the scan node: it’s the first place to look when a federated query “feels slow”.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>The docs say one thing; your plan knows the truth
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This lab originally had query B written with <code>ILIKE</code>, which is the docs’ own example of a non-pushable filter. On running it, the engine rewrote it as <code>LOWER("cliente") LIKE '%tech%'</code> and pushed it anyway. Pushdown quietly improves with every channel; verify against your plan, not against the docs.</p>
+</div>
+</div>
+</section>
+<section id="tuning-fetchsize-parallel-reads-and-join-pushdown" class="level2">
+<h2 class="anchored" data-anchor-id="tuning-fetchsize-parallel-reads-and-join-pushdown">7. Tuning: fetchSize, parallel reads and join pushdown</h2>
+<p>Three knobs, in order of impact per effort:</p>
+<ul>
+<li><strong><code>fetchSize</code></strong>: how many rows each JDBC round trip brings back. By default, most JDBC connectors fetch the result <strong>all at once</strong> (atomic fetch), the exact recipe for the OOM from section 4; setting a <code>fetchSize</code> splits it into batches, and the docs recommend a large one (for example <code>100000</code>). It’s set per query: <code>SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)</code>. Requires DBR 16.1+ (<em>Databricks Runtime</em>, the engine version on clusters) or a warehouse on channel 2024.50+.</li>
+<li><strong>Parallel reads</strong>: with <code>numPartitions</code>, <code>partitionColumn</code>, <code>lowerBound</code> and <code>upperBound</code> the remote scan splits into several concurrent subqueries, each with its own range. Requires DBR 17.1+ or channel 2025.25+, and beware: <strong>it doesn’t work through views</strong> that reference federated tables.</li>
+<li><strong>Join pushdown</strong>: pushing the entire join so the source database resolves it. For Postgres and MySQL it’s in <strong>Public Preview</strong> (for Redshift, Snowflake and BigQuery it’s already GA, <em>Generally Available</em>, stable and supported): it requires DBR 17.2+ or channel 2025.30+, enabling the <em>Join Pushdown for Federated Queries</em> preview in the workspace, and it only covers inner, left outer and right outer joins.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Don’t mix up the requirements
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Federation itself works from DBR 13.3 LTS or warehouse channel 2023.40+. The 17.x/2025.x requirements above belong <strong>only</strong> to each tuning knob. If you read “requires 17.2” in the docs, that’s the join pushdown, not federating.</p>
+</div>
+</div>
+</section>
+<section id="requirements-and-permissions" class="level2">
+<h2 class="anchored" data-anchor-id="requirements-and-permissions">8. Requirements and permissions</h2>
+<p>The minimum for this to work:</p>
+<ul>
+<li>Workspace with <strong>Unity Catalog</strong> enabled</li>
+<li>Compute: <strong>DBR 13.3 LTS+</strong> (Standard or Dedicated access mode) or a <strong>Pro or Serverless SQL warehouse</strong> on channel 2023.40+ (<a href="../databricks-tips-09-sql-warehouses/">warehouse types refresher in Tips #9</a>)</li>
+<li><strong>Network connectivity</strong> from the compute to the source database (with serverless and private databases this is a chapter of its own: allowlists, stable IPs, Private Link)</li>
+<li>Permissions: <code>CREATE CONNECTION</code> on the metastore for the connection; <code>CREATE CATALOG</code> plus ownership of the connection (or <code>CREATE FOREIGN CATALOG</code> on it) for the catalog</li>
+</ul>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">9. Gotchas</h2>
+<ol type="1">
+<li><strong>For databases it’s read-only, no exceptions.</strong> The only write path in all of Lakehouse Federation exists in catalog federation over the workspace’s internal Hive metastore. If you need to write to the remote Postgres, this isn’t the tool: the docs point you to the Spark Data Source API with classic JDBC.</li>
+<li><strong>No caching of any kind.</strong> Every query, including the one your dashboard repeats, executes on the source database. Be kind to your Postgres: point at a read replica if one exists.</li>
+<li><strong>The single stream can take down an executor with OOM.</strong> <code>SELECT *</code> on a large federated table is the exact recipe. Always filter and project; that’s what pushdown is for.</li>
+<li><strong>Lowercasing and silent discards.</strong> Names go lowercase, collisions have no guaranteed winner, invalid names are ignored with no warning (section 3).</li>
+<li><strong>Concurrency is capped by the warehouse, not the connection.</strong> Throttling is determined by the Databricks SQL concurrent query limit: you queue up by saturating the warehouse, not by many users pointing at the same foreign catalog. Across different warehouses there’s no per-connection limit.</li>
+<li><strong>Metadata refreshes itself on every query, with one caveat.</strong> Unity Catalog fetches the latest metadata at query time: new tables and schema changes are picked up without doing anything. <code>REFRESH FOREIGN CATALOG pg_ventas</code> is left for external engines that read the catalog without going through Databricks Runtime (those accesses don’t trigger the refresh) or for proactively warming the cached metadata for performance.</li>
+<li><strong>MySQL has its own rules.</strong> SSL mandatory, the <code>database</code> option doesn’t apply to the catalog, and <code>tinyint(1)</code> interpreted as boolean unless you configure <code>tinyInt1isBit</code>.</li>
+</ol>
+</section>
+<section id="when-to-federate-and-when-not-to" class="level2">
+<h2 class="anchored" data-anchor-id="when-to-federate-and-when-not-to">10. When to federate and when not to</h2>
+<p>The real question isn’t “can I federate?” but “how many times a day am I going to pay the toll of reading live?”. The decision table:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Situation</th>
+<th>Best option</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Exploration, PoC (proof of concept), ad hoc query</td>
+<td><strong>Federate</strong>: zero infrastructure, fresh data</td>
+</tr>
+<tr class="even">
+<td>The same data queried many times a day</td>
+<td><strong>Ingest</strong> with Lakeflow Connect: you pay for the copy once, not per query</td>
+</tr>
+<tr class="odd">
+<td>Heavy, recurring query on federated tables</td>
+<td><strong>Materialized view</strong> on the federated table: the middle ground, precomputed result with a scheduled refresh</td>
+</tr>
+<tr class="even">
+<td>You need to write to the source database</td>
+<td><strong>Spark Data Source API</strong> (JDBC): Federation is read-only</td>
+</tr>
+<tr class="odd">
+<td>You’re creating a new Postgres inside the ecosystem</td>
+<td><strong>Lakebase</strong>: the managed Postgres from Databricks, no JDBC in between</td>
+</tr>
+<tr class="even">
+<td>Sharing data outside your organization</td>
+<td><strong>Delta Sharing</strong> (<a href="../databricks-tips-13-opensharing/">Tips #13</a>)</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The rule of thumb
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Federate what you query rarely and changes a lot; ingest what you query a lot and changes rarely. And when “rarely” turns into “a lot”, the materialized view buys you time before building the ingestion.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/">Connect to external databases and catalogs — Databricks on AWS</a></li>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/database-federation">What is query federation? — Databricks on AWS</a></li>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/postgresql">Run federated queries on PostgreSQL</a></li>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/mysql">Run federated queries on MySQL</a></li>
+<li><a href="https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-federated-queries">Federated queries — SQL reference</a></li>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/performance-recommendations">Performance recommendations</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/query-federation/">Lakehouse Federation — Azure Databricks</a></li>
+</ul>
+</section>
+<section id="more-from-this-series" class="level2">
+<h2 class="anchored" data-anchor-id="more-from-this-series">More from this series</h2>
+<p>If this post helped, check out the previous <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC for Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — the 7 things you wish you’d known</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — governance nobody implements well</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers and micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — from experiment to model</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features that survive production</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker on Databricks</a> — custom containers</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming and event-driven triggers</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — the compute that turns itself on</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — centralized governance for LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — declarative pipelines with built-in quality</li>
+<li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — the C++ engine that speeds up your queries</li>
+<li><a href="../databricks-tips-13-opensharing/"><strong>Tips #13</strong>: OpenSharing</a> — sharing without copying</li>
+<li><a href="../databricks-tips-14-liquid-clustering/"><strong>Tips #14</strong>: Liquid Clustering</a> — the replacement for partitions and Z-ORDER</li>
+</ul>
+<hr>
+<p><em>Next in the series: R + Databricks with sparklyr, or how to query all of this (foreign catalogs included) without leaving R.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

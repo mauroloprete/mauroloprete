@@ -11,7 +11,589 @@
 <description>Databricks tips, Data Engineering, MLOps and survey data processing.</description>
 <language>en</language>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Thu, 09 Jul 2026 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 17 Jul 2026 22:00:00 GMT</lastBuildDate>
+<item>
+  <title>Databricks Tips #15: Query Federation — querying Postgres and MySQL without moving data</title>
+  <dc:creator>Mauro Loprete</dc:creator>
+  <link>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-15-query-federation/</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>You get asked to join the lakehouse sales data with the customers table that lives in a transactional Postgres nobody is ever going to migrate. Today that gets solved in one of two ways, both bad: a nightly dump that always arrives stale, or a <code>spark.read.jdbc</code> with the credentials pasted into the notebook, invisible to governance and to the colleague who inherits the pipeline.</p>
+<p><strong>Lakehouse Federation</strong> is the third option: that Postgres (or MySQL, Oracle, SQL Server, Redshift, Snowflake, BigQuery) shows up in Unity Catalog as just another catalog. You query it with regular SQL, apply the same <code>GRANT</code>s as any other table, and don’t move a single byte. In this post we cover how to set it up in three commands, what happens under the hood when you run a query, which part of the work gets pushed down to the source database, and the criteria for deciding when to federate and when not to.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Lakehouse Federation mirrors an external database as a <strong>foreign catalog</strong> in Unity Catalog: you query it like any table, with fine-grained per-table permissions, always <strong>read-only</strong>.</li>
+<li>The setup is <strong>three commands</strong>: <code>CREATE CONNECTION</code> (credentials via <code>secret()</code>, as the docs recommend), <code>CREATE FOREIGN CATALOG</code>, and the usual <code>GRANT</code>s.</li>
+<li>The engine <strong>pushes</strong> filters, projections and aggregates down to the source database (<em>pushdown</em>) and processes the rest on its side. <code>EXPLAIN FORMATTED</code> even shows the literal SQL that travels to the database (the <code>External engine query</code> line).</li>
+<li><strong>There is no caching</strong>: every query hits the source database, and the result comes back through <strong>a single stream to a single executor</strong>. With large result sets that means OOM risk (<em>out of memory</em>).</li>
+<li>Federation shines for exploration and ad hoc queries. For recurring volume you’re better off <strong>ingesting</strong> with Lakeflow Connect, and the middle ground is <strong>materialized views</strong> on top of federated tables.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="the-problem-the-data-you-need-lives-in-another-database" class="level2">
+<h2 class="anchored" data-anchor-id="the-problem-the-data-you-need-lives-in-another-database">1. The problem: the data you need lives in another database</h2>
+<p>Almost every company has an operational system (the ERP, the core system, the homegrown CRM) sitting on a Postgres or MySQL that works fine, has an owner, and is on nobody’s migration roadmap. But the analyses you’re asked for need that data today.</p>
+<p>The classic solutions have aged badly:</p>
+<ul>
+<li><strong>The scheduled dump</strong>: a job copies the tables every night into the bronze zone. It works, but it duplicates storage, arrives hours late, and every new table means a pipeline change. For data you query twice a month, that’s paying a toll every single day.</li>
+<li><strong>Direct <code>spark.read.jdbc</code></strong>: the classic notebook with <code>host</code>, <code>user</code> and <code>password</code> hardcoded. No governance, no control over who accesses what, credentials scattered across the workspace, and every consumer reinvents the connection.</li>
+</ul>
+<p>Lakehouse Federation attacks exactly that gap: live, governed, declarative access to databases you’re not going to move.</p>
+</section>
+<section id="what-lakehouse-federation-is-two-modes-that-are-not-synonyms" class="level2">
+<h2 class="anchored" data-anchor-id="what-lakehouse-federation-is-two-modes-that-are-not-synonyms">2. What Lakehouse Federation is: two modes that are not synonyms</h2>
+<p>Under the “Lakehouse Federation” umbrella live two distinct mechanisms, and it pays not to mix them up:</p>
+<ul>
+<li><strong>Query federation</strong> is the one that applies to Postgres and MySQL: your query (or its pushable part) travels to the source database over JDBC (<em>Java Database Connectivity</em>, the standard protocol applications use to talk to databases) and runs there. The work is split between the source database and your warehouse.</li>
+<li><strong>Catalog federation</strong> sends no queries to any external engine: it reads the table’s files straight from object storage using Databricks compute. It’s designed for incremental migrations from a legacy Hive Metastore (HMS, the catalog of the pre Unity Catalog era), AWS Glue, or Snowflake.</li>
+</ul>
+<p>Everything that follows in this post is <strong>query federation</strong>. The available connectors: MySQL, PostgreSQL, Oracle, SQL Server, Teradata, Amazon Redshift, Azure Synapse, Snowflake, Google BigQuery, Salesforce Data 360, and even another Databricks workspace.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The flip side of OpenSharing
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Federation brings data in from outside without copying it; <a href="../databricks-tips-13-opensharing/">Delta Sharing and the open formats</a> share it outward without copying it. They’re two halves of the same idea: the data stays where it lives, and it’s the query that travels, not the file.</p>
+</div>
+</div>
+</section>
+<section id="setup-in-three-commands" class="level2">
+<h2 class="anchored" data-anchor-id="setup-in-three-commands">3. Setup in three commands</h2>
+<p>The setup creates two Unity Catalog securable objects: a <strong>connection</strong> (host, port and credentials) and a <strong>foreign catalog</strong> that mirrors the external database. From there on, the usual <code>GRANT</code>s govern, <a href="../databricks-tips-02-unity-catalog/">the same ones you already use for the rest of your catalog</a>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 1. The connection: host + credentials. Databricks recommends</span></span>
+<span id="cb1-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">--    passing credentials with secret(), not as plain text.</span></span>
+<span id="cb1-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> CONNECTION pg_operacional <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TYPE</span> postgresql</span>
+<span id="cb1-4">OPTIONS (</span>
+<span id="cb1-5">  host <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'ep-cool-water-123456.us-east-2.aws.neon.tech'</span>,</span>
+<span id="cb1-6">  port <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'5432'</span>,</span>
+<span id="cb1-7">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">user</span> secret(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'lab-federation'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'pg-user'</span>),</span>
+<span id="cb1-8">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">password</span> secret(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'lab-federation'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'pg-password'</span>)</span>
+<span id="cb1-9">);</span>
+<span id="cb1-10"></span>
+<span id="cb1-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 2. The foreign catalog: mirrors ONE database from the server.</span></span>
+<span id="cb1-12"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FOREIGN</span> CATALOG pg_ventas</span>
+<span id="cb1-13"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">USING</span> CONNECTION pg_operacional</span>
+<span id="cb1-14">OPTIONS (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">database</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'neondb'</span>);</span>
+<span id="cb1-15"></span>
+<span id="cb1-16"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- 3. Fine-grained permissions, like in any UC catalog.</span></span>
+<span id="cb1-17"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">GRANT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">USE</span> CATALOG, <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">USE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SCHEMA</span>, <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span></span>
+<span id="cb1-18"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ON</span> CATALOG pg_ventas <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TO</span> `data<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>analysts`;</span></code></pre></div></div>
+<p>Done: <code>SELECT * FROM pg_ventas.public.orders LIMIT 10</code> and you’re reading the Postgres live.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The Postgres vs MySQL trap
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>In <strong>Postgres</strong>, the foreign catalog mirrors <strong>one</strong> database (the <code>database</code> option in step 2 is required); if you need another database from the same server, that’s another catalog on the same connection. In <strong>MySQL</strong> that option isn’t needed and the documented syntax doesn’t even include it, because MySQL uses a two-layer namespace: in practice, the server’s databases end up exposed as schemas of the catalog. The only documented catalog option for MySQL is <code>tinyInt1isBit</code> (how to interpret <code>tinyint(1)</code> columns), and on top of that <strong>SSL is mandatory</strong> (<em>Secure Sockets Layer</em>, the encrypted connection) to create the connection.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Names get flattened to lowercase
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Unity Catalog lowercases schema and table names when mirroring them. Two silent consequences: if the source database has both <code>Orders</code> and <code>orders</code>, <strong>there’s no guarantee which one survives</strong>; and names that are invalid for UC are simply <strong>ignored with no warning</strong> when the catalog is created. If a table “doesn’t show up”, start here.</p>
+</div>
+</div>
+</section>
+<section id="how-it-works-inside-one-remote-subquery-and-a-single-stream" class="level2">
+<h2 class="anchored" data-anchor-id="how-it-works-inside-one-remote-subquery-and-a-single-stream">4. How it works inside: one remote subquery and a single stream</h2>
+<p>When you run a query that touches a foreign table, Databricks doesn’t “copy the table and then filter”: it builds a <strong>remote subquery</strong> for each foreign table in the plan, sends it over JDBC, and the source database resolves it. Whatever the database returns comes back to the warehouse for the rest of the plan.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="The plan splits in two: the pushable part travels as SQL to the source database and runs there; the result comes back through a single stream to a single executor, and the rest of the plan runs in the warehouse."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-15-query-federation/index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="960" alt="The plan splits in two: the pushable part travels as SQL to the source database and runs there; the result comes back through a single stream to a single executor, and the rest of the plan runs in the warehouse."></a></p>
+</figure>
+</div>
+<figcaption>The plan splits in two: the pushable part travels as SQL to the source database and runs there; the result comes back through a single stream to a single executor, and the rest of the plan runs in the warehouse.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>Three practical consequences of this design:</p>
+<ol type="1">
+<li><strong>The result comes back through a single stream to a single executor.</strong> If the remote subquery returns millions of rows, that executor can run out of memory. Scaling up the cluster doesn’t help: the bottleneck is the stream, not the compute.</li>
+<li><strong>There is no caching.</strong> Neither the Result Cache nor the Disk Cache applies to federated queries: <strong>every execution hits the source database</strong>. The dashboard that refreshes every 5 minutes hits your transactional Postgres every 5 minutes.</li>
+<li><strong>Performance is set by the source database, not the warehouse.</strong> <a href="../databricks-tips-12-photon/">Photon</a> accelerates whatever runs on your side of the JDBC: in the lab in section 6, the local stages of the plan show up as <code>PhotonFilter</code> and <code>PhotonProject</code>. But no cluster can speed up how long the database takes to resolve the remote subquery.</li>
+</ol>
+</section>
+<section id="pushdown-what-travels-to-the-database-and-what-stays" class="level2">
+<h2 class="anchored" data-anchor-id="pushdown-what-travels-to-the-database-and-what-stays">5. Pushdown: what travels to the database and what stays</h2>
+<p><em>Pushdown</em> is what makes this usable: instead of pulling the table and filtering here, the engine translates everything it can into the source database’s SQL and pushes it there. For Postgres and MySQL, on any compute, the following get pushed:</p>
+<ul>
+<li><strong>Filters</strong> (<code>WHERE</code>) and <strong>projections</strong> (reading only the columns you ask for)</li>
+<li><strong>Aggregates</strong> (<code>GROUP BY</code>, <code>count</code>, <code>sum</code>, …)</li>
+<li><strong><code>LIMIT</code></strong> and <strong><code>OFFSET</code></strong>, plus sorting when it goes with a limit</li>
+<li><strong>Boolean and arithmetic operators</strong> (arithmetic ones require ANSI mode enabled)</li>
+<li><strong>Functions</strong> for strings, dates and math, with partial support and <strong>only inside filter expressions</strong></li>
+</ul>
+<p>And what doesn’t? Whatever the engine can’t translate into the database’s SQL. But be careful about taking the doc’s lists at face value: the docs’ own example of a non-pushable filter is <code>ILIKE</code>, the case-insensitive <code>LIKE</code>, and when running this post’s lab the engine rewrote it as <code>LOWER(cliente) LIKE '%tech%'</code> and pushed it anyway. Pushdown improves with every warehouse channel; the real list, the only one you can trust, is the one your query’s plan shows you.</p>
+<p>An example that today does stay on the Databricks side: <code>levenshtein()</code>, the edit distance between two strings (how many letters you have to change to turn one into the other). Spark ships it built-in, but Postgres only has it via an extension, so there’s no possible translation.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The AND trick
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Pushdown is not all-or-nothing: in a compound filter with <code>AND</code>, <strong>the pushable part travels even if the other doesn’t</strong>. In the lab, <code>WHERE fecha &gt;= '2026-01-01' AND levenshtein(cliente, 'cliente_42') &lt;= 1</code> produces a remote subquery carrying the date filter (the database returns only those rows) and a local <code>PhotonFilter</code> that keeps the <code>levenshtein</code>. Arranging your filters so the selective part is pushable changes how much data crosses the wire.</p>
+</div>
+</div>
+</section>
+<section id="lab-a-postgres-on-neon-and-two-queries-with-explain-formatted" class="level2">
+<h2 class="anchored" data-anchor-id="lab-a-postgres-on-neon-and-two-queries-with-explain-formatted">6. Lab: a Postgres on Neon and two queries with EXPLAIN FORMATTED</h2>
+<p>To try this hands-on you don’t need to ask anyone’s permission: <a href="https://neon.com">Neon</a> gives you a free serverless Postgres with a public endpoint, it’s enough for this lab, and it doesn’t ask for a credit card. The full lab is at <a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/query-federation">spark-de-ideas-labs/tips/query-federation</a>, with the Neon database creation via UI and via CLI, the SQL ready to run, and the reference outputs.</p>
+<p><strong>Step 1: the database.</strong> Create a project on Neon and, in its SQL editor, generate an orders table with synthetic data:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> orders <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span></span>
+<span id="cb2-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span></span>
+<span id="cb2-3">  g <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> order_id,</span>
+<span id="cb2-4">  <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cliente_'</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">||</span> (g % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> cliente,</span>
+<span id="cb2-5">  (<span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">ARRAY</span>[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'web'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'app'</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'tienda'</span>])[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> g % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>] <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> canal,</span>
+<span id="cb2-6">  <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">DATE</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'2025-01-01'</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> (g % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">540</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> fecha,</span>
+<span id="cb2-7">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">round</span>((<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">random</span>() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">900</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>):<span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">:numeric</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> monto</span>
+<span id="cb2-8"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> generate_series(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5000000</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> g;</span></code></pre></div></div>
+<p><strong>Step 2: secrets and connection.</strong> Store the Neon credentials in a secret scope and create the connection and the catalog with the DDL from section 3 (Neon requires SSL, same as MySQL).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> secrets create-scope lab-federation</span>
+<span id="cb3-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> secrets put-secret lab-federation pg-user</span>
+<span id="cb3-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">databricks</span> secrets put-secret lab-federation pg-password</span></code></pre></div></div>
+<p><strong>Step 3: the two queries.</strong> One with a pushable filter and aggregate, and one with <code>levenshtein</code>, which has no translation:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- A: the date filter and the aggregate get pushed down</span></span>
+<span id="cb4-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">EXPLAIN</span> FORMATTED</span>
+<span id="cb4-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> canal, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> ordenes</span>
+<span id="cb4-4"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> pg_ventas.<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">public</span>.orders</span>
+<span id="cb4-5"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHERE</span> fecha <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'2026-01-01'</span></span>
+<span id="cb4-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">GROUP</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> canal;</span>
+<span id="cb4-7"></span>
+<span id="cb4-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- B: levenshtein has no translation; the filter runs on this side</span></span>
+<span id="cb4-9"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">EXPLAIN</span> FORMATTED</span>
+<span id="cb4-10"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span></span>
+<span id="cb4-11"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> pg_ventas.<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">public</span>.orders</span>
+<span id="cb4-12"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHERE</span> levenshtein(cliente, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cliente_42'</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>;</span></code></pre></div></div>
+<p>The plan for query A, run against the lab’s Neon on a serverless warehouse (trimmed output):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb5-1">== Physical Plan ==</span>
+<span id="cb5-2">PhotonResultStage (5)</span>
+<span id="cb5-3">+- PhotonColumnarToRow (4)</span>
+<span id="cb5-4">   +- PhotonProject (3)</span>
+<span id="cb5-5">      +- PhotonRowToColumnar (2)</span>
+<span id="cb5-6">         +- * Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders (1)</span>
+<span id="cb5-7"></span>
+<span id="cb5-8">External engine query: SELECT "canal",COUNT(*) FROM "public"."orders"  WHERE ("fecha" IS NOT NULL) AND ("fecha" &gt;= '2026-01-01') GROUP BY "canal"</span>
+<span id="cb5-9"></span>
+<span id="cb5-10">== Photon Explanation ==</span>
+<span id="cb5-11">The query is fully supported by Photon.</span></code></pre></div></div>
+<p>The line worth the whole post is <code>External engine query</code>: the literal SQL that travels to Postgres. Filter <strong>and aggregate</strong> went over entirely: Postgres aggregated 1.6 million rows on its side and <strong>three rows</strong> crossed the wire:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb6-1">tienda | 546281</span>
+<span id="cb6-2">app    | 537022</span>
+<span id="cb6-3">web    | 537022</span></code></pre></div></div>
+<p>In query B the plan changes shape: a local <code>PhotonFilter</code> appears carrying the <code>levenshtein</code>, and the remote subquery travels almost naked, with the <code>WHERE</code> reduced to the only translatable bit:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb7-1">(3) PhotonFilter</span>
+<span id="cb7-2">    Arguments: (levenshtein(cliente#13548, cliente_42, None) &lt;= 1)</span>
+<span id="cb7-3"></span>
+<span id="cb7-4">External engine query: SELECT "order_id","cliente","canal","fecha","monto" FROM "public"."orders"  WHERE ("cliente" IS NOT NULL)</span></code></pre></div></div>
+<p>Here Postgres returns <strong>the entire table</strong> (5 million rows through the single stream from section 4) and the warehouse filters afterwards. Same table, same catalog, and one query costs three rows of traffic while the other costs five million. The same information is in the UI’s <strong>Query Profile</strong>, on the scan node: it’s the first place to look when a federated query “feels slow”.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>The docs say one thing; your plan knows the truth
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This lab originally had query B written with <code>ILIKE</code>, which is the docs’ own example of a non-pushable filter. On running it, the engine rewrote it as <code>LOWER("cliente") LIKE '%tech%'</code> and pushed it anyway. Pushdown quietly improves with every channel; verify against your plan, not against the docs.</p>
+</div>
+</div>
+</section>
+<section id="tuning-fetchsize-parallel-reads-and-join-pushdown" class="level2">
+<h2 class="anchored" data-anchor-id="tuning-fetchsize-parallel-reads-and-join-pushdown">7. Tuning: fetchSize, parallel reads and join pushdown</h2>
+<p>Three knobs, in order of impact per effort:</p>
+<ul>
+<li><strong><code>fetchSize</code></strong>: how many rows each JDBC round trip brings back. By default, most JDBC connectors fetch the result <strong>all at once</strong> (atomic fetch), the exact recipe for the OOM from section 4; setting a <code>fetchSize</code> splits it into batches, and the docs recommend a large one (for example <code>100000</code>). It’s set per query: <code>SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)</code>. Requires DBR 16.1+ (<em>Databricks Runtime</em>, the engine version on clusters) or a warehouse on channel 2024.50+.</li>
+<li><strong>Parallel reads</strong>: with <code>numPartitions</code>, <code>partitionColumn</code>, <code>lowerBound</code> and <code>upperBound</code> the remote scan splits into several concurrent subqueries, each with its own range. Requires DBR 17.1+ or channel 2025.25+, and beware: <strong>it doesn’t work through views</strong> that reference federated tables.</li>
+<li><strong>Join pushdown</strong>: pushing the entire join so the source database resolves it. For Postgres and MySQL it’s in <strong>Public Preview</strong> (for Redshift, Snowflake and BigQuery it’s already GA, <em>Generally Available</em>, stable and supported): it requires DBR 17.2+ or channel 2025.30+, enabling the <em>Join Pushdown for Federated Queries</em> preview in the workspace, and it only covers inner, left outer and right outer joins.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Don’t mix up the requirements
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Federation itself works from DBR 13.3 LTS or warehouse channel 2023.40+. The 17.x/2025.x requirements above belong <strong>only</strong> to each tuning knob. If you read “requires 17.2” in the docs, that’s the join pushdown, not federating.</p>
+</div>
+</div>
+</section>
+<section id="requirements-and-permissions" class="level2">
+<h2 class="anchored" data-anchor-id="requirements-and-permissions">8. Requirements and permissions</h2>
+<p>The minimum for this to work:</p>
+<ul>
+<li>Workspace with <strong>Unity Catalog</strong> enabled</li>
+<li>Compute: <strong>DBR 13.3 LTS+</strong> (Standard or Dedicated access mode) or a <strong>Pro or Serverless SQL warehouse</strong> on channel 2023.40+ (<a href="../databricks-tips-09-sql-warehouses/">warehouse types refresher in Tips #9</a>)</li>
+<li><strong>Network connectivity</strong> from the compute to the source database (with serverless and private databases this is a chapter of its own: allowlists, stable IPs, Private Link)</li>
+<li>Permissions: <code>CREATE CONNECTION</code> on the metastore for the connection; <code>CREATE CATALOG</code> plus ownership of the connection (or <code>CREATE FOREIGN CATALOG</code> on it) for the catalog</li>
+</ul>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">9. Gotchas</h2>
+<ol type="1">
+<li><strong>For databases it’s read-only, no exceptions.</strong> The only write path in all of Lakehouse Federation exists in catalog federation over the workspace’s internal Hive metastore. If you need to write to the remote Postgres, this isn’t the tool: the docs point you to the Spark Data Source API with classic JDBC.</li>
+<li><strong>No caching of any kind.</strong> Every query, including the one your dashboard repeats, executes on the source database. Be kind to your Postgres: point at a read replica if one exists.</li>
+<li><strong>The single stream can take down an executor with OOM.</strong> <code>SELECT *</code> on a large federated table is the exact recipe. Always filter and project; that’s what pushdown is for.</li>
+<li><strong>Lowercasing and silent discards.</strong> Names go lowercase, collisions have no guaranteed winner, invalid names are ignored with no warning (section 3).</li>
+<li><strong>Concurrency is capped by the warehouse, not the connection.</strong> Throttling is determined by the Databricks SQL concurrent query limit: you queue up by saturating the warehouse, not by many users pointing at the same foreign catalog. Across different warehouses there’s no per-connection limit.</li>
+<li><strong>Metadata refreshes itself on every query, with one caveat.</strong> Unity Catalog fetches the latest metadata at query time: new tables and schema changes are picked up without doing anything. <code>REFRESH FOREIGN CATALOG pg_ventas</code> is left for external engines that read the catalog without going through Databricks Runtime (those accesses don’t trigger the refresh) or for proactively warming the cached metadata for performance.</li>
+<li><strong>MySQL has its own rules.</strong> SSL mandatory, the <code>database</code> option doesn’t apply to the catalog, and <code>tinyint(1)</code> interpreted as boolean unless you configure <code>tinyInt1isBit</code>.</li>
+</ol>
+</section>
+<section id="when-to-federate-and-when-not-to" class="level2">
+<h2 class="anchored" data-anchor-id="when-to-federate-and-when-not-to">10. When to federate and when not to</h2>
+<p>The real question isn’t “can I federate?” but “how many times a day am I going to pay the toll of reading live?”. The decision table:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Situation</th>
+<th>Best option</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Exploration, PoC (proof of concept), ad hoc query</td>
+<td><strong>Federate</strong>: zero infrastructure, fresh data</td>
+</tr>
+<tr class="even">
+<td>The same data queried many times a day</td>
+<td><strong>Ingest</strong> with Lakeflow Connect: you pay for the copy once, not per query</td>
+</tr>
+<tr class="odd">
+<td>Heavy, recurring query on federated tables</td>
+<td><strong>Materialized view</strong> on the federated table: the middle ground, precomputed result with a scheduled refresh</td>
+</tr>
+<tr class="even">
+<td>You need to write to the source database</td>
+<td><strong>Spark Data Source API</strong> (JDBC): Federation is read-only</td>
+</tr>
+<tr class="odd">
+<td>You’re creating a new Postgres inside the ecosystem</td>
+<td><strong>Lakebase</strong>: the managed Postgres from Databricks, no JDBC in between</td>
+</tr>
+<tr class="even">
+<td>Sharing data outside your organization</td>
+<td><strong>Delta Sharing</strong> (<a href="../databricks-tips-13-opensharing/">Tips #13</a>)</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The rule of thumb
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Federate what you query rarely and changes a lot; ingest what you query a lot and changes rarely. And when “rarely” turns into “a lot”, the materialized view buys you time before building the ingestion.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/">Connect to external databases and catalogs — Databricks on AWS</a></li>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/database-federation">What is query federation? — Databricks on AWS</a></li>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/postgresql">Run federated queries on PostgreSQL</a></li>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/mysql">Run federated queries on MySQL</a></li>
+<li><a href="https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-federated-queries">Federated queries — SQL reference</a></li>
+<li><a href="https://docs.databricks.com/aws/en/query-federation/performance-recommendations">Performance recommendations</a></li>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/query-federation/">Lakehouse Federation — Azure Databricks</a></li>
+</ul>
+</section>
+<section id="more-from-this-series" class="level2">
+<h2 class="anchored" data-anchor-id="more-from-this-series">More from this series</h2>
+<p>If this post helped, check out the previous <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC for Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — the 7 things you wish you’d known</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — governance nobody implements well</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers and micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — from experiment to model</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features that survive production</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker on Databricks</a> — custom containers</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming and event-driven triggers</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — the compute that turns itself on</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — centralized governance for LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — declarative pipelines with built-in quality</li>
+<li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — the C++ engine that speeds up your queries</li>
+<li><a href="../databricks-tips-13-opensharing/"><strong>Tips #13</strong>: OpenSharing</a> — sharing without copying</li>
+<li><a href="../databricks-tips-14-liquid-clustering/"><strong>Tips #14</strong>: Liquid Clustering</a> — the replacement for partitions and Z-ORDER</li>
+</ul>
+<hr>
+<p><em>Next in the series: R + Databricks with sparklyr, or how to query all of this (foreign catalogs included) without leaving R.</em></p>
+
+
+</section>
+
+ ]]></description>
+  <category>Databricks Tips</category>
+  <category>Data Architecture</category>
+  <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-15-query-federation/</guid>
+  <pubDate>Fri, 17 Jul 2026 22:00:00 GMT</pubDate>
+  <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-15-query-federation/cover.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>Databricks Tips #14: Liquid Clustering — the replacement for partitions and Z-ORDER</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -1048,7 +1630,7 @@ font-style: inherit;">      | "\(.query_text) read=\(.metrics.read_files_count) 
 <li><a href="../databricks-tips-13-opensharing/"><strong>Tips #13</strong>: OpenSharing</a> — sharing without copying</li>
 </ul>
 <hr>
-<p><em>Next in the series: SCD (Slowly Changing Dimensions) in Delta, and how a good layout makes Type 2 MERGEs cheaper.</em></p>
+<p><em>Next in the series: Query Federation, or how to query that Postgres nobody wants to migrate without moving a single byte.</em></p>
 
 
 </section>
@@ -23097,670 +23679,6 @@ font-style: inherit;">"</span>)</span></code></pre></div></div>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-05-feature-engineering/</guid>
   <pubDate>Mon, 30 Mar 2026 22:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-05-feature-engineering/cover.png" medium="image" type="image/png" height="81" width="144"/>
-</item>
-<item>
-  <title>Databricks Tips #5: MLflow + Unity Catalog — from experiment to model in production</title>
-  <dc:creator>Mauro Loprete</dc:creator>
-  <link>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-04-mlflow-unity-catalog/</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>Fifth installment of <strong>Databricks Tips</strong>. If you’re preparing for the ML Professional certification or work with models on Databricks, here’s the modern MLflow workflow integrated with Unity Catalog.</p>
-<section id="the-shift-from-workspace-registry-to-unity-catalog" class="level2">
-<h2 class="anchored" data-anchor-id="the-shift-from-workspace-registry-to-unity-catalog">The shift: from Workspace Registry to Unity Catalog</h2>
-<p>The old model (Workspace Model Registry) used <strong>stages</strong>: <code>None → Staging → Production → Archived</code>. The new model (Unity Catalog) uses <strong>aliases</strong>:</p>
-<div id="lst-registry-uri" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-registry-uri-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Switching from Workspace Registry to Unity Catalog Registry
-</figcaption>
-<div aria-describedby="lst-registry-uri-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> mlflow</span>
-<span id="cb1-2"></span>
-<span id="cb1-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Old (do NOT use): workspace registry with stages</span></span>
-<span id="cb1-4">mlflow.set_registry_uri(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"databricks"</span>)</span>
-<span id="cb1-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Model registered at workspace level, no governance</span></span>
-<span id="cb1-6"></span>
-<span id="cb1-7"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># New: Unity Catalog registry</span></span>
-<span id="cb1-8">mlflow.set_registry_uri(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"databricks-uc"</span>)</span>
-<span id="cb1-9"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Model registered as catalog.schema.model_name</span></span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Why it matters</strong>: with UC, models get the same permissions, lineage and auditing as your Delta tables. An analyst can see which tables a model was trained on without having to ask.</p>
-</section>
-<section id="model-registration-the-full-workflow" class="level2">
-<h2 class="anchored" data-anchor-id="model-registration-the-full-workflow">Model registration: the full workflow</h2>
-<div id="lst-mlflow-tracking" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-mlflow-tracking-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Training with tracking and registering the model in Unity Catalog
-</figcaption>
-<div aria-describedby="lst-mlflow-tracking-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> mlflow</span>
-<span id="cb2-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> sklearn.ensemble <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> GradientBoostingClassifier</span>
-<span id="cb2-3"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> sklearn.metrics <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> f1_score</span>
-<span id="cb2-4"></span>
-<span id="cb2-5">mlflow.set_registry_uri(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"databricks-uc"</span>)</span>
-<span id="cb2-6"></span>
-<span id="cb2-7"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># 1. Train with tracking</span></span>
-<span id="cb2-8"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">with</span> mlflow.start_run(run_name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"gbm_v2"</span>) <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">as</span> run:</span>
-<span id="cb2-9">    model <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> GradientBoostingClassifier(</span>
-<span id="cb2-10">        n_estimators<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span>,</span>
-<span id="cb2-11">        max_depth<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">5</span>,</span>
-<span id="cb2-12">        learning_rate<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.1</span></span>
-<span id="cb2-13">    )</span>
-<span id="cb2-14">    model.fit(X_train, y_train)</span>
-<span id="cb2-15"></span>
-<span id="cb2-16">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Metrics</span></span>
-<span id="cb2-17">    preds <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> model.predict(X_test)</span>
-<span id="cb2-18">    f1 <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> f1_score(y_test, preds)</span>
-<span id="cb2-19">    mlflow.log_metric(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"f1_score"</span>, f1)</span>
-<span id="cb2-20">    mlflow.log_param(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"n_estimators"</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">200</span>)</span>
-<span id="cb2-21"></span>
-<span id="cb2-22">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Log the dataset for lineage</span></span>
-<span id="cb2-23">    dataset <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> mlflow.data.from_spark(</span>
-<span id="cb2-24">        training_df,</span>
-<span id="cb2-25">        table_name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.gold.features"</span>,</span>
-<span id="cb2-26">        version<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"3"</span></span>
-<span id="cb2-27">    )</span>
-<span id="cb2-28">    mlflow.log_input(dataset, context<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"training"</span>)</span>
-<span id="cb2-29"></span>
-<span id="cb2-30">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># 2. Register in Unity Catalog</span></span>
-<span id="cb2-31">    model_uri <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"runs:/</span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>run<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>info<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>run_id<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">/model"</span></span>
-<span id="cb2-32">    mv <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> mlflow.register_model(</span>
-<span id="cb2-33">        model_uri,</span>
-<span id="cb2-34">        <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.churn_predictor"</span></span>
-<span id="cb2-35">    )</span>
-<span id="cb2-36">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Version: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>mv<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>version<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="aliases-the-replacement-for-stages" class="level2">
-<h2 class="anchored" data-anchor-id="aliases-the-replacement-for-stages">Aliases: the replacement for stages</h2>
-<p>Forget about <code>transition_model_version_stage()</code>. Aliases are the way now:</p>
-<div id="lst-model-aliases" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-model-aliases-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Model aliases: assigning champion and challenger
-</figcaption>
-<div aria-describedby="lst-model-aliases-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> mlflow <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> MlflowClient</span>
-<span id="cb3-2"></span>
-<span id="cb3-3">client <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> MlflowClient()</span>
-<span id="cb3-4"></span>
-<span id="cb3-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Assign alias (replaces stages)</span></span>
-<span id="cb3-6">client.set_registered_model_alias(</span>
-<span id="cb3-7">    name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.churn_predictor"</span>,</span>
-<span id="cb3-8">    alias<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"champion"</span>,</span>
-<span id="cb3-9">    version<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">3</span></span>
-<span id="cb3-10">)</span>
-<span id="cb3-11"></span>
-<span id="cb3-12">client.set_registered_model_alias(</span>
-<span id="cb3-13">    name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.churn_predictor"</span>,</span>
-<span id="cb3-14">    alias<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"challenger"</span>,</span>
-<span id="cb3-15">    version<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">4</span></span>
-<span id="cb3-16">)</span>
-<span id="cb3-17"></span>
-<span id="cb3-18"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Load model by alias (in production)</span></span>
-<span id="cb3-19">model <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> mlflow.pyfunc.load_model(</span>
-<span id="cb3-20">    <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"models:/catalog.ml.churn_predictor@champion"</span></span>
-<span id="cb3-21">)</span>
-<span id="cb3-22"></span>
-<span id="cb3-23"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Compare champion vs challenger</span></span>
-<span id="cb3-24">champion <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> mlflow.pyfunc.load_model(</span>
-<span id="cb3-25">    <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"models:/catalog.ml.churn_predictor@champion"</span></span>
-<span id="cb3-26">)</span>
-<span id="cb3-27">challenger <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> mlflow.pyfunc.load_model(</span>
-<span id="cb3-28">    <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"models:/catalog.ml.churn_predictor@challenger"</span></span>
-<span id="cb3-29">)</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>The advantage of aliases</strong>: you can have multiple aliases at the same time (<code>champion</code>, <code>challenger</code>, <code>shadow</code>, <code>rollback</code>). With stages you only had one per stage.</p>
-</section>
-<section id="data-to-model-lineage" class="level2">
-<h2 class="anchored" data-anchor-id="data-to-model-lineage">Data-to-model lineage</h2>
-<p>When you log the dataset with <code>mlflow.log_input()</code>, Unity Catalog connects the feature table to the trained model. That answers questions like:</p>
-<ul>
-<li>“Which tables were used to train this model?” → visible in the lineage</li>
-<li>“If I change the <code>gold.features</code> table, which models are affected?” → reverse lineage</li>
-<li>“Which version of the data was model v3 trained on?” → run metadata</li>
-</ul>
-<div id="lst-linaje-datasets" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-linaje-datasets-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Querying lineage: datasets used to train a model
-</figcaption>
-<div aria-describedby="lst-linaje-datasets-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># View a model's inputs</span></span>
-<span id="cb4-2">run <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> client.get_run(run_id)</span>
-<span id="cb4-3"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> input_data <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> run.inputs.dataset_inputs:</span>
-<span id="cb4-4">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Dataset: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>input_data<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>dataset<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>name<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb4-5">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Source: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>input_data<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>dataset<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>source<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span>
-<span id="cb4-6">    <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Context: </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>input_data<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span>tags<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="model-serving-with-ai-gateway" class="level2">
-<h2 class="anchored" data-anchor-id="model-serving-with-ai-gateway">Model Serving with AI Gateway</h2>
-<p>Once the model is registered, serving it is just configuration:</p>
-<div id="lst-model-serving" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-model-serving-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Setting up a Model Serving endpoint with A/B testing
-</figcaption>
-<div aria-describedby="lst-model-serving-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> requests</span>
-<span id="cb5-2"></span>
-<span id="cb5-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Create endpoint via API</span></span>
-<span id="cb5-4">endpoint_config <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {</span>
-<span id="cb5-5">    <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"name"</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"churn-predictor"</span>,</span>
-<span id="cb5-6">    <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"config"</span>: {</span>
-<span id="cb5-7">        <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"served_entities"</span>: [</span>
-<span id="cb5-8">            {</span>
-<span id="cb5-9">                <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"entity_name"</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.churn_predictor"</span>,</span>
-<span id="cb5-10">                <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"entity_version"</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"3"</span>,</span>
-<span id="cb5-11">                <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"workload_size"</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Small"</span>,</span>
-<span id="cb5-12">                <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"scale_to_zero_enabled"</span>: <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span></span>
-<span id="cb5-13">            }</span>
-<span id="cb5-14">        ],</span>
-<span id="cb5-15">        <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"traffic_config"</span>: {</span>
-<span id="cb5-16">            <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"routes"</span>: [</span>
-<span id="cb5-17">                {</span>
-<span id="cb5-18">                    <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"served_model_name"</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"churn_predictor-3"</span>,</span>
-<span id="cb5-19">                    <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"traffic_percentage"</span>: <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">100</span></span>
-<span id="cb5-20">                }</span>
-<span id="cb5-21">            ]</span>
-<span id="cb5-22">        }</span>
-<span id="cb5-23">    }</span>
-<span id="cb5-24">}</span>
-<span id="cb5-25"></span>
-<span id="cb5-26"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># A/B testing: split traffic between champion and challenger</span></span>
-<span id="cb5-27">ab_config <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> {</span>
-<span id="cb5-28">    <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"routes"</span>: [</span>
-<span id="cb5-29">        {</span>
-<span id="cb5-30">            <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"served_model_name"</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"churn_predictor-3"</span>,  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># champion</span></span>
-<span id="cb5-31">            <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"traffic_percentage"</span>: <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">90</span></span>
-<span id="cb5-32">        },</span>
-<span id="cb5-33">        {</span>
-<span id="cb5-34">            <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"served_model_name"</span>: <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"churn_predictor-4"</span>,  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># challenger</span></span>
-<span id="cb5-35">            <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"traffic_percentage"</span>: <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">10</span></span>
-<span id="cb5-36">        }</span>
-<span id="cb5-37">    ]</span>
-<span id="cb5-38">}</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>AI Gateway</strong> adds rate limiting, logging and guardrails on top of the endpoint:</p>
-<div id="lst-ai-gateway" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-ai-gateway-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: AI Gateway: automatic inference logging
-</figcaption>
-<div aria-describedby="lst-ai-gateway-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Every call to the endpoint is automatically logged</span></span>
-<span id="cb6-2"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># into an inference logs table for monitoring</span></span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="feature-engineering-with-feature-store" class="level2">
-<h2 class="anchored" data-anchor-id="feature-engineering-with-feature-store">Feature Engineering with Feature Store</h2>
-<p>The Databricks Feature Store is integrated with Unity Catalog:</p>
-<div id="lst-feature-store" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-feature-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;7: Feature Store: creating a table and training with feature lookups
-</figcaption>
-<div aria-describedby="lst-feature-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> databricks.feature_engineering <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> FeatureEngineeringClient</span>
-<span id="cb7-2"></span>
-<span id="cb7-3">fe <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> FeatureEngineeringClient()</span>
-<span id="cb7-4"></span>
-<span id="cb7-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Create feature table (it's a Delta table with a PK)</span></span>
-<span id="cb7-6">fe.create_table(</span>
-<span id="cb7-7">    name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.customer_features"</span>,</span>
-<span id="cb7-8">    primary_keys<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_id"</span>],</span>
-<span id="cb7-9">    timestamp_keys<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"event_date"</span>],</span>
-<span id="cb7-10">    df<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>feature_df,</span>
-<span id="cb7-11">    description<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Customer features for churn prediction"</span></span>
-<span id="cb7-12">)</span>
-<span id="cb7-13"></span>
-<span id="cb7-14"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Train with feature lookups (automatic lineage)</span></span>
-<span id="cb7-15"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> databricks.feature_engineering <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> FeatureLookup</span>
-<span id="cb7-16"></span>
-<span id="cb7-17">training_set <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fe.create_training_set(</span>
-<span id="cb7-18">    df<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>labels_df,  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># only customer_id + label</span></span>
-<span id="cb7-19">    feature_lookups<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[</span>
-<span id="cb7-20">        FeatureLookup(</span>
-<span id="cb7-21">            table_name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.customer_features"</span>,</span>
-<span id="cb7-22">            feature_names<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"total_purchases"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"days_since_last"</span>],</span>
-<span id="cb7-23">            lookup_key<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_id"</span></span>
-<span id="cb7-24">        )</span>
-<span id="cb7-25">    ],</span>
-<span id="cb7-26">    label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"churned"</span></span>
-<span id="cb7-27">)</span>
-<span id="cb7-28"></span>
-<span id="cb7-29">training_df <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> training_set.load_df()</span>
-<span id="cb7-30"></span>
-<span id="cb7-31"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># The model knows where the features come from</span></span>
-<span id="cb7-32"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># At serving time, it looks them up automatically</span></span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="summary-table-old-vs-new" class="level2">
-<h2 class="anchored" data-anchor-id="summary-table-old-vs-new">Summary table: old vs new</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Concept</th>
-<th>Workspace Registry</th>
-<th>Unity Catalog</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Namespace</td>
-<td><code>model_name</code></td>
-<td><code>catalog.schema.model</code></td>
-</tr>
-<tr class="even">
-<td>Promotion</td>
-<td>Stages (Staging→Production)</td>
-<td>Aliases (champion, challenger)</td>
-</tr>
-<tr class="odd">
-<td>Permissions</td>
-<td>Workspace ACLs</td>
-<td>UC GRANTS</td>
-</tr>
-<tr class="even">
-<td>Lineage</td>
-<td>Manual</td>
-<td>Automatic</td>
-</tr>
-<tr class="odd">
-<td>Feature Store</td>
-<td>Separate</td>
-<td>Integrated with UC</td>
-</tr>
-<tr class="even">
-<td>Governance</td>
-<td>Limited</td>
-<td>Full</td>
-</tr>
-</tbody>
-</table>
-<hr>
-<p><em>Next week: Feature Engineering — how to design features that scale and don’t break in production.</em></p>
-
-
-</section>
-
- ]]></description>
-  <category>Databricks Tips</category>
-  <category>Machine Learning</category>
-  <category>MLflow</category>
-  <category>Unity Catalog</category>
-  <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-04-mlflow-unity-catalog/</guid>
-  <pubDate>Mon, 23 Mar 2026 23:00:00 GMT</pubDate>
-  <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-04-mlflow-unity-catalog/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>
