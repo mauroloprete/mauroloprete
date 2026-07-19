@@ -37,7 +37,7 @@ The classic solutions have aged badly:
 
 Lakehouse Federation attacks exactly that gap: live, governed, declarative access to databases you're not going to move.
 
-## 2. What Lakehouse Federation is: two modes that are not synonyms
+## 2. What Lakehouse Federation is (and why it's two different things)
 
 Under the "Lakehouse Federation" umbrella live two distinct mechanisms, and it pays not to mix them up:
 
@@ -91,7 +91,7 @@ In **Postgres**, the foreign catalog mirrors **one** database (the `database` op
 Unity Catalog lowercases schema and table names when mirroring them. Two silent consequences: if the source database has both `Orders` and `orders`, **there's no guarantee which one survives**; and names that are invalid for UC are simply **ignored with no warning** when the catalog is created. If a table "doesn't show up", start here.
 :::
 
-## 4. How it works inside: one remote subquery and a single stream
+## 4. How it works under the hood
 
 When you run a query that touches a foreign table, Databricks doesn't "copy the table and then filter": it builds a **remote subquery** for each foreign table in the plan, sends it over JDBC, and the source database resolves it. Whatever the database returns comes back to the warehouse for the rest of the plan.
 
@@ -253,7 +253,7 @@ Here Postgres returns **the entire table** (5 million rows through the single st
 This lab originally had query B written with `ILIKE`, which is the docs' own example of a non-pushable filter. On running it, the engine rewrote it as `LOWER("cliente") LIKE '%tech%'` and pushed it anyway. Pushdown quietly improves with every channel; verify against your plan, not against the docs.
 :::
 
-## 7. Tuning: fetchSize, parallel reads and join pushdown
+## 7. The tuning knobs
 
 Three knobs, in order of impact per effort:
 

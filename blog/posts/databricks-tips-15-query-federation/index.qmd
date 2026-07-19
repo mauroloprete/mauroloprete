@@ -37,7 +37,7 @@ Las soluciones clásicas envejecieron mal:
 
 Lakehouse Federation ataca exactamente ese hueco: acceso en vivo, gobernado y declarativo a bases que no vas a mover.
 
-## 2. Qué es Lakehouse Federation: dos modalidades que no son sinónimos
+## 2. Qué es Lakehouse Federation (y por qué son dos cosas distintas)
 
 Bajo el paraguas "Lakehouse Federation" conviven dos mecanismos distintos, y conviene no mezclarlos:
 
@@ -91,7 +91,7 @@ En **Postgres**, el foreign catalog espeja **una** database (la opción `databas
 Unity Catalog pasa los nombres de schemas y tablas a minúsculas al espejarlos. Dos consecuencias silenciosas: si tenés `Orders` y `orders` en la base origen, **no hay garantía de cuál queda**; y los nombres inválidos para UC directamente **se ignoran sin avisar** al crear el catálogo. Si una tabla "no aparece", empezá por acá.
 :::
 
-## 4. Cómo funciona por dentro: una subquery remota y un solo stream
+## 4. Cómo funciona por dentro
 
 Cuando ejecutás una query que toca una tabla foránea, Databricks no "copia la tabla y filtra": arma una **subquery remota** por cada tabla foránea del plan, la manda por JDBC, y la base origen la resuelve. Lo que la base devuelve vuelve al warehouse para el resto del plan.
 
@@ -253,7 +253,7 @@ Acá Postgres devuelve **la tabla entera** (5 millones de filas por el single st
 Este lab tenía preparada la query B con `ILIKE`, que es el ejemplo de filtro no empujable de la propia doc. Al correrla, el motor lo reescribió como `LOWER("cliente") LIKE '%tech%'` y lo empujó igual. El pushdown mejora silenciosamente con cada canal; verificá contra tu plan, no contra la doc.
 :::
 
-## 7. Tuning: fetchSize, lecturas paralelas y join pushdown
+## 7. Las perillas del tuning
 
 Tres perillas, en orden de impacto por esfuerzo:
 

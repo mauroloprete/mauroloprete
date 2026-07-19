@@ -53,8 +53,8 @@
 </ul>
 <p>Lakehouse Federation attacks exactly that gap: live, governed, declarative access to databases you’re not going to move.</p>
 </section>
-<section id="what-lakehouse-federation-is-two-modes-that-are-not-synonyms" class="level2">
-<h2 class="anchored" data-anchor-id="what-lakehouse-federation-is-two-modes-that-are-not-synonyms">2. What Lakehouse Federation is: two modes that are not synonyms</h2>
+<section id="what-lakehouse-federation-is-and-why-its-two-different-things" class="level2">
+<h2 class="anchored" data-anchor-id="what-lakehouse-federation-is-and-why-its-two-different-things">2. What Lakehouse Federation is (and why it’s two different things)</h2>
 <p>Under the “Lakehouse Federation” umbrella live two distinct mechanisms, and it pays not to mix them up:</p>
 <ul>
 <li><strong>Query federation</strong> is the one that applies to Postgres and MySQL: your query (or its pushable part) travels to the source database over JDBC (<em>Java Database Connectivity</em>, the standard protocol applications use to talk to databases) and runs there. The work is split between the source database and your warehouse.</li>
@@ -192,8 +192,8 @@ font-style: inherit;">-</span>analysts`;</span></code></pre></div></div>
 </div>
 </div>
 </section>
-<section id="how-it-works-inside-one-remote-subquery-and-a-single-stream" class="level2">
-<h2 class="anchored" data-anchor-id="how-it-works-inside-one-remote-subquery-and-a-single-stream">4. How it works inside: one remote subquery and a single stream</h2>
+<section id="how-it-works-under-the-hood" class="level2">
+<h2 class="anchored" data-anchor-id="how-it-works-under-the-hood">4. How it works under the hood</h2>
 <p>When you run a query that touches a foreign table, Databricks doesn’t “copy the table and then filter”: it builds a <strong>remote subquery</strong> for each foreign table in the plan, sends it over JDBC, and the source database resolves it. Whatever the database returns comes back to the warehouse for the rest of the plan.</p>
 <div class="cell" data-layout-align="center">
 <div class="cell-output-display">
@@ -454,8 +454,8 @@ font-style: inherit;">1</span>;</span></code></pre></div></div>
 </div>
 </div>
 </section>
-<section id="tuning-fetchsize-parallel-reads-and-join-pushdown" class="level2">
-<h2 class="anchored" data-anchor-id="tuning-fetchsize-parallel-reads-and-join-pushdown">7. Tuning: fetchSize, parallel reads and join pushdown</h2>
+<section id="the-tuning-knobs" class="level2">
+<h2 class="anchored" data-anchor-id="the-tuning-knobs">7. The tuning knobs</h2>
 <p>Three knobs, in order of impact per effort:</p>
 <ul>
 <li><strong><code>fetchSize</code></strong>: how many rows each JDBC round trip brings back. By default, most JDBC connectors fetch the result <strong>all at once</strong> (atomic fetch), the exact recipe for the OOM from section 4; setting a <code>fetchSize</code> splits it into batches, and the docs recommend a large one (for example <code>100000</code>). It’s set per query: <code>SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)</code>. Requires DBR 16.1+ (<em>Databricks Runtime</em>, the engine version on clusters) or a warehouse on channel 2024.50+.</li>

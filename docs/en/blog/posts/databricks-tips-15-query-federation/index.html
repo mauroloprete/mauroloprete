@@ -202,12 +202,12 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
    
   <ul>
   <li><a href="#the-problem-the-data-you-need-lives-in-another-database" id="toc-the-problem-the-data-you-need-lives-in-another-database" class="nav-link active" data-scroll-target="#the-problem-the-data-you-need-lives-in-another-database">1. The problem: the data you need lives in another database</a></li>
-  <li><a href="#what-lakehouse-federation-is-two-modes-that-are-not-synonyms" id="toc-what-lakehouse-federation-is-two-modes-that-are-not-synonyms" class="nav-link" data-scroll-target="#what-lakehouse-federation-is-two-modes-that-are-not-synonyms">2. What Lakehouse Federation is: two modes that are not synonyms</a></li>
+  <li><a href="#what-lakehouse-federation-is-and-why-its-two-different-things" id="toc-what-lakehouse-federation-is-and-why-its-two-different-things" class="nav-link" data-scroll-target="#what-lakehouse-federation-is-and-why-its-two-different-things">2. What Lakehouse Federation is (and why it’s two different things)</a></li>
   <li><a href="#setup-in-three-commands" id="toc-setup-in-three-commands" class="nav-link" data-scroll-target="#setup-in-three-commands">3. Setup in three commands</a></li>
-  <li><a href="#how-it-works-inside-one-remote-subquery-and-a-single-stream" id="toc-how-it-works-inside-one-remote-subquery-and-a-single-stream" class="nav-link" data-scroll-target="#how-it-works-inside-one-remote-subquery-and-a-single-stream">4. How it works inside: one remote subquery and a single stream</a></li>
+  <li><a href="#how-it-works-under-the-hood" id="toc-how-it-works-under-the-hood" class="nav-link" data-scroll-target="#how-it-works-under-the-hood">4. How it works under the hood</a></li>
   <li><a href="#pushdown-what-travels-to-the-database-and-what-stays" id="toc-pushdown-what-travels-to-the-database-and-what-stays" class="nav-link" data-scroll-target="#pushdown-what-travels-to-the-database-and-what-stays">5. Pushdown: what travels to the database and what stays</a></li>
   <li><a href="#the-lab-two-queries-against-a-postgres" id="toc-the-lab-two-queries-against-a-postgres" class="nav-link" data-scroll-target="#the-lab-two-queries-against-a-postgres">6. The lab: two queries against a Postgres</a></li>
-  <li><a href="#tuning-fetchsize-parallel-reads-and-join-pushdown" id="toc-tuning-fetchsize-parallel-reads-and-join-pushdown" class="nav-link" data-scroll-target="#tuning-fetchsize-parallel-reads-and-join-pushdown">7. Tuning: fetchSize, parallel reads and join pushdown</a></li>
+  <li><a href="#the-tuning-knobs" id="toc-the-tuning-knobs" class="nav-link" data-scroll-target="#the-tuning-knobs">7. The tuning knobs</a></li>
   <li><a href="#requirements-and-permissions" id="toc-requirements-and-permissions" class="nav-link" data-scroll-target="#requirements-and-permissions">8. Requirements and permissions</a></li>
   <li><a href="#gotchas" id="toc-gotchas" class="nav-link" data-scroll-target="#gotchas">9. Gotchas</a></li>
   <li><a href="#when-to-federate-and-when-not-to" id="toc-when-to-federate-and-when-not-to" class="nav-link" data-scroll-target="#when-to-federate-and-when-not-to">10. When to federate and when not to</a></li>
@@ -291,8 +291,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 </ul>
 <p>Lakehouse Federation attacks exactly that gap: live, governed, declarative access to databases you’re not going to move.</p>
 </section>
-<section id="what-lakehouse-federation-is-two-modes-that-are-not-synonyms" class="level2">
-<h2 class="anchored" data-anchor-id="what-lakehouse-federation-is-two-modes-that-are-not-synonyms">2. What Lakehouse Federation is: two modes that are not synonyms</h2>
+<section id="what-lakehouse-federation-is-and-why-its-two-different-things" class="level2">
+<h2 class="anchored" data-anchor-id="what-lakehouse-federation-is-and-why-its-two-different-things">2. What Lakehouse Federation is (and why it’s two different things)</h2>
 <p>Under the “Lakehouse Federation” umbrella live two distinct mechanisms, and it pays not to mix them up:</p>
 <ul>
 <li><strong>Query federation</strong> is the one that applies to Postgres and MySQL: your query (or its pushable part) travels to the source database over JDBC (<em>Java Database Connectivity</em>, the standard protocol applications use to talk to databases) and runs there. The work is split between the source database and your warehouse.</li>
@@ -362,8 +362,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 </div>
 </div>
 </section>
-<section id="how-it-works-inside-one-remote-subquery-and-a-single-stream" class="level2">
-<h2 class="anchored" data-anchor-id="how-it-works-inside-one-remote-subquery-and-a-single-stream">4. How it works inside: one remote subquery and a single stream</h2>
+<section id="how-it-works-under-the-hood" class="level2">
+<h2 class="anchored" data-anchor-id="how-it-works-under-the-hood">4. How it works under the hood</h2>
 <p>When you run a query that touches a foreign table, Databricks doesn’t “copy the table and then filter”: it builds a <strong>remote subquery</strong> for each foreign table in the plan, sends it over JDBC, and the source database resolves it. Whatever the database returns comes back to the warehouse for the rest of the plan.</p>
 <div class="cell" data-layout-align="center">
 <div class="cell-output-display">
@@ -477,8 +477,8 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 </div>
 </div>
 </section>
-<section id="tuning-fetchsize-parallel-reads-and-join-pushdown" class="level2">
-<h2 class="anchored" data-anchor-id="tuning-fetchsize-parallel-reads-and-join-pushdown">7. Tuning: fetchSize, parallel reads and join pushdown</h2>
+<section id="the-tuning-knobs" class="level2">
+<h2 class="anchored" data-anchor-id="the-tuning-knobs">7. The tuning knobs</h2>
 <p>Three knobs, in order of impact per effort:</p>
 <ul>
 <li><strong><code>fetchSize</code></strong>: how many rows each JDBC round trip brings back. By default, most JDBC connectors fetch the result <strong>all at once</strong> (atomic fetch), the exact recipe for the OOM from section 4; setting a <code>fetchSize</code> splits it into batches, and the docs recommend a large one (for example <code>100000</code>). It’s set per query: <code>SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)</code>. Requires DBR 16.1+ (<em>Databricks Runtime</em>, the engine version on clusters) or a warehouse on channel 2024.50+.</li>
