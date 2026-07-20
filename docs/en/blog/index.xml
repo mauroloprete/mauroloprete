@@ -11,7 +11,7 @@
 <description>Databricks tips, Data Engineering, MLOps and survey data processing.</description>
 <language>en</language>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Fri, 17 Jul 2026 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sat, 18 Jul 2026 03:00:00 GMT</lastBuildDate>
 <item>
   <title>Databricks Tips #15: Query Federation — querying Postgres and MySQL without moving data</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -38,7 +38,7 @@
 <li>The setup is <strong>three commands</strong>: <code>CREATE CONNECTION</code> (credentials via <code>secret()</code>, as the docs recommend), <code>CREATE FOREIGN CATALOG</code>, and the usual <code>GRANT</code>s.</li>
 <li>The engine <strong>pushes</strong> filters, projections and aggregates down to the source database (<em>pushdown</em>) and processes the rest on its side. <code>EXPLAIN FORMATTED</code> even shows the literal SQL that travels to the database (the <code>External engine query</code> line).</li>
 <li><strong>There is no caching</strong>: every query hits the source database, and the result comes back through <strong>a single stream to a single executor</strong>. With large result sets that means OOM risk (<em>out of memory</em>).</li>
-<li>Federation shines for exploration and ad hoc queries. For recurring volume you’re better off <strong>ingesting</strong> with Lakeflow Connect, and the middle ground is <strong>materialized views</strong> on top of federated tables.</li>
+<li>Federation works well for exploration and ad hoc queries. For recurring volume you’re better off <strong>ingesting</strong> with Lakeflow Connect, and the middle ground is <strong>materialized views</strong> on top of federated tables.</li>
 </ul>
 </div>
 </div>
@@ -51,11 +51,11 @@
 <li><strong>The scheduled dump</strong>: a job copies the tables every night into the bronze zone. It works, but it duplicates storage, arrives hours late, and every new table means a pipeline change. For data you query twice a month, that’s paying a toll every single day.</li>
 <li><strong>Direct <code>spark.read.jdbc</code></strong>: the classic notebook with <code>host</code>, <code>user</code> and <code>password</code> hardcoded. No governance, no control over who accesses what, credentials scattered across the workspace, and every consumer reinvents the connection.</li>
 </ul>
-<p>Lakehouse Federation attacks exactly that gap: live, governed, declarative access to databases you’re not going to move.</p>
+<p>Lakehouse Federation fills exactly that gap: live, governed, declarative access to databases you’re not going to move.</p>
 </section>
 <section id="what-lakehouse-federation-is-and-why-its-two-different-things" class="level2">
 <h2 class="anchored" data-anchor-id="what-lakehouse-federation-is-and-why-its-two-different-things">2. What Lakehouse Federation is (and why it’s two different things)</h2>
-<p>Under the “Lakehouse Federation” umbrella live two distinct mechanisms, and it pays not to mix them up:</p>
+<p>The name “Lakehouse Federation” groups two distinct mechanisms, and it pays not to mix them up:</p>
 <ul>
 <li><strong>Query federation</strong> is the one that applies to Postgres and MySQL: your query (or its pushable part) travels to the source database over JDBC (<em>Java Database Connectivity</em>, the standard protocol applications use to talk to databases) and runs there. The work is split between the source database and your warehouse.</li>
 <li><strong>Catalog federation</strong> sends no queries to any external engine: it reads the table’s files straight from object storage using Databricks compute. It’s designed for incremental migrations from a legacy Hive Metastore (HMS, the catalog of the pre Unity Catalog era), AWS Glue, or Snowflake.</li>
@@ -71,7 +71,7 @@
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Federation brings data in from outside without copying it; <a href="../databricks-tips-13-opensharing/">Delta Sharing and the open formats</a> share it outward without copying it. They’re two halves of the same idea: the data stays where it lives, and it’s the query that travels, not the file.</p>
+<p>Federation brings data in from outside without copying it; <a href="../databricks-tips-13-opensharing/">Delta Sharing and the open formats</a> share it outward without copying it. It’s the same idea in both directions: the data stays where it lives, and what travels is the query, not the file.</p>
 </div>
 </div>
 </section>
@@ -226,7 +226,7 @@ font-style: inherit;">-</span>analysts`;</span></code></pre></div></div>
 <li><strong>Boolean and arithmetic operators</strong> (arithmetic ones require ANSI mode enabled)</li>
 <li><strong>Functions</strong> for strings, dates and math, with partial support and <strong>only inside filter expressions</strong></li>
 </ul>
-<p>And what doesn’t? Whatever the engine can’t translate into the database’s SQL. But be careful about taking the doc’s lists at face value: the docs’ own example of a non-pushable filter is <code>ILIKE</code>, the case-insensitive <code>LIKE</code>, and when running this post’s lab the engine rewrote it as <code>LOWER(cliente) LIKE '%tech%'</code> and pushed it anyway. Pushdown improves with every warehouse channel; the real list, the only one you can trust, is the one your query’s plan shows you.</p>
+<p>And what doesn’t? Whatever the engine can’t translate into the database’s SQL. Still, be careful about taking the docs’ lists at face value: pushdown improves with every warehouse channel, and the list that counts is the one your query’s plan shows you. It happened to me in the lab in section 6, with an example lifted straight from the docs.</p>
 <p>An example that today does stay on the Databricks side: <code>levenshtein()</code>, the edit distance between two strings (how many letters you have to change to turn one into the other). Spark ships it built-in, but Postgres only has it via an extension, so there’s no possible translation.</p>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -418,7 +418,7 @@ background-color: null;
 font-style: inherit;">&lt;=</span> <span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>;</span></code></pre></div></div>
-<p>The plan for query A, run against the lab’s Neon on a serverless warehouse (trimmed output):</p>
+<p>The plan for query A, run against the lab’s Neon on a serverless warehouse, exactly as <code>EXPLAIN FORMATTED</code> returns it:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb5-1">== Physical Plan ==</span>
 <span id="cb5-2">PhotonResultStage (5)</span>
 <span id="cb5-3">+- PhotonColumnarToRow (4)</span>
@@ -426,19 +426,62 @@ font-style: inherit;">1</span>;</span></code></pre></div></div>
 <span id="cb5-5">      +- PhotonRowToColumnar (2)</span>
 <span id="cb5-6">         +- * Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders (1)</span>
 <span id="cb5-7"></span>
-<span id="cb5-8">External engine query: SELECT "canal",COUNT(*) FROM "public"."orders"  WHERE ("fecha" IS NOT NULL) AND ("fecha" &gt;= '2026-01-01') GROUP BY "canal"</span>
-<span id="cb5-9"></span>
-<span id="cb5-10">== Photon Explanation ==</span>
-<span id="cb5-11">The query is fully supported by Photon.</span></code></pre></div></div>
-<p>The line worth the whole post is <code>External engine query</code>: the literal SQL that travels to Postgres. Filter <strong>and aggregate</strong> went over entirely: Postgres aggregated 1.6 million rows on its side and <strong>three rows</strong> crossed the wire:</p>
+<span id="cb5-8"></span>
+<span id="cb5-9">(1) Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders [codegen id : 1]</span>
+<span id="cb5-10">Output [2]: [canal#13500, count#13501L]</span>
+<span id="cb5-11">Arguments: [canal#13500, count#13501L], [StructField(canal,StringType,true), StructField(count,LongType,true)], PushedDownOperators(Some(org.apache.spark.sql.connector.expressions.aggregate.Aggregation@248ae007),None,None,None,List(),ArraySeq(fecha IS NOT NULL, fecha &gt;= 20454),List(),Some(pg_ventas.public.orders)), JDBCRDD[706] at $anonfun$withExecutionPhase$1 at AttributionContext.scala:349, JDBC v1 Relation from v2 scan, `pg_ventas`.`public`.`orders`, Statistics(sizeInBytes=8.0 EiB, ColumnStat: N/A)</span>
+<span id="cb5-12">External engine query: SELECT "canal",COUNT(*) FROM "public"."orders"  WHERE ("fecha" IS NOT NULL) AND ("fecha" &gt;= '2026-01-01') GROUP BY "canal"</span>
+<span id="cb5-13"></span>
+<span id="cb5-14">(2) PhotonRowToColumnar</span>
+<span id="cb5-15">Input [2]: [canal#13500, count#13501L]</span>
+<span id="cb5-16"></span>
+<span id="cb5-17">(3) PhotonProject</span>
+<span id="cb5-18">Input [2]: [canal#13500, count#13501L]</span>
+<span id="cb5-19">Arguments: [canal#13500, count#13501L AS ordenes#13477L]</span>
+<span id="cb5-20"></span>
+<span id="cb5-21">(4) PhotonColumnarToRow</span>
+<span id="cb5-22">Input [2]: [canal#13500, ordenes#13477L]</span>
+<span id="cb5-23"></span>
+<span id="cb5-24">(5) PhotonResultStage</span>
+<span id="cb5-25">Input [2]: [canal#13500, ordenes#13477L]</span>
+<span id="cb5-26"></span>
+<span id="cb5-27"></span>
+<span id="cb5-28">== Photon Explanation ==</span>
+<span id="cb5-29">The query is fully supported by Photon.</span></code></pre></div></div>
+<p>The line worth the whole post is <code>External engine query</code>: the literal SQL that travels to Postgres. The scan node tells the same story in <code>PushedDownOperators</code>: there go the pushed aggregate and filters, with the date converted to <code>20454</code> (days since 1970-01-01). Filter <strong>and aggregate</strong> went over entirely: Postgres aggregated 1.6 million rows on its side and <strong>three rows</strong> crossed the wire:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb6-1">tienda | 546281</span>
 <span id="cb6-2">app    | 537022</span>
 <span id="cb6-3">web    | 537022</span></code></pre></div></div>
-<p>In query B the plan changes shape: a local <code>PhotonFilter</code> appears carrying the <code>levenshtein</code>, and the remote subquery travels almost naked, with the <code>WHERE</code> reduced to the only translatable bit:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb7-1">(3) PhotonFilter</span>
-<span id="cb7-2">    Arguments: (levenshtein(cliente#13548, cliente_42, None) &lt;= 1)</span>
-<span id="cb7-3"></span>
-<span id="cb7-4">External engine query: SELECT "order_id","cliente","canal","fecha","monto" FROM "public"."orders"  WHERE ("cliente" IS NOT NULL)</span></code></pre></div></div>
+<p>In query B the plan changes shape: a local <code>PhotonFilter</code> appears carrying the <code>levenshtein</code>, and the remote subquery travels almost bare, with the <code>WHERE</code> reduced to the only translatable bit:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb7-1">== Physical Plan ==</span>
+<span id="cb7-2">PhotonResultStage (5)</span>
+<span id="cb7-3">+- PhotonColumnarToRow (4)</span>
+<span id="cb7-4">   +- PhotonFilter (3)</span>
+<span id="cb7-5">      +- PhotonRowToColumnar (2)</span>
+<span id="cb7-6">         +- * Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders (1)</span>
+<span id="cb7-7"></span>
+<span id="cb7-8"></span>
+<span id="cb7-9">(1) Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders [codegen id : 1]</span>
+<span id="cb7-10">Output [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-11">Arguments: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517], [StructField(order_id,IntegerType,true), StructField(cliente,StringType,true), StructField(canal,StringType,true), StructField(fecha,DateType,true), StructField(monto,DecimalType(38,18),true)], PushedDownOperators(None,None,None,None,List(),ArraySeq(cliente IS NOT NULL),List(),Some(pg_ventas.public.orders)), JDBCRDD[707] at $anonfun$withExecutionPhase$1 at AttributionContext.scala:349, JDBC v1 Relation from v2 scan, `pg_ventas`.`public`.`orders`, Statistics(sizeInBytes=8.0 EiB, ColumnStat: N/A)</span>
+<span id="cb7-12">External engine query: SELECT "order_id","cliente","canal","fecha","monto" FROM "public"."orders"  WHERE ("cliente" IS NOT NULL)</span>
+<span id="cb7-13"></span>
+<span id="cb7-14">(2) PhotonRowToColumnar</span>
+<span id="cb7-15">Input [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-16"></span>
+<span id="cb7-17">(3) PhotonFilter</span>
+<span id="cb7-18">Input [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-19">Arguments: (levenshtein(cliente#13514, cliente_42, None) &lt;= 1)</span>
+<span id="cb7-20"></span>
+<span id="cb7-21">(4) PhotonColumnarToRow</span>
+<span id="cb7-22">Input [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-23"></span>
+<span id="cb7-24">(5) PhotonResultStage</span>
+<span id="cb7-25">Input [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-26"></span>
+<span id="cb7-27"></span>
+<span id="cb7-28">== Photon Explanation ==</span>
+<span id="cb7-29">The query is fully supported by Photon.</span></code></pre></div></div>
 <p>Here Postgres returns <strong>the entire table</strong> (5 million rows through the single stream from section 4) and the warehouse filters afterwards. Same table, same catalog, and one query costs three rows of traffic while the other costs five million. The same information is in the UI’s <strong>Query Profile</strong>, on the scan node: it’s the first place to look when a federated query “feels slow”.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -446,19 +489,19 @@ font-style: inherit;">1</span>;</span></code></pre></div></div>
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Note</span>The docs say one thing; your plan knows the truth
+<span class="screen-reader-only">Note</span>The docs say one thing; the plan shows another
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>This lab originally had query B written with <code>ILIKE</code>, which is the docs’ own example of a non-pushable filter. On running it, the engine rewrote it as <code>LOWER("cliente") LIKE '%tech%'</code> and pushed it anyway. Pushdown quietly improves with every channel; verify against your plan, not against the docs.</p>
+<p>This lab originally had query B written with <code>ILIKE</code> (the case-insensitive <code>LIKE</code>), which is the docs’ own example of a non-pushable filter. On running it, the engine rewrote it as <code>LOWER("cliente") LIKE '%tech%'</code> and pushed it anyway. Verify against your plan, not against the docs.</p>
 </div>
 </div>
 </section>
 <section id="the-tuning-knobs" class="level2">
 <h2 class="anchored" data-anchor-id="the-tuning-knobs">7. The tuning knobs</h2>
-<p>Three knobs, in order of impact per effort:</p>
+<p>Three knobs, from the one that gives the most to the one that asks the most:</p>
 <ul>
-<li><strong><code>fetchSize</code></strong>: how many rows each JDBC round trip brings back. By default, most JDBC connectors fetch the result <strong>all at once</strong> (atomic fetch), the exact recipe for the OOM from section 4; setting a <code>fetchSize</code> splits it into batches, and the docs recommend a large one (for example <code>100000</code>). It’s set per query: <code>SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)</code>. Requires DBR 16.1+ (<em>Databricks Runtime</em>, the engine version on clusters) or a warehouse on channel 2024.50+.</li>
+<li><strong><code>fetchSize</code></strong>: how many rows each JDBC round trip brings back. By default, most JDBC connectors fetch the result <strong>all at once</strong> (atomic fetch), exactly the OOM scenario from section 4; setting a <code>fetchSize</code> splits it into batches, and the docs recommend a large one (for example <code>100000</code>). It’s set per query: <code>SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)</code>. Requires DBR 16.1+ (<em>Databricks Runtime</em>, the engine version on clusters) or a warehouse on channel 2024.50+.</li>
 <li><strong>Parallel reads</strong>: with <code>numPartitions</code>, <code>partitionColumn</code>, <code>lowerBound</code> and <code>upperBound</code> the remote scan splits into several concurrent subqueries, each with its own range. Requires DBR 17.1+ or channel 2025.25+, and beware: <strong>it doesn’t work through views</strong> that reference federated tables.</li>
 <li><strong>Join pushdown</strong>: pushing the entire join so the source database resolves it. For Postgres and MySQL it’s in <strong>Public Preview</strong> (for Redshift, Snowflake and BigQuery it’s already GA, <em>Generally Available</em>, stable and supported): it requires DBR 17.2+ or channel 2025.30+, enabling the <em>Join Pushdown for Federated Queries</em> preview in the workspace, and it only covers inner, left outer and right outer joins.</li>
 </ul>
@@ -591,7 +634,7 @@ font-style: inherit;">1</span>;</span></code></pre></div></div>
   <category>Databricks Tips</category>
   <category>Data Architecture</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-15-query-federation/</guid>
-  <pubDate>Fri, 17 Jul 2026 22:00:00 GMT</pubDate>
+  <pubDate>Sat, 18 Jul 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-15-query-federation/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -1639,7 +1682,7 @@ font-style: inherit;">      | "\(.query_text) read=\(.metrics.read_files_count) 
   <category>Databricks Tips</category>
   <category>Delta Lake</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/</guid>
-  <pubDate>Thu, 09 Jul 2026 22:00:00 GMT</pubDate>
+  <pubDate>Fri, 10 Jul 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-14-liquid-clustering/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -2463,7 +2506,7 @@ Tip
   <category>Data Engineering</category>
   <category>Delta Lake</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-13-opensharing/</guid>
-  <pubDate>Mon, 06 Jul 2026 22:00:00 GMT</pubDate>
+  <pubDate>Tue, 07 Jul 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-13-opensharing/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -3574,7 +3617,7 @@ Tip
   <category>Databricks Tips</category>
   <category>Data Engineering</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-12-photon/</guid>
-  <pubDate>Wed, 01 Jul 2026 22:00:00 GMT</pubDate>
+  <pubDate>Thu, 02 Jul 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-12-photon/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -8645,7 +8688,7 @@ font-style: inherit;">--template</span> agent-langgraph-advanced</span></code></
   <category>Data Engineering</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/deploy-ai-agents-dabs/</guid>
-  <pubDate>Fri, 26 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Sat, 27 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/deploy-ai-agents-dabs/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -9241,7 +9284,7 @@ font-style: inherit;">--template</span> agent-langgraph-advanced</span></code></
   <category>Databricks Tips</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/genie-zeroops/</guid>
-  <pubDate>Fri, 26 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Sat, 27 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/genie-zeroops/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -10520,7 +10563,7 @@ font-style: inherit;">"esperado"</span>)</span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>Databricks Tips</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/repos-github-databricks/</guid>
-  <pubDate>Sat, 20 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Sun, 21 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/repos-github-databricks/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -10958,7 +11001,7 @@ Important
   <category>Data Architecture</category>
   <category>Databricks Tips</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/ltap-databricks/</guid>
-  <pubDate>Thu, 18 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Fri, 19 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/ltap-databricks/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -11185,7 +11228,7 @@ Important
   <category>Databricks Tips</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/dais-2026-day-3/</guid>
-  <pubDate>Tue, 16 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Wed, 17 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/dais-2026-day-3/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -11418,7 +11461,7 @@ Important
   <category>Databricks Tips</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/dais-2026-recap/</guid>
-  <pubDate>Mon, 15 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Tue, 16 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/dais-2026-recap/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -12816,7 +12859,7 @@ font-style: inherit;"> inherit</span></span></code></pre></div></div>
   <category>Developer Tools</category>
   <category>Open Source</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/omnigent-meta-harness/</guid>
-  <pubDate>Sat, 13 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Sun, 14 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/omnigent-meta-harness/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -15210,7 +15253,7 @@ font-style: inherit;">'...'</span>)</span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>Streaming</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-11-lakeflow-declarative-pipelines/</guid>
-  <pubDate>Wed, 10 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Thu, 11 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-11-lakeflow-declarative-pipelines/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -16974,7 +17017,7 @@ font-style: inherit;">ucode</span> revert</span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>MLOps</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-10-ai-gateway/</guid>
-  <pubDate>Mon, 08 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Tue, 09 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-10-ai-gateway/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -17992,7 +18035,7 @@ font-style: inherit;">}</span></span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>Serverless</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-09-sql-warehouses/</guid>
-  <pubDate>Fri, 05 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Sat, 06 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-09-sql-warehouses/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -19025,7 +19068,7 @@ font-style: inherit;">"</span>)</span></code></pre></div></div>
   <category>Data Engineering</category>
   <category>Streaming</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-08-jobs-workflows/</guid>
-  <pubDate>Wed, 03 Jun 2026 22:00:00 GMT</pubDate>
+  <pubDate>Thu, 04 Jun 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-08-jobs-workflows/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -20153,7 +20196,7 @@ font-style: inherit;">|</span></span>
   <category>Data Engineering</category>
   <category>Delta Lake</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-06-docker-containers/</guid>
-  <pubDate>Fri, 29 May 2026 22:00:00 GMT</pubDate>
+  <pubDate>Sat, 30 May 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-06-docker-containers/cover.png" medium="image" type="image/png" height="90" width="144"/>
 </item>
 <item>
@@ -20997,7 +21040,7 @@ font-style: inherit;">=</span> AGGREGATE</span>
   <category>Data Engineering</category>
   <category>Podcast</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-mesh-practica/</guid>
-  <pubDate>Mon, 20 Apr 2026 22:00:00 GMT</pubDate>
+  <pubDate>Tue, 21 Apr 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-mesh-practica/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -22515,7 +22558,7 @@ font-style: inherit;">"bronze_transactions"</span>)</span></code></pre></div></d
   <category>Data Engineering</category>
   <category>Podcast</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-contracts-framework/</guid>
-  <pubDate>Mon, 13 Apr 2026 22:00:00 GMT</pubDate>
+  <pubDate>Tue, 14 Apr 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-contracts-framework/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -23134,7 +23177,7 @@ Listing&nbsp;6: MVP pattern: Medallion with flat Gold, no formal modeling
   <category>Data Engineering</category>
   <category>Podcast</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-modeling-medallion-vault-kimball/</guid>
-  <pubDate>Mon, 06 Apr 2026 22:00:00 GMT</pubDate>
+  <pubDate>Tue, 07 Apr 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-modeling-medallion-vault-kimball/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 <item>
@@ -23677,7 +23720,7 @@ font-style: inherit;">"</span>)</span></code></pre></div></div>
   <category>Machine Learning</category>
   <category>Feature Engineering</category>
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-05-feature-engineering/</guid>
-  <pubDate>Mon, 30 Mar 2026 22:00:00 GMT</pubDate>
+  <pubDate>Tue, 31 Mar 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-05-feature-engineering/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>

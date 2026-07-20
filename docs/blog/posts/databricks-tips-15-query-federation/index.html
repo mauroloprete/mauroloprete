@@ -275,7 +275,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <li>El setup son <strong>tres comandos</strong>: <code>CREATE CONNECTION</code> (credenciales con <code>secret()</code>, como recomienda la doc), <code>CREATE FOREIGN CATALOG</code> y los <code>GRANT</code> de siempre.</li>
 <li>El motor <strong>empuja</strong> filtros, proyecciones y agregados a la base origen (<em>pushdown</em>) y procesa el resto de su lado. <code>EXPLAIN FORMATTED</code> muestra hasta el SQL literal que viaja a la base (la línea <code>External engine query</code>).</li>
 <li><strong>No hay caché</strong>: cada query pega en la base origen, y el resultado vuelve por <strong>un solo stream a un solo executor</strong>. Con result sets grandes eso significa riesgo de OOM (<em>out of memory</em>, quedarse sin memoria).</li>
-<li>Federar brilla para exploración y consultas ad hoc. Para volumen recurrente conviene <strong>ingestar</strong> con Lakeflow Connect, y el punto medio son las <strong>materialized views</strong> sobre tablas federadas.</li>
+<li>Federar va bien para exploración y consultas ad hoc. Para volumen recurrente conviene <strong>ingestar</strong> con Lakeflow Connect, y el punto medio son las <strong>materialized views</strong> sobre tablas federadas.</li>
 </ul>
 </div>
 </div>
@@ -288,11 +288,11 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <li><strong>El dump programado</strong>: un job copia las tablas cada noche a la zona bronze. Funciona, pero duplica almacenamiento, llega con horas de atraso, y cada tabla nueva es un cambio en el pipeline. Para datos que consultás dos veces al mes, es pagar peaje todos los días.</li>
 <li><strong><code>spark.read.jdbc</code> directo</strong>: el clásico notebook con <code>host</code>, <code>user</code> y <code>password</code> hardcodeados. Sin gobernanza, sin control de quién accede a qué, credenciales regadas por el workspace, y cada consumidor reinventa la conexión.</li>
 </ul>
-<p>Lakehouse Federation ataca exactamente ese hueco: acceso en vivo, gobernado y declarativo a bases que no vas a mover.</p>
+<p>Lakehouse Federation cubre justo ese hueco: acceso en vivo, gobernado y declarativo a bases que no vas a mover.</p>
 </section>
 <section id="qué-es-lakehouse-federation-y-por-qué-son-dos-cosas-distintas" class="level2">
 <h2 class="anchored" data-anchor-id="qué-es-lakehouse-federation-y-por-qué-son-dos-cosas-distintas">2. Qué es Lakehouse Federation (y por qué son dos cosas distintas)</h2>
-<p>Bajo el paraguas “Lakehouse Federation” conviven dos mecanismos distintos, y conviene no mezclarlos:</p>
+<p>El nombre “Lakehouse Federation” agrupa dos mecanismos distintos, y conviene no mezclarlos:</p>
 <ul>
 <li><strong>Query federation</strong> es la que aplica a Postgres y MySQL: tu query (o la parte empujable) viaja a la base origen por JDBC (<em>Java Database Connectivity</em>, el protocolo estándar con el que las aplicaciones hablan con bases de datos) y se ejecuta allá. El trabajo se reparte entre la base origen y tu warehouse.</li>
 <li><strong>Catalog federation</strong> no manda queries a ningún motor externo: lee los archivos de la tabla directo del object storage con cómputo Databricks. Está pensada para migraciones incrementales desde un Hive Metastore legacy (HMS, el catálogo de la era pre Unity Catalog), AWS Glue o Snowflake.</li>
@@ -304,11 +304,11 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Tip</span>La cara inversa de OpenSharing
+<span class="screen-reader-only">Tip</span>La otra cara de OpenSharing
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Federation trae datos de afuera sin copiarlos; <a href="../databricks-tips-13-opensharing/">Delta Sharing y los formatos abiertos</a> los comparten hacia afuera sin copiarlos. Son las dos mitades de la misma idea: el dato se queda donde vive y viaja la consulta, no el archivo.</p>
+<p>Federation trae datos de afuera sin copiarlos; <a href="../databricks-tips-13-opensharing/">Delta Sharing y los formatos abiertos</a> los comparten hacia afuera sin copiarlos. Es la misma idea en las dos direcciones: el dato se queda donde vive, y lo que viaja es la consulta, no el archivo.</p>
 </div>
 </div>
 </section>
@@ -363,7 +363,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 </section>
 <section id="cómo-funciona-por-dentro" class="level2">
 <h2 class="anchored" data-anchor-id="cómo-funciona-por-dentro">4. Cómo funciona por dentro</h2>
-<p>Cuando ejecutás una query que toca una tabla foránea, Databricks no “copia la tabla y filtra”: arma una <strong>subquery remota</strong> por cada tabla foránea del plan, la manda por JDBC, y la base origen la resuelve. Lo que la base devuelve vuelve al warehouse para el resto del plan.</p>
+<p>Cuando ejecutás una query que toca una tabla foránea, Databricks no “copia la tabla y filtra”: arma una <strong>subquery remota</strong> por cada tabla foránea del plan, la manda por JDBC, y la base origen la resuelve. Lo que la base responde vuelve al warehouse para el resto del plan.</p>
 <div class="cell" data-layout-align="center">
 <div class="cell-output-display">
 <div class="quarto-figure quarto-figure-center">
@@ -395,7 +395,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <li><strong>Operadores booleanos y aritméticos</strong> (los aritméticos piden el modo ANSI habilitado)</li>
 <li><strong>Funciones</strong> de string, fecha y matemáticas, con soporte parcial y <strong>solo dentro de expresiones de filtro</strong></li>
 </ul>
-<p>¿Y qué no? Lo que el motor no sabe traducir al SQL de la base. Pero ojo con tomar las listas de la doc al pie de la letra: el ejemplo de filtro no empujable que da la propia doc es <code>ILIKE</code>, el <code>LIKE</code> que ignora mayúsculas, y al correr el lab de este post el motor lo reescribió como <code>LOWER(cliente) LIKE '%tech%'</code> y lo empujó igual. El pushdown mejora con cada canal del warehouse; la lista real, la única confiable, es la que te muestra el plan de tu query.</p>
+<p>¿Y qué no? Lo que el motor no sabe traducir al SQL de la base. Igual, ojo con tomar las listas de la doc al pie de la letra: el pushdown mejora con cada canal del warehouse, y la lista que cuenta es la que muestra el plan de tu query. En el lab de la sección 6 me pasó con un ejemplo sacado de la doc.</p>
 <p>Un ejemplo que hoy sí se queda del lado Databricks: <code>levenshtein()</code>, la distancia de edición entre dos strings (cuántas letras hay que cambiar para convertir una en la otra). Spark la trae built-in, pero Postgres solo la tiene vía extensión, así que no hay traducción posible.</p>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -440,7 +440,7 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> pg_ventas.<span class="kw">public</span>.orders</span>
 <span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> levenshtein(cliente, <span class="st">'cliente_42'</span>) <span class="op">&lt;=</span> <span class="dv">1</span>;</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
-<p>El plan de la query A, corrido contra el Neon del lab en un warehouse serverless (salida recortada):</p>
+<p>El plan de la query A, corrido contra el Neon del lab en un warehouse serverless, tal cual lo devuelve <code>EXPLAIN FORMATTED</code>:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>== Physical Plan ==</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>PhotonResultStage (5)</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>+- PhotonColumnarToRow (4)</span>
@@ -448,39 +448,82 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>      +- PhotonRowToColumnar (2)</span>
 <span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>         +- * Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders (1)</span>
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>External engine query: SELECT "canal",COUNT(*) FROM "public"."orders"  WHERE ("fecha" IS NOT NULL) AND ("fecha" &gt;= '2026-01-01') GROUP BY "canal"</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>== Photon Explanation ==</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>The query is fully supported by Photon.</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
-<p>La línea que vale el post entero es <code>External engine query</code>: el SQL literal que viaja a Postgres. Filtro <strong>y agregado</strong> se fueron enteros al otro lado: Postgres agregó 1,6 millones de filas de su lado y por el cable cruzaron <strong>tres filas</strong>:</p>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>(1) Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders [codegen id : 1]</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>Output [2]: [canal#13500, count#13501L]</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>Arguments: [canal#13500, count#13501L], [StructField(canal,StringType,true), StructField(count,LongType,true)], PushedDownOperators(Some(org.apache.spark.sql.connector.expressions.aggregate.Aggregation@248ae007),None,None,None,List(),ArraySeq(fecha IS NOT NULL, fecha &gt;= 20454),List(),Some(pg_ventas.public.orders)), JDBCRDD[706] at $anonfun$withExecutionPhase$1 at AttributionContext.scala:349, JDBC v1 Relation from v2 scan, `pg_ventas`.`public`.`orders`, Statistics(sizeInBytes=8.0 EiB, ColumnStat: N/A)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>External engine query: SELECT "canal",COUNT(*) FROM "public"."orders"  WHERE ("fecha" IS NOT NULL) AND ("fecha" &gt;= '2026-01-01') GROUP BY "canal"</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>(2) PhotonRowToColumnar</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>Input [2]: [canal#13500, count#13501L]</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>(3) PhotonProject</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>Input [2]: [canal#13500, count#13501L]</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>Arguments: [canal#13500, count#13501L AS ordenes#13477L]</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>(4) PhotonColumnarToRow</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>Input [2]: [canal#13500, ordenes#13477L]</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>(5) PhotonResultStage</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>Input [2]: [canal#13500, ordenes#13477L]</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>== Photon Explanation ==</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>The query is fully supported by Photon.</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>La línea que vale el post entero es <code>External engine query</code>: el SQL literal que viaja a Postgres. El nodo de scan cuenta lo mismo en <code>PushedDownOperators</code>: ahí van el agregado y los filtros empujados, con la fecha convertida a <code>20454</code> (días desde 1970-01-01). Filtro <strong>y agregado</strong> se fueron enteros al otro lado: Postgres agregó 1,6 millones de filas allá y por el cable cruzaron <strong>tres filas</strong>:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>tienda | 546281</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>app    | 537022</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>web    | 537022</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
-<p>En la query B el plan cambia de forma: aparece un <code>PhotonFilter</code> local con el <code>levenshtein</code>, y la subquery remota viaja casi desnuda, con el <code>WHERE</code> reducido a lo único traducible:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>(3) PhotonFilter</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    Arguments: (levenshtein(cliente#13548, cliente_42, None) &lt;= 1)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>External engine query: SELECT "order_id","cliente","canal","fecha","monto" FROM "public"."orders"  WHERE ("cliente" IS NOT NULL)</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Acá Postgres devuelve <strong>la tabla entera</strong> (5 millones de filas por el single stream de la sección 4) y el warehouse filtra después. Misma tabla, mismo catálogo, y una query cuesta tres filas de tráfico mientras la otra cuesta cinco millones. La misma información está en el <strong>Query Profile</strong> de la UI, en el nodo de scan: es el lugar donde mirar primero cuando una query federada “anda lenta”.</p>
+<p>En la query B el plan cambia de forma: aparece un <code>PhotonFilter</code> local con el <code>levenshtein</code>, y la subquery remota viaja casi pelada, con el <code>WHERE</code> reducido a lo único traducible:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>== Physical Plan ==</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>PhotonResultStage (5)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>+- PhotonColumnarToRow (4)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>   +- PhotonFilter (3)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>      +- PhotonRowToColumnar (2)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>         +- * Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders (1)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>(1) Scan JDBC v1 Relation from v2 scan pg_ventas.public.orders [codegen id : 1]</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>Output [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>Arguments: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517], [StructField(order_id,IntegerType,true), StructField(cliente,StringType,true), StructField(canal,StringType,true), StructField(fecha,DateType,true), StructField(monto,DecimalType(38,18),true)], PushedDownOperators(None,None,None,None,List(),ArraySeq(cliente IS NOT NULL),List(),Some(pg_ventas.public.orders)), JDBCRDD[707] at $anonfun$withExecutionPhase$1 at AttributionContext.scala:349, JDBC v1 Relation from v2 scan, `pg_ventas`.`public`.`orders`, Statistics(sizeInBytes=8.0 EiB, ColumnStat: N/A)</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>External engine query: SELECT "order_id","cliente","canal","fecha","monto" FROM "public"."orders"  WHERE ("cliente" IS NOT NULL)</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>(2) PhotonRowToColumnar</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>Input [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>(3) PhotonFilter</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>Input [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>Arguments: (levenshtein(cliente#13514, cliente_42, None) &lt;= 1)</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>(4) PhotonColumnarToRow</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>Input [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>(5) PhotonResultStage</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>Input [5]: [order_id#13513, cliente#13514, canal#13515, fecha#13516, monto#13517]</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>== Photon Explanation ==</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>The query is fully supported by Photon.</span></code></pre></div><button title="Copiar al portapapeles" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Acá Postgres devuelve <strong>la tabla entera</strong> (5 millones de filas por el single stream de la sección 4) y el warehouse filtra después. Misma tabla, mismo catálogo, y una query cuesta tres filas de tráfico mientras la otra cuesta cinco millones. La misma información está en el <strong>Query Profile</strong> de la UI, en el nodo de scan: por ahí conviene empezar cuando una query federada “anda lenta”.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Nota</span>La doc dice una cosa; tu plan sabe la verdad
+<span class="screen-reader-only">Nota</span>La doc dice una cosa; el plan muestra otra
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Este lab tenía preparada la query B con <code>ILIKE</code>, que es el ejemplo de filtro no empujable de la propia doc. Al correrla, el motor lo reescribió como <code>LOWER("cliente") LIKE '%tech%'</code> y lo empujó igual. El pushdown mejora silenciosamente con cada canal; verificá contra tu plan, no contra la doc.</p>
+<p>Este lab tenía preparada la query B con <code>ILIKE</code> (el <code>LIKE</code> que ignora mayúsculas y minúsculas), que es el ejemplo de filtro no empujable que da la propia doc. Al correrla, el motor lo reescribió como <code>LOWER("cliente") LIKE '%tech%'</code> y lo empujó igual. Verificá contra tu plan, no contra la doc.</p>
 </div>
 </div>
 </section>
 <section id="las-perillas-del-tuning" class="level2">
 <h2 class="anchored" data-anchor-id="las-perillas-del-tuning">7. Las perillas del tuning</h2>
-<p>Tres perillas, en orden de impacto por esfuerzo:</p>
+<p>Tres perillas, de la que más rinde a la que más pide:</p>
 <ul>
-<li><strong><code>fetchSize</code></strong>: cuántas filas trae cada round trip de JDBC. Por defecto, la mayoría de los conectores JDBC traen el resultado <strong>de una sola vez</strong> (fetch atómico), la receta exacta para el OOM de la sección 4; fijar un <code>fetchSize</code> lo parte en tandas, y la doc recomienda uno grande (por ejemplo <code>100000</code>). Se ajusta por query: <code>SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)</code>. Requiere DBR 16.1+ (<em>Databricks Runtime</em>, la versión del motor de los clusters) o warehouse con canal 2024.50+.</li>
+<li><strong><code>fetchSize</code></strong>: cuántas filas trae cada round trip de JDBC. Por defecto, la mayoría de los conectores JDBC traen el resultado <strong>de una sola vez</strong> (fetch atómico), justo el escenario del OOM de la sección 4; fijar un <code>fetchSize</code> lo parte en tandas, y la doc recomienda uno grande (por ejemplo <code>100000</code>). Se ajusta por query: <code>SELECT ... FROM pg_ventas.public.orders WITH ('fetchSize' 100000)</code>. Requiere DBR 16.1+ (<em>Databricks Runtime</em>, la versión del motor de los clusters) o warehouse con canal 2024.50+.</li>
 <li><strong>Lecturas paralelas</strong>: con <code>numPartitions</code>, <code>partitionColumn</code>, <code>lowerBound</code> y <code>upperBound</code> el scan remoto se parte en varias subqueries concurrentes, cada una con su rango. Requiere DBR 17.1+ o canal 2025.25+, y ojo: <strong>no funciona a través de vistas</strong> que referencian tablas federadas.</li>
 <li><strong>Join pushdown</strong>: empujar el join entero para que lo resuelva la base origen. Para Postgres y MySQL está en <strong>Public Preview</strong> (para Redshift, Snowflake y BigQuery ya es GA, <em>Generally Available</em>, estable y soportado): requiere DBR 17.2+ o canal 2025.30+, activar el preview <em>Join Pushdown for Federated Queries</em> en el workspace, y solo cubre joins inner, left outer y right outer.</li>
 </ul>
@@ -563,11 +606,11 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Tip</span>La regla del pulgar
+<span class="screen-reader-only">Tip</span>Para decidir rápido
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Federá lo que consultás poco y cambia mucho; ingestá lo que consultás mucho y cambia poco. Y cuando el “poco” se vuelva “mucho”, la materialized view te compra tiempo antes de armar la ingesta.</p>
+<p>Federá lo que consultás poco y cambia mucho; ingestá lo que consultás mucho y cambia poco. Y cuando el “poco” se vuelva “mucho”, la materialized view te da aire antes de armar la ingesta.</p>
 </div>
 </div>
 <hr>
@@ -604,7 +647,6 @@ gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
 <li><a href="../databricks-tips-14-liquid-clustering/"><strong>Tips #14</strong>: Liquid Clustering</a> — el reemplazo de particiones y Z-ORDER</li>
 </ul>
 <hr>
-<p><em>Siguiente post: R + Databricks con sparklyr, o cómo consultar todo esto (foreign catalogs incluidos) sin salir de R.</em></p>
 
 
 </section>
