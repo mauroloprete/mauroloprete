@@ -11,7 +11,1096 @@
 <description>Databricks tips, Data Engineering, MLOps and survey data processing.</description>
 <language>en</language>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Sat, 18 Jul 2026 03:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 05 Aug 2026 03:00:00 GMT</lastBuildDate>
+<item>
+  <title>Databricks Tips #16: Data Quality — dynamic expectations, quarantine, and DQX</title>
+  <dc:creator>Mauro Loprete</dc:creator>
+  <link>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-16-data-quality/</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>You set up expectations in your pipeline, the graph runs green, and the quality metrics pile up in the event log. And yet the silver table has negative amounts. It’s not a bug: <strong>warn is the default action of an expectation, and warn filters nothing</strong>. The invalid record adds one to a metric nobody looks at, and gets written anyway.</p>
+<p>In <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Tips #11</a> we covered expectations as just another feature of <strong>Lakeflow pipelines</strong>, the product formerly known as Delta Live Tables (DLT for the rest of this post). This post takes them as the starting point to build the full system: the traps that don’t show up in the tutorial, rules defined as data instead of code, a quarantine that loses no records, statistical monitoring after the write, and DQX, the Databricks Labs library that covers what happens outside a pipeline.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Expectations</strong> validate record by record inside a pipeline with three actions: warn (default, writes anyway), drop (discards) and fail (rolls back the update). The basics are in <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Tips #11</a>; here come the traps.</li>
+<li>Rules can live <strong>as data in a Delta table</strong> (or in Lakebase, if an app edits them) and load dynamically with Python: one single place for the rules of all your pipelines. Python only; SQL doesn’t support dynamic loading.</li>
+<li>The official <strong>Quarantine Pattern</strong> doesn’t use drop: it flags each record with an <code>is_quarantined</code> column and splits it into two views, losing nothing and reading the source only once.</li>
+<li><strong>Data quality monitoring</strong> (what used to be called Lakehouse Monitoring) adds the statistical, post-write side: anomaly detection (freshness and completeness) and profiles with drift.</li>
+<li><strong>DQX</strong>, from Databricks Labs, takes the checks to any DataFrame, inside or outside pipelines, with quarantine out of the box and the why behind each rejection, row by row. It’s pre-1.0: pin the version.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="the-map-four-mechanisms-four-moments" class="level2">
+<h2 class="anchored" data-anchor-id="the-map-four-mechanisms-four-moments">1. The map: four mechanisms, four moments</h2>
+<p>“Data quality in Databricks” is not one tool, it’s four, acting at different moments of the flow. Picking the wrong one is the source of most frustrations: asking an expectation to validate a historical table, or a monitor to stop an invalid record, is asking the mechanism for something it doesn’t do.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Four quality mechanisms and where each one acts: DQX on the DataFrame in your code, expectations inside the pipeline, Delta constraints when writing to the table, and monitoring after the write."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-16-data-quality/index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="960" alt="Four quality mechanisms and where each one acts: DQX on the DataFrame in your code, expectations inside the pipeline, Delta constraints when writing to the table, and monitoring after the write."></a></p>
+</figure>
+</div>
+<figcaption>Four quality mechanisms and where each one acts: DQX on the DataFrame in your code, expectations inside the pipeline, Delta constraints when writing to the table, and monitoring after the write.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Mechanism</th>
+<th>Where it runs</th>
+<th>Granularity</th>
+<th>What it does with invalid data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Delta constraints</strong> (<code>NOT NULL</code>, <code>CHECK</code>)</td>
+<td>On the table, wherever the write comes from</td>
+<td>The whole transaction</td>
+<td>Rejects the entire write</td>
+</tr>
+<tr class="even">
+<td><strong>Expectations</strong></td>
+<td>Only inside a DLT pipeline</td>
+<td>Per record</td>
+<td>warn, drop or fail</td>
+</tr>
+<tr class="odd">
+<td><strong>DQX</strong> (Databricks Labs)</td>
+<td>Any DataFrame, inside or outside pipelines</td>
+<td>Per record, with per-rule detail</td>
+<td>Flags error columns, filters, or splits into quarantine</td>
+</tr>
+<tr class="even">
+<td><strong>Data quality monitoring</strong> (Unity Catalog)</td>
+<td>On the already-written table</td>
+<td>Statistical: profiles, drift, anomalies</td>
+<td>Observes and alerts, doesn’t block</td>
+</tr>
+</tbody>
+</table>
+<p>Delta constraints are the hardest safety net: if one record violates a <code>CHECK</code>, the entire write fails, not the row. They work as a last-resort guarantee, but not as a quality system: they don’t tell you how many records came in bad or which ones, and a single invalid record kills your job. The rest of the post focuses on the other three mechanisms, the ones that give you visibility.</p>
+</section>
+<section id="expectations-the-one-table-recap-and-the-traps" class="level2">
+<h2 class="anchored" data-anchor-id="expectations-the-one-table-recap-and-the-traps">2. Expectations: the one-table recap and the traps</h2>
+<p>The full recap is in <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Tips #11</a>; the essentials fit in one table:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Action</th>
+<th>SQL</th>
+<th>Python</th>
+<th>Invalid records…</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Warn</strong> (default)</td>
+<td><code>EXPECT (cond)</code></td>
+<td><code>@dp.expect</code></td>
+<td>Get written anyway, metrics are logged</td>
+</tr>
+<tr class="even">
+<td><strong>Drop</strong></td>
+<td><code>EXPECT ... ON VIOLATION DROP ROW</code></td>
+<td><code>@dp.expect_or_drop</code></td>
+<td>Get discarded before writing</td>
+</tr>
+<tr class="odd">
+<td><strong>Fail</strong></td>
+<td><code>EXPECT ... ON VIOLATION FAIL UPDATE</code></td>
+<td><code>@dp.expect_or_fail</code></td>
+<td>The update fails and the transaction rolls back</td>
+</tr>
+</tbody>
+</table>
+<p>What wasn’t in Tips #11 are the traps:</p>
+<ol type="1">
+<li><strong>Warn doesn’t filter, and it’s the default.</strong> An expectation without <code>ON VIOLATION</code> lets everything through. If nobody checks the metrics, you have decorative validation: the “validated” table accumulates garbage with a counter.</li>
+<li><strong>Fail leaves no metrics.</strong> The update fails before logging, so the event log has no record of how many rows violated the rule. To diagnose, you look at the update error, not the quality metrics.</li>
+<li><strong>Fail rolls back the flow, not the pipeline.</strong> Each dataset in the graph is updated by its own flow (the process that refreshes it). In a triggered pipeline, the failure rolls back that flow; the other tables in the graph may have updated anyway. In continuous mode, the flow and its dependents do stop.</li>
+<li><strong>Boolean SQL only.</strong> An expectation’s constraint doesn’t accept user-defined Python functions, calls to external services, or subqueries against other tables. If your rule needs that, it’s DQX territory (section 6).</li>
+<li><strong>Expectations don’t orchestrate.</strong> A validation table with <code>expect_or_fail</code> doesn’t block its downstream tables: the graph keeps going. If you need “nothing runs if validation fails”, the official docs recommend splitting validation and processing into separate pipelines coordinated by a job.</li>
+<li><strong>What’s already written doesn’t get revalidated on its own.</strong> Expectations are evaluated on each record the query processes during an update. In a streaming table with incremental refresh that means only the new data: what’s already in the table doesn’t get validated again unless you force a full refresh (which reprocesses the whole source). In a materialized view, recomputation can revalidate the entire dataset. To validate an existing table without touching the pipeline: DQX or a separate job. (This is the more precise version of gotcha #10 from Tips #11.)</li>
+<li><strong>Not every dataset supports them.</strong> Streaming tables, materialized views and temporary views do; <code>AUTO CDC FROM SNAPSHOT</code> doesn’t. And on a view the expectation is evaluated only when another dataset queries it, so metrics can be missing or duplicated.</li>
+</ol>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>New in 2026: expectations without a pipeline
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Since June 2026 you can declare expectations on standalone materialized views, with the <code>CONSTRAINT ... EXPECT (...)</code> syntax, without defining a pipeline. The “expectations only inside DLT” gap is slowly closing: it’s worth checking the <a href="https://docs.databricks.com/aws/en/release-notes/dlt/2026">release notes</a> before ruling the tool out for a use case.</p>
+</div>
+</div>
+</section>
+<section id="rules-as-data-expectation-metaprogramming" class="level2">
+<h2 class="anchored" data-anchor-id="rules-as-data-expectation-metaprogramming">3. Rules as data: expectation metaprogramming</h2>
+<p>In Tips #11 the rules were a Python dictionary sitting on top of the table:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1">quality_rules <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb1-2">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"monto_positivo"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"monto &gt; 0"</span>,</span>
+<span id="cb1-3">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cliente_presente"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cliente_id IS NOT NULL"</span>,</span>
+<span id="cb1-4">}</span></code></pre></div></div>
+<p>It works until you have 15 pipelines with the same rules copy-pasted, and one change in business criteria turns into 15 pull requests. The solution the docs themselves recommend is treating <strong>rules as data</strong>: a Delta table with one row per rule, and a function that loads them when the pipeline is built.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> gobernanza.calidad.reglas (</span>
+<span id="cb2-2">  nombre    STRING,   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- rule identifier</span></span>
+<span id="cb2-3">  condicion STRING,   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- the boolean SQL constraint</span></span>
+<span id="cb2-4">  etiqueta  STRING    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- groups rules by criterion or by table</span></span>
+<span id="cb2-5">);</span>
+<span id="cb2-6"></span>
+<span id="cb2-7"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">INSERT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">INTO</span> gobernanza.calidad.reglas <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">VALUES</span></span>
+<span id="cb2-8">  (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'monto_positivo'</span>,   <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'monto &gt; 0'</span>,                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'validez'</span>),</span>
+<span id="cb2-9">  (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cliente_presente'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cliente_id IS NOT NULL'</span>,    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'validez'</span>),</span>
+<span id="cb2-10">  (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'moneda_conocida'</span>,  <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">"moneda IN ('UYU', 'USD')"</span>,  <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'validez'</span>),</span>
+<span id="cb2-11">  (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'fecha_no_futura'</span>,  <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'fecha &lt;= current_date()'</span>,   <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'plausibilidad'</span>);</span></code></pre></div></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> pyspark <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pipelines <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> dp</span>
+<span id="cb3-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> pyspark.sql <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> functions <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> F</span>
+<span id="cb3-3"></span>
+<span id="cb3-4"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> get_rules(etiqueta):</span>
+<span id="cb3-5">    filas <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (</span>
+<span id="cb3-6">        spark.read.table(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gobernanza.calidad.reglas"</span>)</span>
+<span id="cb3-7">        .<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">filter</span>(F.col(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"etiqueta"</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> etiqueta)</span>
+<span id="cb3-8">        .collect()</span>
+<span id="cb3-9">    )</span>
+<span id="cb3-10">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {fila[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"nombre"</span>]: fila[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"condicion"</span>] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> fila <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> filas}</span>
+<span id="cb3-11"></span>
+<span id="cb3-12"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@dp.table</span></span>
+<span id="cb3-13"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@dp.expect_all_or_drop</span>(get_rules(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"validez"</span>))</span>
+<span id="cb3-14"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> silver_transacciones():</span>
+<span id="cb3-15">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> spark.readStream.table(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"bronze_transacciones"</span>)</span></code></pre></div></div>
+<p>The <code>@dp.expect_all_or_drop</code> decorator takes the whole dictionary and applies every rule under the tag. The advantages kick in fast:</p>
+<ul>
+<li><strong>One single place for the rules.</strong> Changing a threshold is an <code>UPDATE</code> to the table (with its Delta history), not a code deploy.</li>
+<li><strong>Rules come with history.</strong> <code>DESCRIBE HISTORY</code> records every change to the table, and with time travel you can compare versions. Mind the default windows (30 days of history, 7 of data for time travel): for long-term auditing, version the rules separately or extend the retention.</li>
+<li><strong>Other teams can propose rules</strong> without touching the pipeline repo: writing a row is more accessible than a pull request.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The rules don’t have to live in Delta either
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If the rules are managed by an application (a back office where the team edits thresholds, with transactional writes and low latency), that’s exactly the case for <a href="https://docs.databricks.com/aws/en/oltp/projects">Lakebase</a>, Databricks’ managed Postgres: you <a href="https://docs.databricks.com/aws/en/oltp/instances/register-uc">register the database as a read-only catalog in Unity Catalog</a> and <code>get_rules()</code> reads it like any other table. DQX (section 6) goes the same way: Lakebase is among its official options for storing checks.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Two pieces of fine print
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Dynamic rule loading is <strong>Python only</strong>: the docs say it explicitly, it can’t be done in SQL. And the rules table is read when the pipeline interprets the source code and builds its graph, not on every microbatch (the docs don’t document any re-read during execution; they do warn the code may be evaluated several times during planning). In practice: don’t count on an <code>INSERT</code> into the rules table changing a running pipeline; the safe moment for a new rule to kick in is the <strong>next update</strong>.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Rules managed in Unity Catalog
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Since January 2026, the release notes announce support for storing and managing expectations directly in Unity Catalog tables: centralized, versioned rules shareable across pipelines. It’s the same idea as this pattern, but with first-class platform support.</p>
+</div>
+</div>
+</section>
+<section id="the-quarantine-pattern-done-right" class="level2">
+<h2 class="anchored" data-anchor-id="the-quarantine-pattern-done-right">4. The Quarantine Pattern done right</h2>
+<p>Drop has a problem you notice late: <strong>discarded records don’t go anywhere</strong>. The metrics tell you how many left, but when the business asks “show me the rows you rejected this week”, they’re gone.</p>
+<p>The answer is the <strong>Quarantine Pattern</strong>: instead of discarding invalid records, split them into a quarantine table to investigate, fix and reprocess them. In Tips #11 I showed the simple version, which today I’d call improvable: one table with <code>expect_or_drop</code> and another one reading the same source with the inverted filter. It works, but it reads the source twice, and the two condition lists (the rule and its negation) evolve separately until one day they no longer match.</p>
+<p>The pattern the official docs recommend solves both with a single read:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> pyspark <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pipelines <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> dp</span>
+<span id="cb4-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> pyspark.sql <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> functions <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> F</span>
+<span id="cb4-3"></span>
+<span id="cb4-4">reglas <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> get_rules(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"validez"</span>)</span>
+<span id="cb4-5"></span>
+<span id="cb4-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># A record goes to quarantine if it does NOT pass all the rules</span></span>
+<span id="cb4-7">condicion_cuarentena <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"NOT(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{0}</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)"</span>.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">format</span>(</span>
+<span id="cb4-8">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" AND "</span>.join(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"(</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>c<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> c <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> reglas.values())</span>
+<span id="cb4-9">)</span>
+<span id="cb4-10"></span>
+<span id="cb4-11"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@dp.table</span>(partition_cols<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"is_quarantined"</span>])</span>
+<span id="cb4-12"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@dp.expect_all</span>(reglas)   <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># warn: keeps metrics, doesn't filter</span></span>
+<span id="cb4-13"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> transacciones_marcadas():</span>
+<span id="cb4-14">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (</span>
+<span id="cb4-15">        spark.readStream.table(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"bronze_transacciones"</span>)</span>
+<span id="cb4-16">        .withColumn(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"is_quarantined"</span>, F.expr(condicion_cuarentena))</span>
+<span id="cb4-17">    )</span>
+<span id="cb4-18"></span>
+<span id="cb4-19"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@dp.table</span></span>
+<span id="cb4-20"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> silver_transacciones():</span>
+<span id="cb4-21">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (</span>
+<span id="cb4-22">        spark.readStream.table(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"transacciones_marcadas"</span>)</span>
+<span id="cb4-23">        .<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">filter</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"is_quarantined = false"</span>)</span>
+<span id="cb4-24">        .drop(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"is_quarantined"</span>)</span>
+<span id="cb4-25">    )</span>
+<span id="cb4-26"></span>
+<span id="cb4-27"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@dp.table</span></span>
+<span id="cb4-28"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> cuarentena_transacciones():</span>
+<span id="cb4-29">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (</span>
+<span id="cb4-30">        spark.readStream.table(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"transacciones_marcadas"</span>)</span>
+<span id="cb4-31">        .<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">filter</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"is_quarantined = true"</span>)</span>
+<span id="cb4-32">    )</span></code></pre></div></div>
+<p>Three design decisions worth understanding:</p>
+<ul>
+<li><strong>The flag is computed once.</strong> The <code>is_quarantined</code> column is the negation of the same rules you see in the metrics, generated from the same dictionary. There are no two lists to keep in sync.</li>
+<li><strong><code>expect_all</code> in warn mode, on purpose.</strong> Here warn is exactly what we want: per-rule metrics in the event log, no filtering, because the filtering is done by the downstream tables using the flag.</li>
+<li><strong>Partitioning by <code>is_quarantined</code></strong> means reading only the valid records (or only the quarantine) doesn’t scan the whole table.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The quarantine is an inbox, not a dead archive
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A quarantine table that only grows is a symptom of a half-implemented pattern. The full circuit has three exits: <strong>investigate</strong> (why invalid records come in), <strong>fix</strong> (repair the source or transform the record) and <strong>reprocess</strong> (reinsert the corrected data into the flow). If nobody on your team owns that circuit, the quarantine is a drop with extra storage.</p>
+</div>
+</div>
+</section>
+<section id="what-happens-after-the-write-data-quality-monitoring" class="level2">
+<h2 class="anchored" data-anchor-id="what-happens-after-the-write-data-quality-monitoring">5. What happens after the write: Data quality monitoring</h2>
+<p>Everything above validates records <strong>on the way in</strong>. But there are quality problems no per-record check detects: the table that stopped updating yesterday, the daily volume that dropped by half, a column’s distribution that shifted without any individual row being invalid.</p>
+<p>For that, Unity Catalog brings <strong>Data quality monitoring</strong> (this suite’s data profiling is what used to be called Lakehouse Monitoring, if you had it filed under that name). It runs on already-written tables, with managed serverless compute, without touching the pipeline or modifying the monitored tables. It has two legs:</p>
+<p><strong>Anomaly detection</strong> (in Public Preview) is enabled at the schema or catalog level and watches two things across all their tables: <strong>freshness</strong> (did this table update when the commit history predicts it should have?) and <strong>completeness</strong> (does the row volume of the last 24 hours fall within the expected range given the history?). Results land in the <code>system.data_quality_monitoring.table_results</code> system table, and Catalog Explorer shows per-table health indicators. Root cause analysis runs separately: it uses Unity Catalog lineage to reason about dependencies and points to the likely source of the problem in the Root Cause column of the Data Quality Monitoring UI.</p>
+<p><strong>Data profiling</strong> is configured per table and computes descriptive statistics (nulls, distributions, quantiles) and <strong>drift metrics</strong> across time windows or against a baseline table: how much the distribution moved compared to last week or to the reference dataset. Three analysis types depending on the table (time series, inference for model outputs, snapshot), two Delta metric tables as output, and an auto-generated dashboard. It supports custom metrics and alerts on the metrics.</p>
+<p>When to use this instead of expectations? It’s not “instead”: it’s the other half.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>Tool</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Is this record valid?</td>
+<td>Expectations / DQX, in the pipeline</td>
+</tr>
+<tr class="even">
+<td>Is this table arriving on time, complete?</td>
+<td>Anomaly detection</td>
+</tr>
+<tr class="odd">
+<td>Did this column’s distribution shift?</td>
+<td>Data profiling (drift)</td>
+</tr>
+<tr class="even">
+<td>Is the model degrading its predictions?</td>
+<td>Data profiling in inference mode</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Costs and limits
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Monitoring runs on serverless and is billed under the shared serverless jobs SKU (SKU is the billing code); in <code>system.billing.usage</code> you identify it with <code>billing_origin_product = 'DATA_QUALITY_MONITORING'</code> for records from February 2026 onwards. Before enabling it on a whole catalog, try it on one schema: bulk enablement at the catalog level takes up to 50 schemas per operation, anomaly detection doesn’t monitor views or foreign tables, and data profiling only works on Delta tables.</p>
+</div>
+</div>
+</section>
+<section id="dqx-quality-for-what-lives-outside-the-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="dqx-quality-for-what-lives-outside-the-pipeline">6. DQX: quality for what lives outside the pipeline</h2>
+<p>Expectations have a clear boundary: <strong>they live in pipelines</strong> (even the standalone materialized views from section 2 are backed by a managed pipeline). The Delta tables you write with classic Spark jobs, notebooks or scripts are left out. That’s where <strong>DQX</strong> comes in, a Python framework from <a href="https://github.com/databrickslabs/dqx">Databricks Labs</a>, the umbrella of open projects Databricks publishes outside the product (I introduced it in <a href="../repos-github-databricks/">the Databricks GitHub map</a>, and it’s one of the repos I use the most: I validate data between medallion layers with it in production).</p>
+<p>DQX applies quality checks to any PySpark DataFrame, batch or streaming, and solves three things expectations don’t:</p>
+<ul>
+<li><strong>It works anywhere</strong>: pipelines, jobs, notebooks, even on a full historical table (exactly the case expectations don’t cover).</li>
+<li><strong>It tells you why each row failed</strong>: it annotates error columns with the violated rule, instead of an aggregate counter.</li>
+<li><strong>Quarantine out of the box</strong>: <code>apply_checks_and_split</code> directly returns two DataFrames, valid and quarantine, without building the pattern by hand.</li>
+</ul>
+<p>The typical flow starts with the profiler, which analyzes a sample of your data and generates candidate rules:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span>pip install databricks<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>labs<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>dqx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.15.0</span></span>
+<span id="cb5-2"></span>
+<span id="cb5-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> databricks.labs.dqx.profiler.profiler <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DQProfiler</span>
+<span id="cb5-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> databricks.labs.dqx.profiler.generator <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DQGenerator</span>
+<span id="cb5-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> databricks.labs.dqx.engine <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> DQEngine</span>
+<span id="cb5-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> databricks.sdk <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> WorkspaceClient</span>
+<span id="cb5-7"></span>
+<span id="cb5-8">ws <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> WorkspaceClient()</span>
+<span id="cb5-9">profiler <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DQProfiler(ws)</span>
+<span id="cb5-10">_, perfiles <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> profiler.profile(df_entrada)</span>
+<span id="cb5-11"></span>
+<span id="cb5-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Generates checks from the statistical profile. Review them before applying:</span></span>
+<span id="cb5-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># they're candidates, not truths.</span></span>
+<span id="cb5-14">checks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DQGenerator(ws).generate_dq_rules(perfiles)</span>
+<span id="cb5-15"></span>
+<span id="cb5-16"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Valid records on one side, quarantine on the other</span></span>
+<span id="cb5-17">df_validos, df_cuarentena <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> DQEngine(ws).apply_checks_by_metadata_and_split(</span>
+<span id="cb5-18">    df_entrada, checks</span>
+<span id="cb5-19">)</span></code></pre></div></div>
+<p>Checks are defined as declarative metadata (a list of dictionaries or a YAML, the text format for configuration files) and can be stored in a workspace file, a Unity Catalog volume, a Delta table or a Lakebase database. It’s the same spirit as section 3: <strong>rules are data</strong>, versionable and shareable, not code buried in each job. And it closes the loop with DLT: the generator can emit the rules as expectations to use them in a pipeline.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Labs is not the product
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>DQX is pre-1.0 (v0.15.0 as of June 2026) and Databricks Labs projects come with no official support and no SLA (service level agreement): they’re maintained through pull requests and issues. The license is the Databricks License, not a license certified by the OSI (Open Source Initiative, the organization that validates open source licenses). None of that stopped me from taking it to production, but it does imply one hygiene rule: <strong>pin the version</strong> (<code>databricks-labs-dqx==0.15.0</code>) and read the changelog before bumping it, because the API still changes between releases.</p>
+</div>
+</div>
+</section>
+<section id="the-lab-rules-in-a-table-quarantine-and-metrics" class="level2">
+<h2 class="anchored" data-anchor-id="the-lab-rules-in-a-table-quarantine-and-metrics">7. The lab: rules in a table, quarantine, and metrics</h2>
+<p>The lab puts the pieces from sections 3 and 4 together in a small, verifiable pipeline: a rules table, a flow with quarantine, and the metrics query against the event log. The full walkthrough lives in <a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/data-quality">spark-de-ideas-labs/tips/data-quality</a>.</p>
+<p><strong>Step 1: dirty data on purpose.</strong> A bronze table with 10% of known broken records: negative amounts, null customers, and a made-up currency.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">OR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">REPLACE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> lab.bronze.transacciones <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span></span>
+<span id="cb6-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span></span>
+<span id="cb6-3">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> transaccion_id,</span>
+<span id="cb6-4">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CASE</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHEN</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">THEN</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">NULL</span></span>
+<span id="cb6-5">       <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ELSE</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">concat</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'cliente_'</span>, <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">500</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">END</span>      <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> cliente_id,</span>
+<span id="cb6-6">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CASE</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHEN</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">25</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">THEN</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">900</span>)</span>
+<span id="cb6-7">       <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ELSE</span> (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">900</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">END</span>                   <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> monto,</span>
+<span id="cb6-8">  <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CASE</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHEN</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">THEN</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'XXX'</span></span>
+<span id="cb6-9">       <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ELSE</span> element_at(<span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">array</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'UYU'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'USD'</span>), <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">CAST</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">INT</span>)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">END</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> moneda,</span>
+<span id="cb6-10">  date_add(<span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">DATE</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'2026-07-01'</span>, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">CAST</span>(<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> % <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">30</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">INT</span>)) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> fecha</span>
+<span id="cb6-11"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100000</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> t(<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span>);</span></code></pre></div></div>
+<p><strong>Step 2: the rules table and the pipeline.</strong> The rules DDL from section 3 and the <code>is_quarantined</code> pipeline from section 4, as is, with the lab’s real names: the source is <code>lab.bronze.transacciones</code>, the rules are read from <code>gobernanza.calidad.reglas</code>, and the pipeline (serverless, triggered) publishes to <code>lab.dq</code>. The graph: <code>bronze</code> to <code>transacciones_marcadas</code>, and from there <code>silver_transacciones</code> and <code>cuarentena_transacciones</code>. The full update took under a minute.</p>
+<p><strong>Step 3: the metrics, per rule.</strong> The same event log query from Tips #11, which here finally shows something interesting, because each rule has its own counter:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span></span>
+<span id="cb7-2">  row_exp.dataset <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> dataset,</span>
+<span id="cb7-3">  row_exp.name <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> expectation,</span>
+<span id="cb7-4">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">SUM</span>(row_exp.passed_records) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> pasan,</span>
+<span id="cb7-5">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">SUM</span>(row_exp.failed_records) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> fallan</span>
+<span id="cb7-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> (</span>
+<span id="cb7-7">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> explode(</span>
+<span id="cb7-8">    from_json(</span>
+<span id="cb7-9">      details<span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">:flow_progress:data_quality:expectations</span>,</span>
+<span id="cb7-10">      <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'array&lt;struct&lt;name:string, dataset:string, passed_records:int, failed_records:int&gt;&gt;'</span></span>
+<span id="cb7-11">    )</span>
+<span id="cb7-12">  ) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> row_exp</span>
+<span id="cb7-13">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> event_log(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'&lt;pipeline_id&gt;'</span>)</span>
+<span id="cb7-14">  <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">WHERE</span> event_type <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'flow_progress'</span></span>
+<span id="cb7-15">)</span>
+<span id="cb7-16"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">GROUP</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> row_exp.dataset, row_exp.name</span>
+<span id="cb7-17"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ORDER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> fallan <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">DESC</span></span></code></pre></div></div>
+<p>The output, run against the lab’s pipeline on the serverless warehouse:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb8-1">dataset                        expectation       pasan  fallan</span>
+<span id="cb8-2">lab.dq.transacciones_marcadas  cliente_presente  95000    5000</span>
+<span id="cb8-3">lab.dq.transacciones_marcadas  monto_positivo    96000    4000</span>
+<span id="cb8-4">lab.dq.transacciones_marcadas  moneda_conocida   98000    2000</span></code></pre></div></div>
+<p>Each rule with its counter, exactly the broken records we seeded in step 1: 5,000 null customers, 4,000 invalid amounts, 2,000 unknown currencies.</p>
+<p><strong>Step 4: the verification that matters.</strong> Count the rows in <code>silver_transacciones</code> plus <code>cuarentena_transacciones</code> and compare against bronze: the sum has to match exactly. That’s the pattern’s contract: nothing gets lost here.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span></span>
+<span id="cb9-2">  (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.bronze.transacciones)        <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> bronze,</span>
+<span id="cb9-3">  (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.dq.silver_transacciones)     <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> silver,</span>
+<span id="cb9-4">  (<span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> lab.dq.cuarentena_transacciones) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> cuarentena;</span></code></pre></div></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb10-1">bronze  silver  cuarentena</span>
+<span id="cb10-2">100000   92000        8000</span></code></pre></div></div>
+<p>92,000 plus 8,000 gives bronze’s 100,000, exactly. And there’s a detail that teaches more than it seems: the per-rule metrics add up to 11,000 violations, but the quarantine holds 8,000 records. It’s not an error: the metrics count <strong>violations per rule</strong> and the quarantine counts <strong>records</strong>, and one record can violate more than one rule at a time (given how we seeded the data, multiples of 50 violate two rules and multiples of 100 violate all three). If you ever audit a quality pipeline and the numbers “don’t add up”, start there.</p>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">8. Gotchas</h2>
+<p><strong>1. The rules table is read when the code is interpreted.</strong> <code>get_rules()</code> runs when the pipeline builds its graph, and the docs don’t document any re-read per microbatch. Don’t design assuming an <code>INSERT</code> into the rules table changes the behavior of a running pipeline: the guaranteed moment for a new rule to kick in is the next update.</p>
+<p><strong>2. Drop leaves no trace of the data.</strong> The metrics count how many records were discarded, but the records are nowhere. If there’s any chance you’ll be asked to see them (audits, claims, debugging), quarantine from day one: migrating later means accepting there’s a period with no evidence.</p>
+<p><strong>3. In the new API, each dataset type has its own decorator.</strong> With <code>import dlt</code>, <code>@dlt.table</code> created a streaming table or a materialized view depending on the query. In <code>from pyspark import pipelines as dp</code>, <code>@dp.table</code> is the decorator for streaming tables (with a batch query it still creates a materialized view for compatibility, but Databricks recommends <code>@dp.materialized_view</code> for that), and <code>@dlt.view</code> was renamed to <code>@dp.temporary_view</code>. Old code with <code>import dlt</code> keeps working with no migration.</p>
+<p><strong>4. The event log and billing still say “dlt”.</strong> The Lakeflow rename didn’t touch the schemas: your queries on <code>details:flow_progress</code> and the filters by <code>usage_metadata.dlt_pipeline_id</code> in the system tables don’t change.</p>
+<p><strong>5. Anomaly detection has edges.</strong> No support for views or foreign tables (<a href="../databricks-tips-15-query-federation/">the federation ones from Tips #15</a> are left out), it requires serverless available in the workspace, and bulk enablement at the catalog level goes 50 schemas per operation. If your critical table is a foreign table, automatic monitoring doesn’t reach it yet.</p>
+<p><strong>6. Data profiling has its own.</strong> Delta tables only, snapshots up to 4 TB, and the time series and inference analyses compute only the last 30 days by default. For a full historical profile you have to ask for it explicitly.</p>
+<p><strong>7. Monitoring is billed as serverless jobs.</strong> It has no SKU of its own: it shares the serverless jobs one, and in <code>system.billing.usage</code> you separate it with <code>billing_origin_product = 'DATA_QUALITY_MONITORING'</code>. Enabling it on a whole catalog is still a budget decision, not just a toggle: start with the schema that hurts the most.</p>
+<p><strong>8. DQX breaks API between releases.</strong> Pre-1.0 means the changelog is mandatory reading. Pin the version in your jobs and upgrade deliberately, not by drift of an unpinned <code>%pip install</code>.</p>
+</section>
+<section id="when-to-use-each-mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="when-to-use-each-mechanism">9. When to use each mechanism</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>You need</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A hard guarantee at the table level, wherever the write comes from</td>
+<td>Delta constraints (<code>NOT NULL</code>, <code>CHECK</code>)</td>
+</tr>
+<tr class="even">
+<td>Per-record validation inside a DLT pipeline</td>
+<td>Expectations</td>
+</tr>
+<tr class="odd">
+<td>The same rules across many pipelines, no copy-paste</td>
+<td>Rules in a Delta table + <code>get_rules()</code> (section 3)</td>
+</tr>
+<tr class="even">
+<td>Keeping invalid records to investigate and reprocess</td>
+<td>Quarantine Pattern (section 4), or DQX with <code>apply_checks_and_split</code></td>
+</tr>
+<tr class="odd">
+<td>Validating DataFrames outside pipelines: jobs, notebooks, historicals</td>
+<td>DQX</td>
+</tr>
+<tr class="even">
+<td>Knowing why each row failed, rule by rule</td>
+<td>DQX</td>
+</tr>
+<tr class="odd">
+<td>Finding out a table arrived late or incomplete</td>
+<td>Anomaly detection</td>
+</tr>
+<tr class="even">
+<td>Detecting drift in distributions or model outputs</td>
+<td>Data profiling</td>
+</tr>
+<tr class="odd">
+<td>Blocking downstream when validation fails</td>
+<td>Separate pipelines coordinated by a job (expectations don’t orchestrate)</td>
+</tr>
+</tbody>
+</table>
+<p>If I had to summarize the criteria in one line: expectations and DQX validate <strong>records in motion</strong>, monitoring watches <strong>tables at rest</strong>, and Delta constraints are the seatbelt for whatever slipped past everything else.</p>
+<hr>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li><a href="https://docs.databricks.com/aws/en/ldp/expectations">Manage data quality with pipeline expectations — Databricks</a></li>
+<li><a href="https://docs.databricks.com/aws/en/ldp/expectation-patterns">Expectation recommendations and advanced patterns</a></li>
+<li><a href="https://docs.databricks.com/aws/en/ldp/developer/ldp-python-ref-expectations">Python reference: expectations (<code>dp.expect*</code>)</a></li>
+<li><a href="https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/">Data quality monitoring — Unity Catalog</a></li>
+<li><a href="https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/anomaly-detection/">Anomaly detection (Public Preview)</a></li>
+<li><a href="https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/data-profiling/">Data profiling (ex Lakehouse Monitoring)</a></li>
+<li><a href="https://docs.databricks.com/aws/en/ldp/concepts/where-is-dlt">What happened to Delta Live Tables?</a></li>
+<li><a href="https://docs.databricks.com/aws/en/release-notes/dlt/2026">Lakeflow pipelines release notes 2026</a></li>
+<li><a href="https://github.com/databrickslabs/dqx">DQX — GitHub (databrickslabs/dqx)</a></li>
+<li><a href="https://databrickslabs.github.io/dqx/">DQX — official documentation</a></li>
+<li><a href="https://docs.delta.io/latest/delta-constraints.html">Delta Lake constraints (NOT NULL / CHECK)</a></li>
+</ul>
+</section>
+<section id="other-posts-in-the-series" class="level2">
+<h2 class="anchored" data-anchor-id="other-posts-in-the-series">Other posts in the series</h2>
+<p>If this post was useful, check the previous <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC for Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — the 7 things you wish you’d known</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — the governance nobody implements well</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers and micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — from experiment to model</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features that survive production</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker on Databricks</a> — custom containers</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming and event-driven triggers</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — the compute that turns itself on</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — centralized governance for LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — declarative pipelines with built-in quality</li>
+<li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — the C++ engine that speeds up your queries</li>
+<li><a href="../databricks-tips-13-opensharing/"><strong>Tips #13</strong>: OpenSharing</a> — sharing without copying</li>
+<li><a href="../databricks-tips-14-liquid-clustering/"><strong>Tips #14</strong>: Liquid Clustering</a> — the replacement for partitions and Z-ORDER</li>
+<li><a href="../databricks-tips-15-query-federation/"><strong>Tips #15</strong>: Query Federation</a> — querying Postgres and MySQL without moving data</li>
+</ul>
+<hr>
+<p><em>Next Tips: dbt on Databricks — SQL-first transformations on the Lakehouse, and what role is left for expectations when the tests live in dbt.</em></p>
+
+
+</section>
+
+ ]]></description>
+  <category>Databricks Tips</category>
+  <category>Data Engineering</category>
+  <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-16-data-quality/</guid>
+  <pubDate>Wed, 05 Aug 2026 03:00:00 GMT</pubDate>
+  <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-16-data-quality/cover.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>Databricks Tips #15: Query Federation — querying Postgres and MySQL without moving data</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -23179,549 +24268,6 @@ Listing&nbsp;6: MVP pattern: Medallion with flat Gold, no formal modeling
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-modeling-medallion-vault-kimball/</guid>
   <pubDate>Tue, 07 Apr 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-modeling-medallion-vault-kimball/cover.png" medium="image" type="image/png" height="81" width="144"/>
-</item>
-<item>
-  <title>Databricks Tips #6: Feature Engineering — designing features that survive production</title>
-  <dc:creator>Mauro Loprete</dc:creator>
-  <link>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-05-feature-engineering/</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>Sixth installment of <strong>Databricks Tips</strong>. Feature Engineering is where most ML projects fail silently: the model works in the notebook but not in production. Almost always the problem is in the features.</p>
-<section id="the-problem-training-serving-skew" class="level2">
-<h2 class="anchored" data-anchor-id="the-problem-training-serving-skew">The problem: training-serving skew</h2>
-<p>The most common mistake in ML is not picking the wrong model. It’s that features in production are computed differently than they were at training time:</p>
-<div id="lst-training-skew" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-training-skew-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Training-serving skew: data leakage through the time window
-</figcaption>
-<div aria-describedby="lst-training-skew-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In the notebook (training):</span></span>
-<span id="cb1-2">df[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"avg_purchases_30d"</span>] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> df.groupby(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_id"</span>)[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"amount"</span>] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">\</span></span>
-<span id="cb1-3">    .transform(<span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">lambda</span> x: x.rolling(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">30</span>).mean())</span>
-<span id="cb1-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># This uses FUTURE data (data leakage)</span></span>
-<span id="cb1-5"></span>
-<span id="cb1-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># In production (serving):</span></span>
-<span id="cb1-7"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># You don't have access to the last 30 days of data</span></span>
-<span id="cb1-8"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># The feature gets computed with a different window</span></span>
-<span id="cb1-9"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># The model predicts garbage</span></span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p>The solution: <strong>Feature Store with point-in-time correctness</strong>.</p>
-</section>
-<section id="feature-store-the-source-of-truth" class="level2">
-<h2 class="anchored" data-anchor-id="feature-store-the-source-of-truth">Feature Store: the source of truth</h2>
-<div id="lst-feature-table" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-feature-table-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Create a Feature Table with a timestamp key for point-in-time
-</figcaption>
-<div aria-describedby="lst-feature-table-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> databricks.feature_engineering <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> FeatureEngineeringClient</span>
-<span id="cb2-2"></span>
-<span id="cb2-3">fe <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> FeatureEngineeringClient()</span>
-<span id="cb2-4"></span>
-<span id="cb2-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Feature table with timestamp key (critical for PIT)</span></span>
-<span id="cb2-6">fe.create_table(</span>
-<span id="cb2-7">    name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.customer_features"</span>,</span>
-<span id="cb2-8">    primary_keys<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_id"</span>],</span>
-<span id="cb2-9">    timestamp_keys<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"feature_date"</span>],</span>
-<span id="cb2-10">    df<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>features_df,</span>
-<span id="cb2-11">    description<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Daily customer behavior features"</span></span>
-<span id="cb2-12">)</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>The three rules of the Feature Store</strong>:</p>
-<ol type="1">
-<li><strong>Primary key</strong>: identifies the entity (customer_id, product_id)</li>
-<li><strong>Timestamp key</strong>: when the feature was computed (for point-in-time)</li>
-<li><strong>Feature columns</strong>: the computed values</li>
-</ol>
-</section>
-<section id="point-in-time-lookups-avoiding-data-leakage" class="level2">
-<h2 class="anchored" data-anchor-id="point-in-time-lookups-avoiding-data-leakage">Point-in-time lookups: avoiding data leakage</h2>
-<p>This is where most people mess up. If you train with features computed at the moment you run the notebook, you’re using information from the future:</p>
-<div id="lst-pit-lookup" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pit-lookup-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Point-in-time lookup: avoiding data leakage in the training set
-</figcaption>
-<div aria-describedby="lst-pit-lookup-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> databricks.feature_engineering <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> FeatureLookup</span>
-<span id="cb3-2"></span>
-<span id="cb3-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># CORRECT: point-in-time lookup</span></span>
-<span id="cb3-4"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># For each label row, look up the features</span></span>
-<span id="cb3-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># that existed BEFORE the event (not after)</span></span>
-<span id="cb3-6">training_set <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fe.create_training_set(</span>
-<span id="cb3-7">    df<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>labels_df,  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># customer_id, event_date, churned</span></span>
-<span id="cb3-8">    feature_lookups<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[</span>
-<span id="cb3-9">        FeatureLookup(</span>
-<span id="cb3-10">            table_name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.customer_features"</span>,</span>
-<span id="cb3-11">            feature_names<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[</span>
-<span id="cb3-12">                <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"avg_purchases_30d"</span>,</span>
-<span id="cb3-13">                <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"days_since_last_purchase"</span>,</span>
-<span id="cb3-14">                <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"support_tickets_count"</span></span>
-<span id="cb3-15">            ],</span>
-<span id="cb3-16">            lookup_key<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_id"</span>,</span>
-<span id="cb3-17">            timestamp_lookup_key<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"event_date"</span></span>
-<span id="cb3-18">            <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># ^ looks up features with feature_date &lt;= event_date</span></span>
-<span id="cb3-19">        )</span>
-<span id="cb3-20">    ],</span>
-<span id="cb3-21">    label<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"churned"</span></span>
-<span id="cb3-22">)</span>
-<span id="cb3-23"></span>
-<span id="cb3-24">training_df <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> training_set.load_df()</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p>The <code>timestamp_lookup_key</code> guarantees that for an event on March 15, it only uses features computed up to March 14. Without this, you have data leakage and inflated metrics.</p>
-</section>
-<section id="feature-pipeline-batch-streaming" class="level2">
-<h2 class="anchored" data-anchor-id="feature-pipeline-batch-streaming">Feature pipeline: batch + streaming</h2>
-<p>A pattern that works well in production:</p>
-<div id="lst-pipeline-features" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pipeline-features-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Feature pipeline: daily batch + streaming in DLT
-</figcaption>
-<div aria-describedby="lst-pipeline-features-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># 1. Batch features (computed daily)</span></span>
-<span id="cb4-2"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">@dlt.table</span>(</span>
-<span id="cb4-3">    name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_features_daily"</span>,</span>
-<span id="cb4-4">    comment<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Daily features computed in batch"</span></span>
-<span id="cb4-5">)</span>
-<span id="cb4-6"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> compute_daily_features():</span>
-<span id="cb4-7">    orders <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> dlt.read(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"silver_orders"</span>)</span>
-<span id="cb4-8">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> (orders</span>
-<span id="cb4-9">        .groupBy(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_id"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"feature_date"</span>)</span>
-<span id="cb4-10">        .agg(</span>
-<span id="cb4-11">            F.avg(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"amount"</span>).alias(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"avg_order_amount"</span>),</span>
-<span id="cb4-12">            F.count(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"*"</span>).alias(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"order_count"</span>),</span>
-<span id="cb4-13">            F.<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">sum</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"amount"</span>).alias(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"total_spent"</span>)</span>
-<span id="cb4-14">        ))</span>
-<span id="cb4-15"></span>
-<span id="cb4-16"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># 2. Streaming features (near real-time)</span></span>
-<span id="cb4-17"><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">@dlt.table</span>(</span>
-<span id="cb4-18">    name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_features_rt"</span>,</span>
-<span id="cb4-19">    comment<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"Real-time features"</span></span>
-<span id="cb4-20">)</span>
-<span id="cb4-21"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> compute_rt_features():</span>
-<span id="cb4-22">    events <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> dlt.read_stream(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"bronze_events"</span>)</span>
-<span id="cb4-23">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> (events</span>
-<span id="cb4-24">        .withWatermark(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"event_time"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"1 hour"</span>)</span>
-<span id="cb4-25">        .groupBy(</span>
-<span id="cb4-26">            <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"customer_id"</span>,</span>
-<span id="cb4-27">            F.window(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"event_time"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"1 hour"</span>)</span>
-<span id="cb4-28">        )</span>
-<span id="cb4-29">        .agg(</span>
-<span id="cb4-30">            F.count(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"*"</span>).alias(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"events_last_hour"</span>),</span>
-<span id="cb4-31">            F.countDistinct(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"page"</span>).alias(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"pages_visited"</span>)</span>
-<span id="cb4-32">        ))</span>
-<span id="cb4-33"></span>
-<span id="cb4-34"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># 3. Publish to the Feature Store</span></span>
-<span id="cb4-35">fe.write_table(</span>
-<span id="cb4-36">    name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.customer_features"</span>,</span>
-<span id="cb4-37">    df<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>daily_features,</span>
-<span id="cb4-38">    mode<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"merge"</span></span>
-<span id="cb4-39">)</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="online-feature-store-serving-in-milliseconds" class="level2">
-<h2 class="anchored" data-anchor-id="online-feature-store-serving-in-milliseconds">Online Feature Store: serving in milliseconds</h2>
-<p>For models serving real-time predictions, reading features from Delta (seconds) is too slow. You need an online store:</p>
-<div id="lst-online-store" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-online-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Publish features to an Online Store for millisecond serving
-</figcaption>
-<div aria-describedby="lst-online-store-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> databricks.feature_engineering <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> FeatureEngineeringClient</span>
-<span id="cb5-2"></span>
-<span id="cb5-3">fe <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> FeatureEngineeringClient()</span>
-<span id="cb5-4"></span>
-<span id="cb5-5"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Publish features to the online store</span></span>
-<span id="cb5-6"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># This syncs Delta → Cosmos DB / DynamoDB</span></span>
-<span id="cb5-7">spec <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> fe.publish_table(</span>
-<span id="cb5-8">    name<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"catalog.ml.customer_features"</span>,</span>
-<span id="cb5-9">    online_store<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>OnlineStoreSpec(</span>
-<span id="cb5-10">        cloud<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"azure"</span>,</span>
-<span id="cb5-11">        write_secret_prefix<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"online-store"</span></span>
-<span id="cb5-12">    ),</span>
-<span id="cb5-13">    features<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"avg_purchases_30d"</span>, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"days_since_last_purchase"</span>]</span>
-<span id="cb5-14">)</span>
-<span id="cb5-15"></span>
-<span id="cb5-16"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># At serving time, the model looks up online features automatically</span></span>
-<span id="cb5-17"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Latency: ~10ms vs ~2s from Delta</span></span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-<section id="feature-freshness-monitoring" class="level2">
-<h2 class="anchored" data-anchor-id="feature-freshness-monitoring">Feature freshness: monitoring</h2>
-<p>Features go stale. A pipeline that fails silently produces old features and bad predictions:</p>
-<div id="lst-freshness-check" class="python listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-freshness-check-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: Freshness monitoring: alert if features are stale
-</figcaption>
-<div aria-describedby="lst-freshness-check-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># Check freshness before serving</span></span>
-<span id="cb6-2"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">from</span> datetime <span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> datetime, timedelta</span>
-<span id="cb6-3"></span>
-<span id="cb6-4">latest_feature <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> spark.sql(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"""</span></span>
-<span id="cb6-5"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">    SELECT MAX(feature_date) as latest</span></span>
-<span id="cb6-6"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">    FROM catalog.ml.customer_features</span></span>
-<span id="cb6-7"><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"""</span>).collect()[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0</span>][<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"latest"</span>]</span>
-<span id="cb6-8"></span>
-<span id="cb6-9">staleness <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> datetime.now() <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span> latest_feature</span>
-<span id="cb6-10"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> staleness <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;</span> timedelta(hours<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">26</span>):  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># daily batch + margin</span></span>
-<span id="cb6-11">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">raise</span> Alert(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"Features stale by </span><span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">{</span>staleness<span class="sc" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">}</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"</span>)</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-<p><strong>Tip</strong>: set up a Unity Catalog <code>quality_monitor</code> on your feature table for automatic drift and freshness alerts.</p>
-</section>
-<section id="feature-engineering-checklist" class="level2">
-<h2 class="anchored" data-anchor-id="feature-engineering-checklist">Feature Engineering checklist</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Step</th>
-<th>Question</th>
-<th>If you skip it…</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Point-in-time</td>
-<td>Do your features respect temporal order?</td>
-<td>Data leakage, fake metrics</td>
-</tr>
-<tr class="even">
-<td>Feature Store</td>
-<td>Are features shared across models?</td>
-<td>Duplication, inconsistency</td>
-</tr>
-<tr class="odd">
-<td>Online Store</td>
-<td>Does serving need low latency?</td>
-<td>Timeouts in production</td>
-</tr>
-<tr class="even">
-<td>Freshness</td>
-<td>Do you monitor feature age?</td>
-<td>Predictions on old data</td>
-</tr>
-<tr class="odd">
-<td>Lineage</td>
-<td>Do you know which tables feed each feature?</td>
-<td>You can’t debug</td>
-</tr>
-<tr class="even">
-<td>Idempotency</td>
-<td>If you recompute features, is the result the same?</td>
-<td>Silent drift</td>
-</tr>
-</tbody>
-</table>
-<hr>
-<p><em>Next week: Lakeflow Declarative Pipelines (formerly DLT) — expectations, materialized views, and serverless compute.</em></p>
-
-
-</section>
-
- ]]></description>
-  <category>Databricks Tips</category>
-  <category>Machine Learning</category>
-  <category>Feature Engineering</category>
-  <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-05-feature-engineering/</guid>
-  <pubDate>Tue, 31 Mar 2026 03:00:00 GMT</pubDate>
-  <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-05-feature-engineering/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>

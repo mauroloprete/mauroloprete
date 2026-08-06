@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Mauro Loprete">
+<meta name="dcterms.date" content="2026-08-05">
+<meta name="description" content="Warn is the default and filters nothing: how to go from scattered checks to a quality system in Databricks, with rules loaded dynamically from a Delta table, a quarantine that loses no records, post-write monitoring, and DQX from Databricks Labs.">
+
+<title>Databricks Tips #16: Data Quality — dynamic expectations, quarantine, and DQX – Mauro Loprete</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../../">
+<link href="../../../../mauro.jpg" rel="icon" type="image/jpeg">
+<script src="../../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../../site_libs/bootstrap/bootstrap-daa8fa81d25beabfc7405797cb8d7aea.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-J5BYS9RXY6"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-J5BYS9RXY6', { 'anonymize_ip': true});
+</script>
+
+
+<link rel="stylesheet" href="../../../../styles.css">
+<meta property="og:title" content="Databricks Tips #16: Data Quality — dynamic expectations, quarantine, and DQX – Mauro Loprete">
+<meta property="og:description" content="Warn is the default and filters nothing: how to go from scattered checks to a quality system in Databricks, with rules loaded dynamically from a Delta table, a quarantine that loses no records, post-write monitoring, and DQX from Databricks Labs.">
+<meta property="og:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-16-data-quality/cover.png">
+<meta property="og:site_name" content="Mauro Loprete">
+<meta property="og:locale" content="es_UY">
+<meta property="og:image:height" content="843">
+<meta property="og:image:width" content="1500">
+<meta name="twitter:title" content="Databricks Tips #16: Data Quality — dynamic expectations, quarantine, and DQX – Mauro Loprete">
+<meta name="twitter:description" content="Warn is the default and filters nothing: how to go from scattered checks to a quality system in Databricks, with rules loaded dynamically from a Delta table, a quarantine that loses no records, post-write monitoring, and DQX from Databricks Labs.">
+<meta name="twitter:image" content="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-16-data-quality/cover.png">
+<meta name="twitter:creator" content="@mloprete17">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image-height" content="843">
+<meta name="twitter:image-width" content="1500">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../../index.html">
+    <span class="navbar-title">Mauro Loprete</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../index.html"> 
+<span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../experience.html"> 
+<span class="menu-text">Experiencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../teaching.html"> 
+<span class="menu-text">Docencia</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../projects.html"> 
+<span class="menu-text">Proyectos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../certifications.html"> 
+<span class="menu-text">Certificaciones</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../blog/index.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../../slides.html"> 
+<span class="menu-text">Slides</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-map-four-mechanisms-four-moments" id="toc-the-map-four-mechanisms-four-moments" class="nav-link active" data-scroll-target="#the-map-four-mechanisms-four-moments">1. The map: four mechanisms, four moments</a></li>
+  <li><a href="#expectations-the-one-table-recap-and-the-traps" id="toc-expectations-the-one-table-recap-and-the-traps" class="nav-link" data-scroll-target="#expectations-the-one-table-recap-and-the-traps">2. Expectations: the one-table recap and the traps</a></li>
+  <li><a href="#rules-as-data-expectation-metaprogramming" id="toc-rules-as-data-expectation-metaprogramming" class="nav-link" data-scroll-target="#rules-as-data-expectation-metaprogramming">3. Rules as data: expectation metaprogramming</a></li>
+  <li><a href="#the-quarantine-pattern-done-right" id="toc-the-quarantine-pattern-done-right" class="nav-link" data-scroll-target="#the-quarantine-pattern-done-right">4. The Quarantine Pattern done right</a></li>
+  <li><a href="#what-happens-after-the-write-data-quality-monitoring" id="toc-what-happens-after-the-write-data-quality-monitoring" class="nav-link" data-scroll-target="#what-happens-after-the-write-data-quality-monitoring">5. What happens after the write: Data quality monitoring</a></li>
+  <li><a href="#dqx-quality-for-what-lives-outside-the-pipeline" id="toc-dqx-quality-for-what-lives-outside-the-pipeline" class="nav-link" data-scroll-target="#dqx-quality-for-what-lives-outside-the-pipeline">6. DQX: quality for what lives outside the pipeline</a></li>
+  <li><a href="#the-lab-rules-in-a-table-quarantine-and-metrics" id="toc-the-lab-rules-in-a-table-quarantine-and-metrics" class="nav-link" data-scroll-target="#the-lab-rules-in-a-table-quarantine-and-metrics">7. The lab: rules in a table, quarantine, and metrics</a></li>
+  <li><a href="#gotchas" id="toc-gotchas" class="nav-link" data-scroll-target="#gotchas">8. Gotchas</a></li>
+  <li><a href="#when-to-use-each-mechanism" id="toc-when-to-use-each-mechanism" class="nav-link" data-scroll-target="#when-to-use-each-mechanism">9. When to use each mechanism</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#other-posts-in-the-series" id="toc-other-posts-in-the-series" class="nav-link" data-scroll-target="#other-posts-in-the-series">Other posts in the series</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Databricks Tips #16: Data Quality — dynamic expectations, quarantine, and DQX</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">Databricks Tips</div>
+    <div class="quarto-category">Data Engineering</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    Warn is the default and filters nothing: how to go from scattered checks to a quality system in Databricks, with rules loaded dynamically from a Delta table, a quarantine that loses no records, post-write monitoring, and DQX from Databricks Labs.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://mauroloprete.github.io/mauroloprete/en/experience.html">Mauro Loprete</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">August 5, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>You set up expectations in your pipeline, the graph runs green, and the quality metrics pile up in the event log. And yet the silver table has negative amounts. It’s not a bug: <strong>warn is the default action of an expectation, and warn filters nothing</strong>. The invalid record adds one to a metric nobody looks at, and gets written anyway.</p>
+<p>In <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Tips #11</a> we covered expectations as just another feature of <strong>Lakeflow pipelines</strong>, the product formerly known as Delta Live Tables (DLT for the rest of this post). This post takes them as the starting point to build the full system: the traps that don’t show up in the tutorial, rules defined as data instead of code, a quarantine that loses no records, statistical monitoring after the write, and DQX, the Databricks Labs library that covers what happens outside a pipeline.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Expectations</strong> validate record by record inside a pipeline with three actions: warn (default, writes anyway), drop (discards) and fail (rolls back the update). The basics are in <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Tips #11</a>; here come the traps.</li>
+<li>Rules can live <strong>as data in a Delta table</strong> (or in Lakebase, if an app edits them) and load dynamically with Python: one single place for the rules of all your pipelines. Python only; SQL doesn’t support dynamic loading.</li>
+<li>The official <strong>Quarantine Pattern</strong> doesn’t use drop: it flags each record with an <code>is_quarantined</code> column and splits it into two views, losing nothing and reading the source only once.</li>
+<li><strong>Data quality monitoring</strong> (what used to be called Lakehouse Monitoring) adds the statistical, post-write side: anomaly detection (freshness and completeness) and profiles with drift.</li>
+<li><strong>DQX</strong>, from Databricks Labs, takes the checks to any DataFrame, inside or outside pipelines, with quarantine out of the box and the why behind each rejection, row by row. It’s pre-1.0: pin the version.</li>
+</ul>
+</div>
+</div>
+<hr>
+<section id="the-map-four-mechanisms-four-moments" class="level2">
+<h2 class="anchored" data-anchor-id="the-map-four-mechanisms-four-moments">1. The map: four mechanisms, four moments</h2>
+<p>“Data quality in Databricks” is not one tool, it’s four, acting at different moments of the flow. Picking the wrong one is the source of most frustrations: asking an expectation to validate a historical table, or a monitor to stop an invalid record, is asking the mechanism for something it doesn’t do.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Four quality mechanisms and where each one acts: DQX on the DataFrame in your code, expectations inside the pipeline, Delta constraints when writing to the table, and monitoring after the write."><img src="index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="960" alt="Four quality mechanisms and where each one acts: DQX on the DataFrame in your code, expectations inside the pipeline, Delta constraints when writing to the table, and monitoring after the write."></a></p>
+</figure>
+</div>
+<figcaption>Four quality mechanisms and where each one acts: DQX on the DataFrame in your code, expectations inside the pipeline, Delta constraints when writing to the table, and monitoring after the write.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Mechanism</th>
+<th>Where it runs</th>
+<th>Granularity</th>
+<th>What it does with invalid data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Delta constraints</strong> (<code>NOT NULL</code>, <code>CHECK</code>)</td>
+<td>On the table, wherever the write comes from</td>
+<td>The whole transaction</td>
+<td>Rejects the entire write</td>
+</tr>
+<tr class="even">
+<td><strong>Expectations</strong></td>
+<td>Only inside a DLT pipeline</td>
+<td>Per record</td>
+<td>warn, drop or fail</td>
+</tr>
+<tr class="odd">
+<td><strong>DQX</strong> (Databricks Labs)</td>
+<td>Any DataFrame, inside or outside pipelines</td>
+<td>Per record, with per-rule detail</td>
+<td>Flags error columns, filters, or splits into quarantine</td>
+</tr>
+<tr class="even">
+<td><strong>Data quality monitoring</strong> (Unity Catalog)</td>
+<td>On the already-written table</td>
+<td>Statistical: profiles, drift, anomalies</td>
+<td>Observes and alerts, doesn’t block</td>
+</tr>
+</tbody>
+</table>
+<p>Delta constraints are the hardest safety net: if one record violates a <code>CHECK</code>, the entire write fails, not the row. They work as a last-resort guarantee, but not as a quality system: they don’t tell you how many records came in bad or which ones, and a single invalid record kills your job. The rest of the post focuses on the other three mechanisms, the ones that give you visibility.</p>
+</section>
+<section id="expectations-the-one-table-recap-and-the-traps" class="level2">
+<h2 class="anchored" data-anchor-id="expectations-the-one-table-recap-and-the-traps">2. Expectations: the one-table recap and the traps</h2>
+<p>The full recap is in <a href="../databricks-tips-11-lakeflow-declarative-pipelines/">Tips #11</a>; the essentials fit in one table:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Action</th>
+<th>SQL</th>
+<th>Python</th>
+<th>Invalid records…</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Warn</strong> (default)</td>
+<td><code>EXPECT (cond)</code></td>
+<td><code>@dp.expect</code></td>
+<td>Get written anyway, metrics are logged</td>
+</tr>
+<tr class="even">
+<td><strong>Drop</strong></td>
+<td><code>EXPECT ... ON VIOLATION DROP ROW</code></td>
+<td><code>@dp.expect_or_drop</code></td>
+<td>Get discarded before writing</td>
+</tr>
+<tr class="odd">
+<td><strong>Fail</strong></td>
+<td><code>EXPECT ... ON VIOLATION FAIL UPDATE</code></td>
+<td><code>@dp.expect_or_fail</code></td>
+<td>The update fails and the transaction rolls back</td>
+</tr>
+</tbody>
+</table>
+<p>What wasn’t in Tips #11 are the traps:</p>
+<ol type="1">
+<li><strong>Warn doesn’t filter, and it’s the default.</strong> An expectation without <code>ON VIOLATION</code> lets everything through. If nobody checks the metrics, you have decorative validation: the “validated” table accumulates garbage with a counter.</li>
+<li><strong>Fail leaves no metrics.</strong> The update fails before logging, so the event log has no record of how many rows violated the rule. To diagnose, you look at the update error, not the quality metrics.</li>
+<li><strong>Fail rolls back the flow, not the pipeline.</strong> Each dataset in the graph is updated by its own flow (the process that refreshes it). In a triggered pipeline, the failure rolls back that flow; the other tables in the graph may have updated anyway. In continuous mode, the flow and its dependents do stop.</li>
+<li><strong>Boolean SQL only.</strong> An expectation’s constraint doesn’t accept user-defined Python functions, calls to external services, or subqueries against other tables. If your rule needs that, it’s DQX territory (section 6).</li>
+<li><strong>Expectations don’t orchestrate.</strong> A validation table with <code>expect_or_fail</code> doesn’t block its downstream tables: the graph keeps going. If you need “nothing runs if validation fails”, the official docs recommend splitting validation and processing into separate pipelines coordinated by a job.</li>
+<li><strong>What’s already written doesn’t get revalidated on its own.</strong> Expectations are evaluated on each record the query processes during an update. In a streaming table with incremental refresh that means only the new data: what’s already in the table doesn’t get validated again unless you force a full refresh (which reprocesses the whole source). In a materialized view, recomputation can revalidate the entire dataset. To validate an existing table without touching the pipeline: DQX or a separate job. (This is the more precise version of gotcha #10 from Tips #11.)</li>
+<li><strong>Not every dataset supports them.</strong> Streaming tables, materialized views and temporary views do; <code>AUTO CDC FROM SNAPSHOT</code> doesn’t. And on a view the expectation is evaluated only when another dataset queries it, so metrics can be missing or duplicated.</li>
+</ol>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>New in 2026: expectations without a pipeline
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Since June 2026 you can declare expectations on standalone materialized views, with the <code>CONSTRAINT ... EXPECT (...)</code> syntax, without defining a pipeline. The “expectations only inside DLT” gap is slowly closing: it’s worth checking the <a href="https://docs.databricks.com/aws/en/release-notes/dlt/2026">release notes</a> before ruling the tool out for a use case.</p>
+</div>
+</div>
+</section>
+<section id="rules-as-data-expectation-metaprogramming" class="level2">
+<h2 class="anchored" data-anchor-id="rules-as-data-expectation-metaprogramming">3. Rules as data: expectation metaprogramming</h2>
+<p>In Tips #11 the rules were a Python dictionary sitting on top of the table:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>quality_rules <span class="op">=</span> {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"monto_positivo"</span>: <span class="st">"monto &gt; 0"</span>,</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"cliente_presente"</span>: <span class="st">"cliente_id IS NOT NULL"</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>It works until you have 15 pipelines with the same rules copy-pasted, and one change in business criteria turns into 15 pull requests. The solution the docs themselves recommend is treating <strong>rules as data</strong>: a Delta table with one row per rule, and a function that loads them when the pipeline is built.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> gobernanza.calidad.reglas (</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  nombre    STRING,   <span class="co">-- rule identifier</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  condicion STRING,   <span class="co">-- the boolean SQL constraint</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  etiqueta  STRING    <span class="co">-- groups rules by criterion or by table</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>);</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> gobernanza.calidad.reglas <span class="kw">VALUES</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  (<span class="st">'monto_positivo'</span>,   <span class="st">'monto &gt; 0'</span>,                 <span class="st">'validez'</span>),</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  (<span class="st">'cliente_presente'</span>, <span class="st">'cliente_id IS NOT NULL'</span>,    <span class="st">'validez'</span>),</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  (<span class="st">'moneda_conocida'</span>,  <span class="ot">"moneda IN ('UYU', 'USD')"</span>,  <span class="st">'validez'</span>),</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  (<span class="st">'fecha_no_futura'</span>,  <span class="st">'fecha &lt;= current_date()'</span>,   <span class="st">'plausibilidad'</span>);</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark <span class="im">import</span> pipelines <span class="im">as</span> dp</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_rules(etiqueta):</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    filas <span class="op">=</span> (</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        spark.read.table(<span class="st">"gobernanza.calidad.reglas"</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">filter</span>(F.col(<span class="st">"etiqueta"</span>) <span class="op">==</span> etiqueta)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        .collect()</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {fila[<span class="st">"nombre"</span>]: fila[<span class="st">"condicion"</span>] <span class="cf">for</span> fila <span class="kw">in</span> filas}</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.table</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.expect_all_or_drop</span>(get_rules(<span class="st">"validez"</span>))</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> silver_transacciones():</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> spark.readStream.table(<span class="st">"bronze_transacciones"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The <code>@dp.expect_all_or_drop</code> decorator takes the whole dictionary and applies every rule under the tag. The advantages kick in fast:</p>
+<ul>
+<li><strong>One single place for the rules.</strong> Changing a threshold is an <code>UPDATE</code> to the table (with its Delta history), not a code deploy.</li>
+<li><strong>Rules come with history.</strong> <code>DESCRIBE HISTORY</code> records every change to the table, and with time travel you can compare versions. Mind the default windows (30 days of history, 7 of data for time travel): for long-term auditing, version the rules separately or extend the retention.</li>
+<li><strong>Other teams can propose rules</strong> without touching the pipeline repo: writing a row is more accessible than a pull request.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The rules don’t have to live in Delta either
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If the rules are managed by an application (a back office where the team edits thresholds, with transactional writes and low latency), that’s exactly the case for <a href="https://docs.databricks.com/aws/en/oltp/projects">Lakebase</a>, Databricks’ managed Postgres: you <a href="https://docs.databricks.com/aws/en/oltp/instances/register-uc">register the database as a read-only catalog in Unity Catalog</a> and <code>get_rules()</code> reads it like any other table. DQX (section 6) goes the same way: Lakebase is among its official options for storing checks.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Two pieces of fine print
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Dynamic rule loading is <strong>Python only</strong>: the docs say it explicitly, it can’t be done in SQL. And the rules table is read when the pipeline interprets the source code and builds its graph, not on every microbatch (the docs don’t document any re-read during execution; they do warn the code may be evaluated several times during planning). In practice: don’t count on an <code>INSERT</code> into the rules table changing a running pipeline; the safe moment for a new rule to kick in is the <strong>next update</strong>.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Rules managed in Unity Catalog
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Since January 2026, the release notes announce support for storing and managing expectations directly in Unity Catalog tables: centralized, versioned rules shareable across pipelines. It’s the same idea as this pattern, but with first-class platform support.</p>
+</div>
+</div>
+</section>
+<section id="the-quarantine-pattern-done-right" class="level2">
+<h2 class="anchored" data-anchor-id="the-quarantine-pattern-done-right">4. The Quarantine Pattern done right</h2>
+<p>Drop has a problem you notice late: <strong>discarded records don’t go anywhere</strong>. The metrics tell you how many left, but when the business asks “show me the rows you rejected this week”, they’re gone.</p>
+<p>The answer is the <strong>Quarantine Pattern</strong>: instead of discarding invalid records, split them into a quarantine table to investigate, fix and reprocess them. In Tips #11 I showed the simple version, which today I’d call improvable: one table with <code>expect_or_drop</code> and another one reading the same source with the inverted filter. It works, but it reads the source twice, and the two condition lists (the rule and its negation) evolve separately until one day they no longer match.</p>
+<p>The pattern the official docs recommend solves both with a single read:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark <span class="im">import</span> pipelines <span class="im">as</span> dp</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>reglas <span class="op">=</span> get_rules(<span class="st">"validez"</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co"># A record goes to quarantine if it does NOT pass all the rules</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>condicion_cuarentena <span class="op">=</span> <span class="st">"NOT(</span><span class="sc">{0}</span><span class="st">)"</span>.<span class="bu">format</span>(</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">" AND "</span>.join(<span class="ss">f"(</span><span class="sc">{</span>c<span class="sc">}</span><span class="ss">)"</span> <span class="cf">for</span> c <span class="kw">in</span> reglas.values())</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.table</span>(partition_cols<span class="op">=</span>[<span class="st">"is_quarantined"</span>])</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.expect_all</span>(reglas)   <span class="co"># warn: keeps metrics, doesn't filter</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> transacciones_marcadas():</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>        spark.readStream.table(<span class="st">"bronze_transacciones"</span>)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>        .withColumn(<span class="st">"is_quarantined"</span>, F.expr(condicion_cuarentena))</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.table</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> silver_transacciones():</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>        spark.readStream.table(<span class="st">"transacciones_marcadas"</span>)</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">filter</span>(<span class="st">"is_quarantined = false"</span>)</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>        .drop(<span class="st">"is_quarantined"</span>)</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a><span class="at">@dp.table</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cuarentena_transacciones():</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>        spark.readStream.table(<span class="st">"transacciones_marcadas"</span>)</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">filter</span>(<span class="st">"is_quarantined = true"</span>)</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Three design decisions worth understanding:</p>
+<ul>
+<li><strong>The flag is computed once.</strong> The <code>is_quarantined</code> column is the negation of the same rules you see in the metrics, generated from the same dictionary. There are no two lists to keep in sync.</li>
+<li><strong><code>expect_all</code> in warn mode, on purpose.</strong> Here warn is exactly what we want: per-rule metrics in the event log, no filtering, because the filtering is done by the downstream tables using the flag.</li>
+<li><strong>Partitioning by <code>is_quarantined</code></strong> means reading only the valid records (or only the quarantine) doesn’t scan the whole table.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>The quarantine is an inbox, not a dead archive
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A quarantine table that only grows is a symptom of a half-implemented pattern. The full circuit has three exits: <strong>investigate</strong> (why invalid records come in), <strong>fix</strong> (repair the source or transform the record) and <strong>reprocess</strong> (reinsert the corrected data into the flow). If nobody on your team owns that circuit, the quarantine is a drop with extra storage.</p>
+</div>
+</div>
+</section>
+<section id="what-happens-after-the-write-data-quality-monitoring" class="level2">
+<h2 class="anchored" data-anchor-id="what-happens-after-the-write-data-quality-monitoring">5. What happens after the write: Data quality monitoring</h2>
+<p>Everything above validates records <strong>on the way in</strong>. But there are quality problems no per-record check detects: the table that stopped updating yesterday, the daily volume that dropped by half, a column’s distribution that shifted without any individual row being invalid.</p>
+<p>For that, Unity Catalog brings <strong>Data quality monitoring</strong> (this suite’s data profiling is what used to be called Lakehouse Monitoring, if you had it filed under that name). It runs on already-written tables, with managed serverless compute, without touching the pipeline or modifying the monitored tables. It has two legs:</p>
+<p><strong>Anomaly detection</strong> (in Public Preview) is enabled at the schema or catalog level and watches two things across all their tables: <strong>freshness</strong> (did this table update when the commit history predicts it should have?) and <strong>completeness</strong> (does the row volume of the last 24 hours fall within the expected range given the history?). Results land in the <code>system.data_quality_monitoring.table_results</code> system table, and Catalog Explorer shows per-table health indicators. Root cause analysis runs separately: it uses Unity Catalog lineage to reason about dependencies and points to the likely source of the problem in the Root Cause column of the Data Quality Monitoring UI.</p>
+<p><strong>Data profiling</strong> is configured per table and computes descriptive statistics (nulls, distributions, quantiles) and <strong>drift metrics</strong> across time windows or against a baseline table: how much the distribution moved compared to last week or to the reference dataset. Three analysis types depending on the table (time series, inference for model outputs, snapshot), two Delta metric tables as output, and an auto-generated dashboard. It supports custom metrics and alerts on the metrics.</p>
+<p>When to use this instead of expectations? It’s not “instead”: it’s the other half.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>Tool</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Is this record valid?</td>
+<td>Expectations / DQX, in the pipeline</td>
+</tr>
+<tr class="even">
+<td>Is this table arriving on time, complete?</td>
+<td>Anomaly detection</td>
+</tr>
+<tr class="odd">
+<td>Did this column’s distribution shift?</td>
+<td>Data profiling (drift)</td>
+</tr>
+<tr class="even">
+<td>Is the model degrading its predictions?</td>
+<td>Data profiling in inference mode</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Costs and limits
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Monitoring runs on serverless and is billed under the shared serverless jobs SKU (SKU is the billing code); in <code>system.billing.usage</code> you identify it with <code>billing_origin_product = 'DATA_QUALITY_MONITORING'</code> for records from February 2026 onwards. Before enabling it on a whole catalog, try it on one schema: bulk enablement at the catalog level takes up to 50 schemas per operation, anomaly detection doesn’t monitor views or foreign tables, and data profiling only works on Delta tables.</p>
+</div>
+</div>
+</section>
+<section id="dqx-quality-for-what-lives-outside-the-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="dqx-quality-for-what-lives-outside-the-pipeline">6. DQX: quality for what lives outside the pipeline</h2>
+<p>Expectations have a clear boundary: <strong>they live in pipelines</strong> (even the standalone materialized views from section 2 are backed by a managed pipeline). The Delta tables you write with classic Spark jobs, notebooks or scripts are left out. That’s where <strong>DQX</strong> comes in, a Python framework from <a href="https://github.com/databrickslabs/dqx">Databricks Labs</a>, the umbrella of open projects Databricks publishes outside the product (I introduced it in <a href="../repos-github-databricks/">the Databricks GitHub map</a>, and it’s one of the repos I use the most: I validate data between medallion layers with it in production).</p>
+<p>DQX applies quality checks to any PySpark DataFrame, batch or streaming, and solves three things expectations don’t:</p>
+<ul>
+<li><strong>It works anywhere</strong>: pipelines, jobs, notebooks, even on a full historical table (exactly the case expectations don’t cover).</li>
+<li><strong>It tells you why each row failed</strong>: it annotates error columns with the violated rule, instead of an aggregate counter.</li>
+<li><strong>Quarantine out of the box</strong>: <code>apply_checks_and_split</code> directly returns two DataFrames, valid and quarantine, without building the pattern by hand.</li>
+</ul>
+<p>The typical flow starts with the profiler, which analyzes a sample of your data and generates candidate rules:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="op">%</span>pip install databricks<span class="op">-</span>labs<span class="op">-</span>dqx<span class="op">==</span><span class="fl">0.15.0</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.labs.dqx.profiler.profiler <span class="im">import</span> DQProfiler</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.labs.dqx.profiler.generator <span class="im">import</span> DQGenerator</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.labs.dqx.engine <span class="im">import</span> DQEngine</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> databricks.sdk <span class="im">import</span> WorkspaceClient</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>ws <span class="op">=</span> WorkspaceClient()</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>profiler <span class="op">=</span> DQProfiler(ws)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>_, perfiles <span class="op">=</span> profiler.profile(df_entrada)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Generates checks from the statistical profile. Review them before applying:</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co"># they're candidates, not truths.</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>checks <span class="op">=</span> DQGenerator(ws).generate_dq_rules(perfiles)</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Valid records on one side, quarantine on the other</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>df_validos, df_cuarentena <span class="op">=</span> DQEngine(ws).apply_checks_by_metadata_and_split(</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    df_entrada, checks</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Checks are defined as declarative metadata (a list of dictionaries or a YAML, the text format for configuration files) and can be stored in a workspace file, a Unity Catalog volume, a Delta table or a Lakebase database. It’s the same spirit as section 3: <strong>rules are data</strong>, versionable and shareable, not code buried in each job. And it closes the loop with DLT: the generator can emit the rules as expectations to use them in a pipeline.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Labs is not the product
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>DQX is pre-1.0 (v0.15.0 as of June 2026) and Databricks Labs projects come with no official support and no SLA (service level agreement): they’re maintained through pull requests and issues. The license is the Databricks License, not a license certified by the OSI (Open Source Initiative, the organization that validates open source licenses). None of that stopped me from taking it to production, but it does imply one hygiene rule: <strong>pin the version</strong> (<code>databricks-labs-dqx==0.15.0</code>) and read the changelog before bumping it, because the API still changes between releases.</p>
+</div>
+</div>
+</section>
+<section id="the-lab-rules-in-a-table-quarantine-and-metrics" class="level2">
+<h2 class="anchored" data-anchor-id="the-lab-rules-in-a-table-quarantine-and-metrics">7. The lab: rules in a table, quarantine, and metrics</h2>
+<p>The lab puts the pieces from sections 3 and 4 together in a small, verifiable pipeline: a rules table, a flow with quarantine, and the metrics query against the event log. The full walkthrough lives in <a href="https://github.com/mauroloprete/spark-de-ideas-labs/tree/main/tips/data-quality">spark-de-ideas-labs/tips/data-quality</a>.</p>
+<p><strong>Step 1: dirty data on purpose.</strong> A bronze table with 10% of known broken records: negative amounts, null customers, and a made-up currency.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">TABLE</span> lab.bronze.transacciones <span class="kw">AS</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">id</span> <span class="kw">AS</span> transaccion_id,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="kw">id</span> % <span class="dv">20</span> <span class="op">=</span> <span class="dv">0</span> <span class="cf">THEN</span> <span class="kw">NULL</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>       <span class="cf">ELSE</span> <span class="fu">concat</span>(<span class="st">'cliente_'</span>, <span class="kw">id</span> % <span class="dv">500</span>) <span class="cf">END</span>      <span class="kw">AS</span> cliente_id,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="kw">id</span> % <span class="dv">25</span> <span class="op">=</span> <span class="dv">0</span> <span class="cf">THEN</span> <span class="op">-</span><span class="dv">1</span> <span class="op">*</span> (<span class="kw">id</span> % <span class="dv">900</span>)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>       <span class="cf">ELSE</span> (<span class="kw">id</span> % <span class="dv">900</span>) <span class="op">+</span> <span class="dv">10</span> <span class="cf">END</span>                   <span class="kw">AS</span> monto,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="kw">id</span> % <span class="dv">50</span> <span class="op">=</span> <span class="dv">0</span> <span class="cf">THEN</span> <span class="st">'XXX'</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>       <span class="cf">ELSE</span> element_at(<span class="dt">array</span>(<span class="st">'UYU'</span>, <span class="st">'USD'</span>), <span class="fu">CAST</span>(<span class="dv">1</span> <span class="op">+</span> <span class="kw">id</span> % <span class="dv">2</span> <span class="kw">AS</span> <span class="dt">INT</span>)) <span class="cf">END</span> <span class="kw">AS</span> moneda,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  date_add(<span class="dt">DATE</span> <span class="st">'2026-07-01'</span>, <span class="fu">CAST</span>(<span class="kw">id</span> % <span class="dv">30</span> <span class="kw">AS</span> <span class="dt">INT</span>)) <span class="kw">AS</span> fecha</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">range</span>(<span class="dv">100000</span>) <span class="kw">AS</span> t(<span class="kw">id</span>);</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Step 2: the rules table and the pipeline.</strong> The rules DDL from section 3 and the <code>is_quarantined</code> pipeline from section 4, as is, with the lab’s real names: the source is <code>lab.bronze.transacciones</code>, the rules are read from <code>gobernanza.calidad.reglas</code>, and the pipeline (serverless, triggered) publishes to <code>lab.dq</code>. The graph: <code>bronze</code> to <code>transacciones_marcadas</code>, and from there <code>silver_transacciones</code> and <code>cuarentena_transacciones</code>. The full update took under a minute.</p>
+<p><strong>Step 3: the metrics, per rule.</strong> The same event log query from Tips #11, which here finally shows something interesting, because each rule has its own counter:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  row_exp.dataset <span class="kw">AS</span> dataset,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  row_exp.name <span class="kw">AS</span> expectation,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(row_exp.passed_records) <span class="kw">AS</span> pasan,</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SUM</span>(row_exp.failed_records) <span class="kw">AS</span> fallan</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> (</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">SELECT</span> explode(</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    from_json(</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>      details<span class="ch">:flow_progress:data_quality:expectations</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>      <span class="st">'array&lt;struct&lt;name:string, dataset:string, passed_records:int, failed_records:int&gt;&gt;'</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  ) <span class="kw">AS</span> row_exp</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  <span class="kw">FROM</span> event_log(<span class="st">'&lt;pipeline_id&gt;'</span>)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">WHERE</span> event_type <span class="op">=</span> <span class="st">'flow_progress'</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> row_exp.dataset, row_exp.name</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> fallan <span class="kw">DESC</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The output, run against the lab’s pipeline on the serverless warehouse:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>dataset                        expectation       pasan  fallan</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>lab.dq.transacciones_marcadas  cliente_presente  95000    5000</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>lab.dq.transacciones_marcadas  monto_positivo    96000    4000</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>lab.dq.transacciones_marcadas  moneda_conocida   98000    2000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Each rule with its counter, exactly the broken records we seeded in step 1: 5,000 null customers, 4,000 invalid amounts, 2,000 unknown currencies.</p>
+<p><strong>Step 4: the verification that matters.</strong> Count the rows in <code>silver_transacciones</code> plus <code>cuarentena_transacciones</code> and compare against bronze: the sum has to match exactly. That’s the pattern’s contract: nothing gets lost here.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">SELECT</span> <span class="fu">count</span>(<span class="op">*</span>) <span class="kw">FROM</span> lab.bronze.transacciones)        <span class="kw">AS</span> bronze,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">SELECT</span> <span class="fu">count</span>(<span class="op">*</span>) <span class="kw">FROM</span> lab.dq.silver_transacciones)     <span class="kw">AS</span> silver,</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">SELECT</span> <span class="fu">count</span>(<span class="op">*</span>) <span class="kw">FROM</span> lab.dq.cuarentena_transacciones) <span class="kw">AS</span> cuarentena;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>bronze  silver  cuarentena</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>100000   92000        8000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>92,000 plus 8,000 gives bronze’s 100,000, exactly. And there’s a detail that teaches more than it seems: the per-rule metrics add up to 11,000 violations, but the quarantine holds 8,000 records. It’s not an error: the metrics count <strong>violations per rule</strong> and the quarantine counts <strong>records</strong>, and one record can violate more than one rule at a time (given how we seeded the data, multiples of 50 violate two rules and multiples of 100 violate all three). If you ever audit a quality pipeline and the numbers “don’t add up”, start there.</p>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">8. Gotchas</h2>
+<p><strong>1. The rules table is read when the code is interpreted.</strong> <code>get_rules()</code> runs when the pipeline builds its graph, and the docs don’t document any re-read per microbatch. Don’t design assuming an <code>INSERT</code> into the rules table changes the behavior of a running pipeline: the guaranteed moment for a new rule to kick in is the next update.</p>
+<p><strong>2. Drop leaves no trace of the data.</strong> The metrics count how many records were discarded, but the records are nowhere. If there’s any chance you’ll be asked to see them (audits, claims, debugging), quarantine from day one: migrating later means accepting there’s a period with no evidence.</p>
+<p><strong>3. In the new API, each dataset type has its own decorator.</strong> With <code>import dlt</code>, <code>@dlt.table</code> created a streaming table or a materialized view depending on the query. In <code>from pyspark import pipelines as dp</code>, <code>@dp.table</code> is the decorator for streaming tables (with a batch query it still creates a materialized view for compatibility, but Databricks recommends <code>@dp.materialized_view</code> for that), and <code>@dlt.view</code> was renamed to <code>@dp.temporary_view</code>. Old code with <code>import dlt</code> keeps working with no migration.</p>
+<p><strong>4. The event log and billing still say “dlt”.</strong> The Lakeflow rename didn’t touch the schemas: your queries on <code>details:flow_progress</code> and the filters by <code>usage_metadata.dlt_pipeline_id</code> in the system tables don’t change.</p>
+<p><strong>5. Anomaly detection has edges.</strong> No support for views or foreign tables (<a href="../databricks-tips-15-query-federation/">the federation ones from Tips #15</a> are left out), it requires serverless available in the workspace, and bulk enablement at the catalog level goes 50 schemas per operation. If your critical table is a foreign table, automatic monitoring doesn’t reach it yet.</p>
+<p><strong>6. Data profiling has its own.</strong> Delta tables only, snapshots up to 4 TB, and the time series and inference analyses compute only the last 30 days by default. For a full historical profile you have to ask for it explicitly.</p>
+<p><strong>7. Monitoring is billed as serverless jobs.</strong> It has no SKU of its own: it shares the serverless jobs one, and in <code>system.billing.usage</code> you separate it with <code>billing_origin_product = 'DATA_QUALITY_MONITORING'</code>. Enabling it on a whole catalog is still a budget decision, not just a toggle: start with the schema that hurts the most.</p>
+<p><strong>8. DQX breaks API between releases.</strong> Pre-1.0 means the changelog is mandatory reading. Pin the version in your jobs and upgrade deliberately, not by drift of an unpinned <code>%pip install</code>.</p>
+</section>
+<section id="when-to-use-each-mechanism" class="level2">
+<h2 class="anchored" data-anchor-id="when-to-use-each-mechanism">9. When to use each mechanism</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>You need</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A hard guarantee at the table level, wherever the write comes from</td>
+<td>Delta constraints (<code>NOT NULL</code>, <code>CHECK</code>)</td>
+</tr>
+<tr class="even">
+<td>Per-record validation inside a DLT pipeline</td>
+<td>Expectations</td>
+</tr>
+<tr class="odd">
+<td>The same rules across many pipelines, no copy-paste</td>
+<td>Rules in a Delta table + <code>get_rules()</code> (section 3)</td>
+</tr>
+<tr class="even">
+<td>Keeping invalid records to investigate and reprocess</td>
+<td>Quarantine Pattern (section 4), or DQX with <code>apply_checks_and_split</code></td>
+</tr>
+<tr class="odd">
+<td>Validating DataFrames outside pipelines: jobs, notebooks, historicals</td>
+<td>DQX</td>
+</tr>
+<tr class="even">
+<td>Knowing why each row failed, rule by rule</td>
+<td>DQX</td>
+</tr>
+<tr class="odd">
+<td>Finding out a table arrived late or incomplete</td>
+<td>Anomaly detection</td>
+</tr>
+<tr class="even">
+<td>Detecting drift in distributions or model outputs</td>
+<td>Data profiling</td>
+</tr>
+<tr class="odd">
+<td>Blocking downstream when validation fails</td>
+<td>Separate pipelines coordinated by a job (expectations don’t orchestrate)</td>
+</tr>
+</tbody>
+</table>
+<p>If I had to summarize the criteria in one line: expectations and DQX validate <strong>records in motion</strong>, monitoring watches <strong>tables at rest</strong>, and Delta constraints are the seatbelt for whatever slipped past everything else.</p>
+<hr>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li><a href="https://docs.databricks.com/aws/en/ldp/expectations">Manage data quality with pipeline expectations — Databricks</a></li>
+<li><a href="https://docs.databricks.com/aws/en/ldp/expectation-patterns">Expectation recommendations and advanced patterns</a></li>
+<li><a href="https://docs.databricks.com/aws/en/ldp/developer/ldp-python-ref-expectations">Python reference: expectations (<code>dp.expect*</code>)</a></li>
+<li><a href="https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/">Data quality monitoring — Unity Catalog</a></li>
+<li><a href="https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/anomaly-detection/">Anomaly detection (Public Preview)</a></li>
+<li><a href="https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/data-profiling/">Data profiling (ex Lakehouse Monitoring)</a></li>
+<li><a href="https://docs.databricks.com/aws/en/ldp/concepts/where-is-dlt">What happened to Delta Live Tables?</a></li>
+<li><a href="https://docs.databricks.com/aws/en/release-notes/dlt/2026">Lakeflow pipelines release notes 2026</a></li>
+<li><a href="https://github.com/databrickslabs/dqx">DQX — GitHub (databrickslabs/dqx)</a></li>
+<li><a href="https://databrickslabs.github.io/dqx/">DQX — official documentation</a></li>
+<li><a href="https://docs.delta.io/latest/delta-constraints.html">Delta Lake constraints (NOT NULL / CHECK)</a></li>
+</ul>
+</section>
+<section id="other-posts-in-the-series" class="level2">
+<h2 class="anchored" data-anchor-id="other-posts-in-the-series">Other posts in the series</h2>
+<p>If this post was useful, check the previous <strong>Databricks Tips</strong>:</p>
+<ul>
+<li><a href="../databricks-asset-bundles-advanced/"><strong>Tips #1</strong>: Databricks Asset Bundles</a> — IaC for Databricks</li>
+<li><a href="../databricks-tips-01-delta-lake/"><strong>Tips #2</strong>: Delta Lake</a> — the 7 things you wish you’d known</li>
+<li><a href="../databricks-tips-02-unity-catalog/"><strong>Tips #3</strong>: Unity Catalog</a> — the governance nobody implements well</li>
+<li><a href="../databricks-tips-03-structured-streaming/"><strong>Tips #4</strong>: Structured Streaming</a> — watermarks, triggers and micro-batch</li>
+<li><a href="../databricks-tips-04-mlflow-unity-catalog/"><strong>Tips #5</strong>: MLflow + Unity Catalog</a> — from experiment to model</li>
+<li><a href="../databricks-tips-05-feature-engineering/"><strong>Tips #6</strong>: Feature Engineering</a> — features that survive production</li>
+<li><a href="../databricks-tips-06-docker-containers/"><strong>Tips #7</strong>: Docker on Databricks</a> — custom containers</li>
+<li><a href="../databricks-tips-08-jobs-workflows/"><strong>Tips #8</strong>: Jobs &amp; Workflows</a> — streaming and event-driven triggers</li>
+<li><a href="../databricks-tips-09-sql-warehouses/"><strong>Tips #9</strong>: SQL Warehouses</a> — the compute that turns itself on</li>
+<li><a href="../databricks-tips-10-ai-gateway/"><strong>Tips #10</strong>: AI Gateway</a> — centralized governance for LLMs</li>
+<li><a href="../databricks-tips-11-lakeflow-declarative-pipelines/"><strong>Tips #11</strong>: Lakeflow Declarative Pipelines</a> — declarative pipelines with built-in quality</li>
+<li><a href="../databricks-tips-12-photon/"><strong>Tips #12</strong>: Photon</a> — the C++ engine that speeds up your queries</li>
+<li><a href="../databricks-tips-13-opensharing/"><strong>Tips #13</strong>: OpenSharing</a> — sharing without copying</li>
+<li><a href="../databricks-tips-14-liquid-clustering/"><strong>Tips #14</strong>: Liquid Clustering</a> — the replacement for partitions and Z-ORDER</li>
+<li><a href="../databricks-tips-15-query-federation/"><strong>Tips #15</strong>: Query Federation</a> — querying Postgres and MySQL without moving data</li>
+</ul>
+<hr>
+<p><em>Next Tips: dbt on Databricks — SQL-first transformations on the Lakehouse, and what role is left for expectations when the tests live in dbt.</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script>
+function initScrollAnimations() {
+  var targets = document.querySelectorAll(
+    'h2, h3, .callout, .quarto-figure, .cell-output-display, ' +
+    'table, .quarto-grid-item, .card, pre.sourceCode, blockquote'
+  );
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -40px 0px'
+  });
+
+  targets.forEach(function(el) {
+    if (!el.classList.contains('fade-in')) {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    }
+  });
+}
+
+function initTocToggle() {
+  // Solo en páginas con headings de artículo (posts)
+  var headings = document.querySelectorAll('main.content h2, main.content h3');
+  if (headings.length < 2) return;
+
+  // No duplicar
+  if (document.getElementById('toc-toggle-btn')) return;
+
+  // Construir panel TOC flotante
+  var panel = document.createElement('div');
+  panel.id = 'toc-floating-panel';
+
+  var title = document.createElement('div');
+  title.className = 'panel-title';
+  title.textContent = 'En esta página';
+  panel.appendChild(title);
+
+  var list = document.createElement('ul');
+  var currentSublist = null;
+
+  headings.forEach(function(h) {
+    // Asegurar que tenga id para el anchor
+    if (!h.id) {
+      h.id = h.textContent.toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    var li = document.createElement('li');
+    var a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+
+    // Cerrar TOC al clickear un link
+    a.addEventListener('click', function() {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    });
+
+    li.appendChild(a);
+
+    if (h.tagName === 'H2') {
+      list.appendChild(li);
+      // Preparar sublista para H3s
+      currentSublist = document.createElement('ul');
+      li.appendChild(currentSublist);
+    } else if (h.tagName === 'H3' && currentSublist) {
+      currentSublist.appendChild(li);
+    }
+  });
+
+  // Limpiar sublistas vacías
+  list.querySelectorAll('ul:empty').forEach(function(ul) { ul.remove(); });
+
+  panel.appendChild(list);
+  document.body.appendChild(panel);
+
+  // Botón toggle
+  var btn = document.createElement('button');
+  btn.id = 'toc-toggle-btn';
+  btn.innerHTML = '☰';
+  btn.title = 'Mostrar/ocultar índice';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.classList.toggle('toc-visible');
+    btn.innerHTML = panel.classList.contains('toc-visible') ? '✕' : '☰';
+  });
+
+  // Cerrar al clickear fuera
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn && panel.classList.contains('toc-visible')) {
+      panel.classList.remove('toc-visible');
+      btn.innerHTML = '☰';
+    }
+  });
+}
+
+// Primera carga
+document.addEventListener("DOMContentLoaded", function() {
+  initScrollAnimations();
+  initTocToggle();
+});
+
+// Navegación interna de Quarto (SPA-like)
+window.addEventListener("quarto-page-loaded", function() {
+  initScrollAnimations();
+  // Limpiar TOC anterior si existe
+  var oldPanel = document.getElementById('toc-floating-panel');
+  var oldBtn = document.getElementById('toc-toggle-btn');
+  if (oldPanel) oldPanel.remove();
+  if (oldBtn) oldBtn.remove();
+  initTocToggle();
+});
+</script>
+<script>
+(function () {
+  var brand = document.querySelector(".navbar-brand");
+  if (!brand) return;
+
+  var rootPath = new URL(brand.getAttribute("href"), window.location.href).pathname
+    .replace(/index\.html$/, "");
+  if (!rootPath.endsWith("/")) rootPath += "/";
+
+  var path = window.location.pathname;
+  var enPrefix = rootPath + "en/";
+  var isEN = path === rootPath + "en" || path.indexOf(enPrefix) === 0;
+
+  var target = isEN
+    ? rootPath + path.slice(enPrefix.length)
+    : enPrefix + path.slice(rootPath.length);
+
+  var nav = document.querySelector(".navbar .navbar-nav");
+  if (nav) {
+    var li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML =
+      '<a class="nav-link lang-toggle" href="' + target + '" title="' +
+      (isEN ? "Versión en español" : "English version") + '"><b>' +
+      (isEN ? "ES" : "EN") + "</b></a>";
+    nav.appendChild(li);
+  }
+
+  if (!isEN) return;
+
+  var labels = {
+    "Inicio": "Home",
+    "Experiencia": "Experience",
+    "Docencia": "Teaching",
+    "Proyectos": "Projects",
+    "Certificaciones": "Certifications"
+  };
+  document.querySelectorAll(".navbar .menu-text").forEach(function (el) {
+    var t = el.textContent.trim();
+    if (labels[t]) el.textContent = labels[t];
+  });
+
+  document.querySelectorAll(".navbar a.nav-link, .navbar a.navbar-brand").forEach(function (a) {
+    if (a.classList.contains("lang-toggle")) return;
+    var href = a.getAttribute("href");
+    if (!href || /^(https?:|mailto:|#)/.test(href)) return;
+    var abs = new URL(href, window.location.href).pathname;
+    if (abs.indexOf(rootPath) === 0 && abs.indexOf(enPrefix) !== 0) {
+      a.setAttribute("href", enPrefix + abs.slice(rootPath.length));
+    }
+  });
+
+  var footer = document.querySelector(".nav-footer .nav-footer-left");
+  if (footer) {
+    footer.innerHTML = footer.innerHTML
+      .replace("Sitio hecho con", "Site built with")
+      .replace(", por Mauro Loprete. Licencia:", ", by Mauro Loprete. License:");
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/mauroloprete\.github\.io\/mauroloprete\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<input type="hidden" id="giscus-base-theme" value="light_protanopia">
+<input type="hidden" id="giscus-alt-theme" value="dark">
+<script>
+  function loadGiscus() {
+    // Function to get the theme based on body class
+    const getTheme = () => {
+      let baseTheme = document.getElementById('giscus-base-theme').value;
+      let altTheme = document.getElementById('giscus-alt-theme').value;
+      return document.body.classList.contains('quarto-dark') ? altTheme : baseTheme;
+    };
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.async = true;
+    script.dataset.repo = "mauroloprete/mauroloprete";
+    script.dataset.repoId = "R_kgDORVoiEQ";
+    script.dataset.category = "Announcements";
+    script.dataset.categoryId = "DIC_kwDORVoiEc4C_LKu";
+    script.dataset.mapping = "pathname";
+    script.dataset.reactionsEnabled = "1";
+    script.dataset.emitMetadata = "0";
+    script.dataset.inputPosition = "top";
+    script.dataset.theme = getTheme();
+    script.dataset.lang = "en";
+    script.crossOrigin = "anonymous";
+    // Append the script to the desired div instead of at the end of the body
+    document.getElementById("quarto-content").appendChild(script);
+  }
+  loadGiscus();
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sitio hecho con <a href="https://quarto.org/">Quarto</a>, por Mauro Loprete. Licencia: <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a>.</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>
