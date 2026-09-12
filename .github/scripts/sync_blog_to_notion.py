@@ -15,16 +15,6 @@ SITE_BASE_URL = os.environ.get(
     "SITE_BASE_URL", "https://mauroloprete.github.io/mauroloprete"
 )
 
-NOTION_CATEGORIES = {
-    "Databricks Tips",
-    "Data Engineering",
-    "Data Architecture",
-    "MLOps",
-    "Delta Lake",
-    "Carrera",
-    "Podcast",
-}
-
 notion = Client(auth=NOTION_API_KEY)
 
 
@@ -49,7 +39,7 @@ def slug_from_path(filepath: str) -> str:
 def find_notion_page(title: str) -> dict | None:
     response = notion.databases.query(
         database_id=NOTION_DATABASE_ID,
-        filter={"property": "Título", "title": {"equals": title.strip()}},
+        filter={"property": "Content name", "title": {"equals": title.strip()}},
     )
     results = response.get("results", [])
     return results[0] if results else None
@@ -58,34 +48,30 @@ def find_notion_page(title: str) -> dict | None:
 def build_properties(front_matter: dict, slug: str) -> dict:
     title = front_matter.get("title", "")
     categories = front_matter.get("categories", [])
-    description = front_matter.get("description", "")
     date = front_matter.get("date")
     draft = front_matter.get("draft", False)
 
-    estado = "Borrador" if draft else "Publicado"
-    tipo = "Podcast" if "Podcast" in categories else "Blog"
-
-    mapped_cats = [
-        {"name": c.strip()}
-        for c in categories
-        if c.strip() in NOTION_CATEGORIES
-    ]
+    is_podcast = "Podcast" in categories
+    status = "Drafting" if draft else "Published"
+    content_type = "Podcast (audio)" if is_podcast else "Blog article"
+    platforms = [{"name": "Blog / website"}]
+    if is_podcast:
+        platforms.append({"name": "Spotify"})
 
     properties = {
-        "Título": {"title": [{"text": {"content": title}}]},
-        "Estado": {"select": {"name": estado}},
-        "Tipo": {"select": {"name": tipo}},
-        "Categoría": {"multi_select": mapped_cats},
-        "Descripción": {"rich_text": [{"text": {"content": description}}]},
+        "Content name": {"title": [{"text": {"content": title}}]},
+        "Status": {"status": {"name": status}},
+        "Content type": {"select": {"name": content_type}},
+        "Platform": {"multi_select": platforms},
     }
 
     if not draft:
-        properties["Link Publicado"] = {
+        properties["Post URL"] = {
             "url": f"{SITE_BASE_URL}/blog/posts/{slug}/"
         }
 
     if date:
-        properties["Fecha Planificada"] = {"date": {"start": str(date)}}
+        properties["Publish date"] = {"date": {"start": str(date)}}
 
     return properties
 
