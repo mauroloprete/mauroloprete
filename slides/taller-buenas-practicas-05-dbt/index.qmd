@@ -1,0 +1,441 @@
+---
+title: "Buenas prácticas #5: dbt, el proyecto detrás de Prophecy"
+subtitle: "Taller semanal del equipo de datos · Sesión 5"
+description: "Quinta sesión del taller semanal. Qué es dbt y qué comitea Prophecy al repo: dbt_project.yml, modelos, ref() y sources, variables, macros y paquetes. Cierra con una guía concreta para las PRs: qué preguntarle a cada archivo del diff."
+author: "Mauro Loprete"
+date: "2026-09-16"
+draft: false
+image: ../spark-de-ideas-cover.jpg
+categories: [Taller, Data Engineering]
+title-slide-attributes:
+  data-visibility: hidden
+format:
+  revealjs:
+    output-file: index.html
+    smaller: true
+    css: custom.css
+    footer: "Buenas prácticas · Mauro Loprete"
+---
+
+##  {data-background-color="#1e293b" visibility="uncounted"}
+
+:::: {style="color: white; text-align: center; margin-top: 2em;"}
+[Buenas prácticas de datos]{style="color: #94a3b8; font-size: 1.1em; display: block;"}
+
+[**dbt**]{style="font-size: 2.2em; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;"}
+
+[El proyecto detrás de Prophecy]{style="color: #FFA166; font-size: 1.2em; display: block; margin-top: 0.4em;"}
+
+::: {style="margin-top: 1.5em; padding-top: 1em; border-top: 1px solid rgba(148,163,184,0.3);"}
+[Taller semanal · Sesión 5 · 30 minutos]{style="color: #94a3b8; font-size: 0.8em;"}
+
+[Mauro Loprete]{style="color: #cbd5e1; font-size: 0.9em; display: block; margin-top: 0.3em;"}
+:::
+::::
+
+::: notes
+Arranque de la segunda vuelta del taller. Cambio de plano: las sesiones 1 a 4 fueron sobre el SQL que corre; esta es sobre el proyecto que lo genera. La audiencia usa Prophecy todos los días pero nadie escribió un proyecto dbt a mano, así que el nivel es introductorio a propósito. Conviene tener abierta una PR real de Prophecy para ir señalando los archivos a medida que aparecen en las slides.
+:::
+
+## El problema: la PR que se aprueba sin leer
+
+Un diff típico de Prophecy:
+
+``` default
+modificado:  models/gold/mov_diarios.sql      ← SQL lleno de {{ llaves }}
+modificado:  models/gold/schema.yml           ← YAML que nadie escribió a mano
+modificado:  dbt_project.yml                  ← ¿esto qué era?
+nuevo:       macros/limpiar_monto.sql         ← ¿y esto?
+```
+
+- Prophecy no inventa un formato propio: lo que comitea al repo es un **proyecto dbt estándar**, más su metadata visual
+- Ese código generado corre en producción **igual que el escrito a mano**, y la PR es el único filtro antes de que corra
+
+. . .
+
+> Meta de hoy: que cada archivo del diff te diga **qué es y qué hay que mirarle**.
+
+::: notes
+Nombrar el elefante sin culpar a nadie: las PRs de Prophecy se aprueban rápido porque el diff no se entiende, no por vagancia. La causa es que el equipo diseña en el editor visual y nunca necesitó aprender el formato del proyecto que Prophecy escribe abajo. El argumento para invertir estos 30 minutos: el visual es una vista, el repo es la verdad; lo que se mergea es dbt, no gems. La metadata visual de Prophecy son archivos JSON dentro del mismo repo: se pueden ignorar en la revisión, el contenido revisable es el proyecto dbt.
+:::
+
+## Qué es dbt
+
+**dbt** viene de *data build tool*, y va en minúscula. La idea completa:
+
+> Cada transformación es un **SELECT versionado en git**. dbt lo convierte en tabla o vista, en el orden correcto, con tests.
+
+| Pieza | Quién se ocupa |
+|--------------------------------------|----------------------------------|
+| La lógica: un `SELECT` por modelo | Vos, o Prophecy por vos |
+| El DDL: `CREATE TABLE AS`, `MERGE` | dbt lo escribe |
+| El orden de ejecución | dbt lo deduce de los `ref()` |
+| Tests y documentación | Los declarás en YAML, dbt los corre |
+
+. . .
+
+- dbt **no procesa datos**: compila SQL y se lo manda a Databricks. El que trabaja es el warehouse de siempre
+
+::: notes
+La definición operativa: dbt es un compilador y orquestador de SELECTs, no un motor. Ese último bullet es la conexión con toda la serie: como dbt no ejecuta nada por su cuenta, todo lo de las sesiones 1 a 4, el Query Profile, los patrones caros, las window functions y el clustering, aplica tal cual a lo que genera. DDL por si alguien pregunta: las sentencias que crean o modifican objetos, CREATE, ALTER, DROP. El pitch de por qué existe dbt: antes de esto las transformaciones eran scripts SQL sueltos sin orden, sin tests y sin lineage; dbt les puso ingeniería de software encima.
+:::
+
+## Cómo se usa: Core, Cloud y nuestro caso
+
+- **dbt Core**: la herramienta open source de línea de comandos. Corre donde la invoques: tu máquina, un job, CI
+- **dbt Cloud**: la plataforma comercial de dbt Labs. IDE web, scheduler y ambientes, con Core adentro
+- **Nuestro caso**: Prophecy escribe el proyecto y lo comitea; los jobs lo ejecutan con Core. Nadie tipea `dbt run` a mano, pero los logs hablan este idioma:
+
+| Comando | Qué hace |
+|---------------|---------------------------------------------------------|
+| `dbt run` | Construye los modelos: crea las tablas y vistas |
+| `dbt test` | Corre los tests declarados en los YAML |
+| `dbt build` | `run` + `test`, en orden de dependencias |
+| `dbt compile` | Genera el SQL final sin ejecutar nada (vuelve al final) |
+| `dbt deps` | Instala los paquetes de `packages.yml` |
+
+::: notes
+Solo mencionar Cloud y CLI, sin profundizar: el mensaje es que dbt existe fuera de Prophecy y que el proyecto del repo se puede correr con cualquiera de los dos. Vale la pena instalar dbt Core en una máquina del equipo para la tarea de la semana: pip install dbt-databricks alcanza. Los comandos importan porque aparecen en los logs de los jobs: cuando un job falla, el error dice en qué comando y en qué modelo murió, y saber leer eso ya resuelve la mitad de los tickets.
+:::
+
+## La conexión con Databricks: dbt-databricks
+
+**dbt-databricks** es el *adapter*: el paquete que traduce lo que dbt quiere hacer al dialecto y las APIs de Databricks. La conexión vive en `profiles.yml`:
+
+``` yaml
+ventas_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      host: adb-xxxx.azuredatabricks.net
+      http_path: /sql/1.0/warehouses/abc123   # un SQL warehouse
+      catalog: dev
+      schema: analytics
+      token: "{{ env_var('DBT_TOKEN') }}"
+```
+
+- Cada `target` apunta a un **catálogo y esquema** de Unity Catalog: eso decide dónde caen los modelos, y es lo que separa dev de prod
+- Las queries salen por un **SQL warehouse**: aparecen en el Query History como cualquier otra (sesión 1)
+
+::: notes
+En Prophecy esta conexión es la fabric que se elige al correr el pipeline: fabric y target son la misma idea, un ambiente de ejecución con sus credenciales y su destino. El token del ejemplo sale de una variable de entorno a propósito: credenciales nunca van al repo; para jobs productivos la opción actual es OAuth machine-to-machine con un service principal. El punto pedagógico del catalog y schema por target: el mismo proyecto, sin tocar una línea, escribe en dev o en prod según contra qué target corra. Eso solo funciona si los modelos no hardcodean nombres, que es el anti-patrón de la slide de ref().
+:::
+
+##  {data-background-color="#dc2626"}
+
+::: {style="color: white; text-align: center;"}
+[**1**]{style="font-size: 3em; opacity: 0.4;"}
+
+### El proyecto, archivo por archivo
+
+[Lo que ves en el diff]{style="font-size: 0.9em;"}
+:::
+
+## dbt_project.yml: la cédula del proyecto
+
+``` yaml
+name: ventas_analytics
+profile: databricks
+model-paths: ["models"]
+
+vars:
+  fecha_inicio: "2020-01-01"
+
+models:
+  ventas_analytics:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+```
+
+- Uno por proyecto, en la raíz: nombre, rutas y **configuración por carpeta**
+- El bloque `models:` fija defaults en cascada: todo `staging/` sale como vista, todo `marts/` como tabla. El `+` marca que es una config
+- `vars:` define valores globales (ya llegamos)
+
+. . .
+
+> En una PR, una línea cambiada acá puede cambiar la materialización de **cuarenta modelos**. Pesa más que cualquier diff de un modelo suelto.
+
+::: notes
+La jerarquía de configuración completa, por si alguien pregunta: dbt_project.yml es el default, el YAML de la carpeta lo pisa, y el config() dentro del modelo pisa a los dos. Por eso el archivo es chico pero peligroso: opera al nivel más general. En los proyectos generados por Prophecy este archivo casi no cambia, así que cuando aparece en un diff es deliberado y merece leerse línea por línea.
+:::
+
+## Un modelo: un archivo .sql con un SELECT
+
+``` sql
+-- models/marts/mov_diarios.sql
+{{ config(materialized='table') }}
+
+SELECT cliente_id, fecha, SUM(monto) AS monto_dia
+FROM {{ ref('stg_movimientos') }}
+GROUP BY cliente_id, fecha
+```
+
+- El **nombre del archivo es el nombre del objeto** en el catálogo: `mov_diarios.sql` crea `catalogo.esquema.mov_diarios`
+- Siempre es un `SELECT`: el `CREATE TABLE AS` lo escribe dbt. Si ves DDL a mano en un modelo, algo anda mal
+- `materialized` decide qué se crea: `view` (default), `table`, o `incremental` (tema de la próxima sesión)
+- El `config()` ya lo vimos en la sesión 4: ahí declaramos `liquid_clustered_by`
+
+::: notes
+Primer archivo del diff que ya queda resuelto: un .sql bajo models/ es una tabla o vista futura, y lo primero que se le mira es la materialización. La intuición de costo: view no materializa nada y se recalcula en cada lectura; table reconstruye todo en cada corrida; incremental agrega solo lo nuevo. En los modelos generados por Prophecy cada gem del pipeline visual suele aparecer como una CTE con su nombre adentro del SELECT, así que el archivo es más largo que este ejemplo pero la estructura es la misma. Verificar antes de la sesión con un modelo nuestro y tenerlo abierto para mostrar el paralelismo gem a gem.
+:::
+
+## ref() y source(): así se arma el DAG
+
+``` sql
+FROM {{ ref('stg_movimientos') }}         -- otro modelo del proyecto
+FROM {{ source('core', 'movimientos') }}  -- tabla cruda que carga otro proceso
+```
+
+- dbt reemplaza cada llamada por el nombre completo `catalogo.esquema.tabla` **según el ambiente**: el mismo modelo lee de dev en dev y de prod en prod
+- Con esas referencias dbt arma el **DAG**, el grafo de dependencias: de ahí saca el orden de ejecución y el lineage
+
+. . .
+
+El anti-patrón que hay que cazar en las PRs:
+
+``` sql
+FROM prod.raw.movimientos    -- hardcodeado: corre, pero...
+```
+
+- Queda **fuera del DAG**: el orden ya no lo protege, el lineage miente, y en dev sigue leyendo de prod
+
+> Un `FROM` sin llaves es una bandera roja en la PR.
+
+::: notes
+La regla más rendidora de toda la sesión: en un modelo dbt, todo FROM debería ser un ref o un source. DAG ya lo conocen del Query Profile de la sesión 1; es el mismo concepto a otra escala, dependencias entre modelos en vez de operadores dentro de una query. El hardcodeo aparece cuando alguien resuelve algo rápido en el editor SQL de Prophecy y pega el nombre completo. Los tres síntomas del bullet dan para un minuto cada uno: orden no garantizado significa carreras donde el modelo lee datos viejos; lineage mentiroso significa que un impact analysis no encuentra al consumidor; y leer de prod desde dev es el clásico susto de ambientes cruzados.
+:::
+
+## sources.yml: las tablas que dbt no construye
+
+``` yaml
+version: 2
+sources:
+  - name: core
+    database: prod        # en Databricks: el catálogo
+    schema: raw
+    tables:
+      - name: movimientos
+        loaded_at_field: fecha_carga
+        freshness:
+          warn_after: {count: 24, period: hour}
+```
+
+- Declara las **tablas crudas** que ingesta otro proceso: la frontera entre nuestro proyecto y el resto del mundo
+- Es lo que `source('core', 'movimientos')` va a buscar
+- `freshness`: `dbt source freshness` avisa si la fuente lleva más de 24 horas sin datos nuevos
+
+. . .
+
+> Una source nueva en el diff es una **dependencia externa nueva**: ¿quién carga esa tabla? ¿tiene dueño?
+
+::: notes
+El nombre del archivo es convención: dbt lee cualquier YAML bajo models/, y sources.yml o schema.yml son los nombres habituales; Prophecy genera los suyos. La pregunta del cierre es la que importa en revisión: los modelos internos los protege el DAG, pero una source es una promesa de que otro equipo carga esa tabla. Si nadie firma esa promesa, el pipeline hereda un punto de falla silencioso. El freshness es la versión barata de un data contract: no evita el problema pero lo hace visible en el job en vez de en el dashboard del lunes.
+:::
+
+##  {data-background-color="#593196"}
+
+::: {style="color: white; text-align: center;"}
+[**2**]{style="font-size: 3em; opacity: 0.4;"}
+
+### Jinja
+
+[Variables, macros y paquetes]{style="font-size: 0.9em;"}
+:::
+
+## Por qué el SQL tiene llaves
+
+**Jinja** es un motor de plantillas: texto con huecos que se rellenan al compilar. dbt lo usa arriba del SQL.
+
+``` sql
+SELECT * FROM {{ ref('stg_movimientos') }}
+{% if target.name != 'prod' %}
+LIMIT 1000
+{% endif %}
+```
+
+Compilado contra dev, queda:
+
+``` sql
+SELECT * FROM dev.analytics.stg_movimientos
+LIMIT 1000
+```
+
+- `{{ ... }}` **imprime un valor**; `{% ... %}` es **control de flujo**: if, for
+- Se resuelve **antes de ejecutar**: Databricks nunca ve una llave, solo recibe el SQL final
+- `target` trae los datos del ambiente contra el que corrés: por eso el LIMIT existe solo fuera de prod
+
+::: notes
+Desdramatizar el Jinja es el objetivo de la sección: las llaves asustan porque parecen otro lenguaje, pero el 95 por ciento de lo que van a ver son ref, source, config y var, o sea las cuatro cosas de esta sesión. El modelo mental correcto: Jinja genera texto SQL, no toca datos. Todo lo que hace Jinja podría hacerse escribiendo el SQL final a mano; existe para no repetir y para que el mismo código sirva en todos los ambientes. El ejemplo del LIMIT en dev es real y útil: desarrollo barato sin tocar la lógica.
+:::
+
+## Variables: valores que viven fuera del código
+
+``` yaml
+# dbt_project.yml
+vars:
+  fecha_proceso: "2026-09-01"
+```
+
+``` sql
+-- en cualquier modelo
+WHERE fecha >= '{{ var("fecha_proceso") }}'
+```
+
+``` bash
+# override puntual, sin tocar el repo
+dbt run --vars '{fecha_proceso: "2026-01-01"}'
+```
+
+- `var("nombre", "default")`: el segundo argumento evita el error si nadie la definió
+- Uso típico: fechas de reproceso, flags, umbrales que cambian entre corridas
+- El override de la línea de comandos gana sobre el `dbt_project.yml`
+
+. . .
+
+> En la PR: si un modelo trae un **valor mágico** (una fecha, un umbral suelto), la pregunta es si debería ser una var.
+
+::: notes
+La jerarquía completa: default en el código, valor en dbt_project.yml, override por línea de comandos, y gana el más específico. El caso de uso estrella en nuestro contexto es el reproceso: en vez de editar un modelo para recargar desde una fecha, se pasa la var en la corrida y el repo no se toca. Eso convierte una PR de emergencia en un parámetro de ejecución, que es exactamente donde tiene que vivir.
+:::
+
+## Macros: funciones que generan SQL
+
+``` sql
+-- macros/limpiar_monto.sql
+{% macro limpiar_monto(col) %}
+    CAST(REPLACE({{ col }}, ',', '.') AS DECIMAL(18, 2))
+{% endmacro %}
+```
+
+``` sql
+-- en un modelo
+SELECT {{ limpiar_monto('monto_txt') }} AS monto
+```
+
+- Una macro se **expande al compilar**: el warehouse recibe el CAST, no la macro
+- La regla de negocio vive en **un solo lugar**; sin macro, ese CAST estaría copiado en veinte modelos con tres versiones distintas
+- Prophecy genera una en todos los proyectos SQL: `generate_schema_name`, que decide **en qué esquema cae cada modelo**. No se borra ni se toca sin charla previa
+
+. . .
+
+> En la PR: un diff en `macros/` alcanza a **todos los modelos que la llaman**. El radio de impacto no es el archivo, es el proyecto.
+
+::: notes
+Misma lógica que una función en cualquier lenguaje, con la diferencia de que devuelve texto SQL. La de generate_schema_name merece el minuto de detalle: dbt trae un default que concatena el esquema del target con el esquema custom usando guion bajo, tipo default_my_schema, y Prophecy lo pisa con una versión directa que usa el esquema tal cual se declaró en el gem. Está documentado en la doc de Prophecy y si alguien la borra por accidente los modelos caen en esquemas con nombres concatenados raros. Es el ejemplo perfecto de macro con radio de impacto total: una función de diez líneas que decide dónde escribe todo el proyecto.
+:::
+
+## packages.yml: código de otros
+
+``` yaml
+packages:
+  - package: dbt-labs/dbt_utils
+    version: 1.3.0
+```
+
+- Dependencias del proyecto, como un `requirements.txt`: `dbt deps` las instala en `dbt_packages/`
+- `dbt_utils` es el paquete estrella: tests genéricos y macros que evitan reinventar (deduplicación, pivots, comparar esquemas)
+- Lo instalado en `dbt_packages/` es **código de terceros**: no se revisa, no se edita, y no debería estar comiteado
+- En Prophecy los paquetes se agregan como *dependencies* del proyecto y sus macros aparecen en el gem de macros
+
+. . .
+
+> En la PR: ¿la **versión está fijada**? Un paquete sin versión fija es un deploy distinto cada vez que corre `dbt deps`.
+
+::: notes
+El paralelo con requirements.txt o package.json ordena la slide entera: mismo concepto, mismo riesgo, misma regla de fijar versiones. Los paquetes se buscan en hub.getdbt.com. Si en nuestros repos aparece dbt_packages comiteado conviene limpiarlo y agregarlo al gitignore, mismo tratamiento que node_modules. dbt_utils da para mencionar dos o tres macros concretas si hay tiempo: deduplicate, que es el ROW_NUMBER de la sesión 3 empaquetado, y los tests genéricos como expression_is_true.
+:::
+
+##  {data-background-color="#1e293b"}
+
+::: {style="color: white; text-align: center;"}
+[**3**]{style="font-size: 3em; opacity: 0.4;"}
+
+### La PR
+
+[Qué preguntarle a cada archivo]{style="font-size: 0.9em;"}
+:::
+
+## El checklist, archivo por archivo
+
+| Archivo en el diff | La pregunta que hay que hacerle |
+|------------------------|-----------------------------------------------|
+| `models/*.sql` nuevo | ¿Materialización razonable? ¿Todos los `FROM` con `ref()` o `source()`? |
+| `models/*.yml` | ¿El modelo nuevo trae tests y descripción, o vino pelado? |
+| `dbt_project.yml` | ¿Qué config global cambió y a cuántos modelos alcanza? |
+| `macros/*.sql` | ¿Quién más llama esta macro? El impacto es el proyecto entero |
+| `packages.yml` | ¿Versión fijada? ¿Para qué se necesita el paquete? |
+| Metadata de Prophecy (`.json`) | Nada: es la vista visual, no se revisa a mano |
+
+. . .
+
+> El SQL generado se revisa **igual que el escrito a mano**: los patrones de las sesiones 2 y 3 (`SELECT *` final, `DISTINCT` sospechoso, ventanas sin `PARTITION BY`) aplican tal cual.
+
+::: notes
+La slide que resume la sesión: seis tipos de archivo, seis preguntas. Aclarar que esto es la introducción: la próxima sesión es entera de PRs, con revisión guiada de casos reales del equipo, así que hoy alcanza con que el checklist se entienda, no hace falta dominarlo. La cita del final conecta la serie completa: que el SQL lo haya generado una herramienta no le da inmunidad, y de hecho el SQL generado es donde más aparecen el DISTINCT de más y el SELECT * arrastrado, porque nadie lo leyó nunca. La propuesta de convertir la tabla en template de descripción de PR del repo queda para la sesión que viene.
+:::
+
+## dbt compile: ver el SQL de verdad
+
+``` bash
+dbt compile --select mov_diarios
+# → target/compiled/ventas_analytics/models/marts/mov_diarios.sql
+```
+
+- Genera el SQL **con todo el Jinja resuelto**: sin llaves, sin macros, nombres completos. Eso es exactamente lo que ejecuta el warehouse
+- No corre nada contra los datos: es seguro compilar lo que sea
+- Además dbt marca cada query con un **comentario JSON** al inicio: en el Query History se ve qué modelo y qué corrida la generaron
+
+. . .
+
+> Cuando la PR no se entiende, **compilá**: el SQL final no tiene magia. Y ese SQL es el que se analiza con el Query Profile de la sesión 1.
+
+::: notes
+El puente final con la serie: compile produce el artefacto que las sesiones 1 a 4 enseñaron a leer. El flujo completo de diagnóstico queda así: modelo lento, se busca la query en el Query History filtrando por el comentario de dbt que trae el node_id del modelo, se abre el profile, y se razona con las herramientas de las sesiones anteriores. Demo en vivo si el tiempo alcanza: compilar un modelo real del proyecto y mostrar el antes y después del Jinja, en particular cómo un ref se convierte en el nombre completo del catálogo según el target.
+:::
+
+## Para esta semana
+
+1.  Abrí la **última PR mergeada** de Prophecy y ponele nombre a cada archivo del diff con el checklist de hoy
+2.  Elegí un modelo y mirá su **SQL compilado** (en `target/compiled/` del job, o corriendo `dbt compile`): compará contra lo que aparece en el Query History
+3.  Buscá un `FROM` **sin llaves** en los modelos y proponé el `ref()` o `source()` que corresponde
+4.  Bonus: abrí `macros/generate_schema_name.sql` del proyecto y explicá con tus palabras qué hace
+
+. . .
+
+> Si encontrás un hardcodeo en el punto 3, no lo arregles todavía: traelo a la próxima sesión, que el impacto de tocarlo se conversa.
+
+::: notes
+Tarea deliberadamente de lectura, no de escritura: el objetivo de la sesión era entender lo que se revisa, así que la práctica es revisar. El punto 3 casi seguro encuentra algo, porque los hardcodeos existen en cualquier proyecto con historia. La advertencia final es en serio: cambiar un FROM hardcodeado por un ref puede cambiar de qué ambiente lee el modelo, así que es un cambio de comportamiento, no cosmético.
+:::
+
+##  {data-background-color="#1e293b"}
+
+:::: {style="color: white; text-align: center; margin-top: 2em;"}
+[Próxima sesión]{style="color: #94a3b8; font-size: 0.9em; display: block;"}
+
+[**La PR, a fondo**]{style="font-size: 1.8em; font-weight: 700;"}
+
+[El checklist de hoy convertido en método: revisión guiada de PRs reales del equipo, dbt compile en vivo y qué pedir antes de aprobar]{style="color: #94a3b8; font-size: 0.85em; display: block; margin-top: 0.6em; padding: 0 2em;"}
+
+::: {style="margin-top: 2em; padding-top: 1em; border-top: 1px solid rgba(148,163,184,0.3);"}
+[¿Preguntas? · Mauro Loprete]{style="color: #cbd5e1; font-size: 0.8em;"}
+:::
+::::
+
+::: notes
+Hoy la PR se presentó a nivel introducción; la próxima sesión es entera de eso: agarrar dos o tres PRs reales del equipo y revisarlas en vivo con el checklist, compilar los modelos tocados, y acordar qué se le pide a una PR antes de aprobarla. Lo que traiga el equipo de la tarea de esta semana es el insumo directo. Para más adelante queda el otro candidato fuerte: modelos incrementales, con is_incremental, la estrategia de merge del adapter y el full refresh.
+:::
+
+## Referencias {visibility="uncounted"}
+
+- [What is dbt? — doc oficial de dbt](https://docs.getdbt.com/docs/introduction)
+- [dbt_project.yml — referencia oficial](https://docs.getdbt.com/reference/dbt_project.yml)
+- [Sources — doc oficial de dbt](https://docs.getdbt.com/docs/build/sources)
+- [Jinja y macros — doc oficial de dbt](https://docs.getdbt.com/docs/build/jinja-macros)
+- [Packages — doc oficial de dbt](https://docs.getdbt.com/docs/build/packages)
+- [Conectar dbt Core a Databricks — doc oficial de Databricks](https://docs.databricks.com/aws/en/partners/prep/dbt)
+- [dbt-databricks — repo del adapter](https://github.com/databricks/dbt-databricks)
+- [generate_schema_name en proyectos SQL — doc de Prophecy](https://docs.prophecy.ai/data-analysis/development/extensibility/generate-schema-name)
