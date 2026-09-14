@@ -1,9 +1,9 @@
 ---
-title: "Buenas prácticas #5: dbt, el proyecto detrás de Prophecy"
-subtitle: "Taller semanal del equipo de datos · Sesión 5"
-description: "Quinta sesión del taller semanal. Qué es dbt y qué comitea Prophecy al repo: dbt_project.yml, modelos, ref() y sources, variables, macros y paquetes. Cierra con una guía concreta para las PRs: qué preguntarle a cada archivo del diff."
+title: "Buenas prácticas #5: dbt, la herramienta detrás de Prophecy"
+subtitle: "Sesión 5"
+description: "Quinta sesión del taller semanal. Qué es dbt y que archivos genera Prophecy en el repo."
 author: "Mauro Loprete"
-date: "2026-09-16"
+date: "2026-09-14"
 draft: false
 image: ../spark-de-ideas-cover.jpg
 categories: [Taller, Data Engineering]
@@ -14,49 +14,165 @@ format:
     output-file: index.html
     smaller: true
     css: custom.css
-    footer: "Buenas prácticas · Mauro Loprete"
+    footer: "Buenas prácticas"
 ---
 
 ##  {data-background-color="#1e293b" visibility="uncounted"}
 
 :::: {style="color: white; text-align: center; margin-top: 2em;"}
-[Buenas prácticas de datos]{style="color: #94a3b8; font-size: 1.1em; display: block;"}
+[Buenas practicas DBX]{style="color: #94a3b8; font-size: 1.1em; display: block;"}
 
 [**dbt**]{style="font-size: 2.2em; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;"}
 
-[El proyecto detrás de Prophecy]{style="color: #FFA166; font-size: 1.2em; display: block; margin-top: 0.4em;"}
+[La tecnología detrás de Prophecy]{style="color: #FFA166; font-size: 1.2em; display: block; margin-top: 0.4em;"}
 
 ::: {style="margin-top: 1.5em; padding-top: 1em; border-top: 1px solid rgba(148,163,184,0.3);"}
-[Taller semanal · Sesión 5 · 30 minutos]{style="color: #94a3b8; font-size: 0.8em;"}
+[Taller semanal · Sesión 5]{style="color: #94a3b8; font-size: 0.8em;"}
 
 [Mauro Loprete]{style="color: #cbd5e1; font-size: 0.9em; display: block; margin-top: 0.3em;"}
 :::
 ::::
 
 ::: notes
-Arranque de la segunda vuelta del taller. Cambio de plano: las sesiones 1 a 4 fueron sobre el SQL que corre; esta es sobre el proyecto que lo genera. La audiencia usa Prophecy todos los días pero nadie escribió un proyecto dbt a mano, así que el nivel es introductorio a propósito. Conviene tener abierta una PR real de Prophecy para ir señalando los archivos a medida que aparecen en las slides.
+Arranque de la segunda vuelta del taller. Cambio de plano: las sesiones 1 a 4 fueron sobre el SQL que corre; esta es sobre el proyecto que lo genera. Si bien ya sabemos usar Prophecy, para entender lo que pasa por debajo necesitamos conocer un poco mas de DBT, ya sea para pensar nuevas soluciones, revisar correctamente los diffs y para entender las herramientas que estamos usando desde que plasmamos la lógica en el IDE hasta que termina en producción.
 :::
 
-## El problema: la PR que se aprueba sin leer
 
-Un diff típico de Prophecy:
+## Cómo funciona Prophecy: el camino feliz
 
-``` default
-modificado:  models/gold/mov_diarios.sql      ← SQL lleno de {{ llaves }}
-modificado:  models/gold/schema.yml           ← YAML que nadie escribió a mano
-modificado:  dbt_project.yml                  ← ¿esto qué era?
-nuevo:       macros/limpiar_monto.sql         ← ¿y esto?
+Lo que dibujás en el lienzo nunca corre tal cual: **se compila dos veces** antes de tocar un dato.
+
+```{=html}
+<div class="flow">
+  <div class="step prophecy"><span class="t">Gems visuales</span><span class="s">se persisten como JSON en <code>.prophecy/</code></span></div>
+  <div class="arrow">→</div>
+  <div class="step prophecy"><span class="t">Compilador de Prophecy</span><span class="s">traduce cada gem a SQL + YAML</span></div>
+  <div class="arrow">→</div>
+  <div class="step dbt"><span class="t">Proyecto dbt</span><span class="s">lo que se comitea y se revisa en la PR</span></div>
+  <div class="arrow">→</div>
+  <div class="step"><span class="t">Compilación dbt</span><span class="s">resuelve Jinja, <code>ref()</code> y el orden</span></div>
+  <div class="arrow">→</div>
+  <div class="step"><span class="t">Warehouse</span><span class="s">Databricks ejecuta el SQL final</span></div>
+</div>
 ```
 
-- Prophecy no inventa un formato propio: lo que comitea al repo es un **proyecto dbt estándar**, más su metadata visual
-- Ese código generado corre en producción **igual que el escrito a mano**, y la PR es el único filtro antes de que corra
+- El editor visual es una **vista**: la verdad que corre en producción es el proyecto del repo
+- De la caja naranja en adelante ya no hay nada de Prophecy: es **dbt estándar**, el tema del resto de la sesión
 
 . . .
 
-> Meta de hoy: que cada archivo del diff te diga **qué es y qué hay que mirarle**.
+> Todo lo que mergeás y todo lo que corre en producción sale de la **caja naranja**, no del lienzo.
 
 ::: notes
-Nombrar el elefante sin culpar a nadie: las PRs de Prophecy se aprueban rápido porque el diff no se entiende, no por vagancia. La causa es que el equipo diseña en el editor visual y nunca necesitó aprender el formato del proyecto que Prophecy escribe abajo. El argumento para invertir estos 30 minutos: el visual es una vista, el repo es la verdad; lo que se mergea es dbt, no gems. La metadata visual de Prophecy son archivos JSON dentro del mismo repo: se pueden ignorar en la revisión, el contenido revisable es el proyecto dbt.
+Este es el mapa de toda la sesión: dos compiladores encadenados. El primero es de Prophecy y es opaco; el segundo es dbt y es abierto, documentado y estándar. La caja naranja es la bisagra: ahí termina la parte propietaria y empieza la parte que cualquiera puede leer, correr y auditar. Recalcar que el JSON de .prophecy/ y el proyecto dbt viven en el mismo repo y viajan juntos en cada commit: por eso los diffs traen ambos. Si bien ya sabemos usar Prophecy, entender este camino sirve para pensar soluciones nuevas, revisar bien los diffs y saber qué pasa desde que la lógica se plasma en el IDE hasta que llega a producción.
+:::
+
+## El desvío: gems que no compilan a SQL
+
+Las gems con conexiones externas (Excel en SharePoint, archivos en Volumes, otras bases) no se pueden traducir a un `SELECT`: toman otro camino.
+
+```{=html}
+<div class="flow">
+  <div class="step prophecy"><span class="t">Gem con conexión externa</span><span class="s">SharePoint · Volumes · bases externas</span></div>
+  <div class="arrow slow">→</div>
+  <div class="step slow"><span class="t">Orquestador de Prophecy</span><span class="s">código propietario, fuera de dbt</span></div>
+  <div class="arrow slow">→</div>
+  <div class="step slow"><span class="t">Tabla temporal</span><span class="s">escribe el dato en el warehouse</span></div>
+  <div class="arrow">→</div>
+  <div class="step dbt"><span class="t">Proyecto dbt</span><span class="s">la referencia como una tabla más</span></div>
+</div>
+```
+
+- El tramo rojo levanta el orquestador y abre la conexión antes de mover un solo dato: el costo es **de arranque, no de volumen**. Leer un Excel de 5 filas puede tardar más de 2 minutos
+- Prophecy resuelve esas dependencias por su cuenta: el dato entra al proyecto dbt ya materializado como tabla
+- Es el tramo que **job_generator** todavía no cubre: para generar esos jobs hay que parsear esa lógica propietaria
+
+. . .
+
+> Pipeline lento: antes de mirar el SQL, preguntate **en qué camino** están sus gems. El rojo cuesta caro aunque el dato sea chico.
+
+::: notes
+La pregunta que esta slide responde: por qué gems que parecen triviales tardan minutos. La respuesta es que no son SQL: son código propietario que corre en el orquestador de Prophecy, con costo fijo de arranque y conexión que no depende del tamaño del dato. El ejemplo del Excel de 5 filas y más de 2 minutos es real y conviene contarlo. Segundo mensaje: este tramo es la razón por la que job_generator todavía no cubre todos los casos de uso; para eso hay que parsear la lógica propietaria, y es trabajo pendiente de la herramienta. Cierre: una vez que el dato aterriza en la tabla temporal, el resto vuelve a ser el camino feliz de la slide anterior.
+:::
+
+## Los mensajes del Prophecy IDE
+
+Los carteles que el Studio muestra mientras editás son estas mismas etapas, contadas en vivo:
+
+```{=html}
+<div class="studio-msgs">
+  <div class="smsg s"><span class="dot"></span><span class="mtxt">Initializing project</span><span class="mnote">carga los archivos del proyecto y prepara el editor</span><span class="chip st-studio">Studio</span></div>
+  <div class="smsg p"><span class="dot"></span><span class="mtxt">Processing changes</span><span class="mnote">detecta qué archivos dependen de tu cambio y los actualiza</span><span class="chip st-prophecy">Prophecy</span></div>
+  <div class="smsg p"><span class="dot"></span><span class="mtxt">Generating code</span><span class="mnote">traduce las gems a SQL + YAML: acá se escribe el proyecto dbt</span><span class="chip st-prophecy">Prophecy</span></div>
+  <div class="smsg p"><span class="dot"></span><span class="mtxt">Compiling</span><span class="mnote">calcula el esquema de salida de cada gem</span><span class="chip st-prophecy">Prophecy</span></div>
+  <div class="smsg d"><span class="dot"></span><span class="mtxt">DBT initialization</span><span class="mnote">prepara el sandbox de dbt y compila los modelos</span><span class="chip st-dbt">dbt</span></div>
+  <div class="smsg a"><span class="dot"></span><span class="mtxt">Running</span><span class="mnote">orquesta la corrida y sus dependencias</span><span class="chip st-automate">Automate</span></div>
+  <div class="smsg w"><span class="dot"></span><span class="mtxt">Running query in warehouse</span><span class="mnote">el SQL final corre en Databricks: visible en el Query History</span><span class="chip st-wh">Warehouse</span></div>
+</div>
+```
+
+- Lo que no es SQL corre por **Prophecy Automate**: es el orquestador del camino rojo
+- Cuanto más grande el proyecto (más gems, más dependencias), más duran estos carteles
+
+. . .
+
+
+## El problema: la PR que se aprueba sin leer
+
+Un diff típico de Prophecy: seis archivos que nadie escribió a mano.
+
+```{=html}
+<div class="pr-files">
+  <div class="pr-file mod"><span class="st">M</span><span class="path">prophecy/PROJECT_1/models/PIPELINE_1/<b>mov_diarios.sql</b></span><span class="chip modelo">Modelo · SQL</span></div>
+  <div class="pr-file mod"><span class="st">M</span><span class="path">prophecy/PROJECT_1/models/PIPELINE_1/<b>schema.yml</b></span><span class="chip tests">Tests y docs</span></div>
+  <div class="pr-file mod"><span class="st">M</span><span class="path">prophecy/PROJECT_1/<b>dbt_project.yml</b></span><span class="chip config">Config global</span></div>
+  <div class="pr-file mod"><span class="st">M</span><span class="path">prophecy/PROJECT_1/.prophecy/models/PIPELINE_1/<b>mov_diarios.json</b></span><span class="chip meta">Metadata visual</span></div>
+  <div class="pr-file mod"><span class="st">M</span><span class="path">prophecy/PROJECT_1/.prophecy/pipeline/<b>PIPELINE_1.json</b></span><span class="chip meta">Metadata visual</span></div>
+  <div class="pr-file new"><span class="st">N</span><span class="path">prophecy/PROJECT_1/macros/<b>limpiar_monto.sql</b></span><span class="chip macro">Macro</span></div>
+</div>
+```
+
+. . .
+
+> Todo esto corre en producción **igual que el código escrito a mano**, y la PR es el único filtro antes de que corra.
+
+::: notes
+Nombrar el elefante sin culpar a nadie: las PRs de Prophecy se aprueban rápido porque el diff no se entiende, no por vagancia. La causa es que el equipo diseña en el editor visual y nunca necesitó aprender el formato del proyecto que Prophecy escribe abajo. El argumento para invertir estos 30 minutos: el visual es una vista, el repo es la verdad; lo que se mergea es dbt, no gems. Dejar que el diff intimide un momento antes de pasar a la siguiente slide, que lo ordena en dos mitades.
+:::
+
+## La regla: el diff tiene dos mitades
+
+Prophecy no inventa un formato propio: comitea un **proyecto dbt estándar** más la **metadata del lienzo**.
+
+```{=html}
+<div class="halves">
+  <div class="half yes">
+    <div class="h-head"><span>El proyecto dbt</span><span class="tag">SE REVISA</span></div>
+    <div class="h-body">
+      <div class="h-row"><span class="chip modelo">Modelo · SQL</span><span class="lbl">la lógica que corre</span></div>
+      <div class="h-row"><span class="chip tests">Tests y docs</span><span class="lbl">lo que protege al dato</span></div>
+      <div class="h-row"><span class="chip config">Config global</span><span class="lbl">alcance: el proyecto entero</span></div>
+      <div class="h-row"><span class="chip macro">Macro</span><span class="lbl">una función, muchos modelos</span></div>
+      <div class="h-row"><span class="chip pkg">Dependencias</span><span class="lbl">código de terceros</span></div>
+    </div>
+  </div>
+  <div class="half no">
+    <div class="h-head"><span>La metadata visual</span><span class="tag">NO SE REVISA A MANO</span></div>
+    <div class="h-body">
+      <div class="h-row"><span class="chip meta">models/*.json</span><span class="lbl">cada gem, editable en el lienzo</span></div>
+      <div class="h-row"><span class="chip meta">pipeline/*.json</span><span class="lbl">conexiones, dependencias, parámetros</span></div>
+      <div class="h-note">El chequeo es de presencia: que ningún JSON falte ni se renombre. La lógica se revisa en el SQL de al lado.</div>
+    </div>
+  </div>
+</div>
+```
+
+. . .
+
+> Meta de hoy: que cada archivo del diff te diga **qué es**. La próxima sesión: qué preguntarle a cada uno, con un diff de ejemplo por cada color.
+
+::: notes
+La regla para llevarse aunque se olvide todo lo demás: todo diff de Prophecy se parte en dos mitades. La izquierda es el proyecto dbt, lo que el compilador escribió para que corra en producción: eso se revisa; hoy aprendemos qué es cada tipo y la sesión 6 enseña qué preguntarle. La derecha es lo que Prophecy guardó para poder redibujar el lienzo: no se lee línea a línea, solo se chequea que ningún archivo desaparezca. Los colores de los chips son el mapa de la serie: cada uno vuelve en la sesión 6 con un diff real de ejemplo y la pregunta que hay que hacerle.
 :::
 
 ## Qué es dbt
@@ -91,11 +207,25 @@ La definición operativa: dbt es un compilador y orquestador de SELECTs, no un m
 | `dbt run` | Construye los modelos: crea las tablas y vistas |
 | `dbt test` | Corre los tests declarados en los YAML |
 | `dbt build` | `run` + `test`, en orden de dependencias |
-| `dbt compile` | Genera el SQL final sin ejecutar nada (vuelve al final) |
+| `dbt compile` | Genera el SQL final sin ejecutar nada (protagonista de la sesión 6) |
 | `dbt deps` | Instala los paquetes de `packages.yml` |
 
 ::: notes
 Solo mencionar Cloud y CLI, sin profundizar: el mensaje es que dbt existe fuera de Prophecy y que el proyecto del repo se puede correr con cualquiera de los dos. Vale la pena instalar dbt Core en una máquina del equipo para la tarea de la semana: pip install dbt-databricks alcanza. Los comandos importan porque aparecen en los logs de los jobs: cuando un job falla, el error dice en qué comando y en qué modelo murió, y saber leer eso ya resuelve la mitad de los tickets.
+:::
+
+## Qué NO hace dbt
+
+- dbt **solo genera SQL**: no lee archivos, no abre conexiones, no mueve datos por su cuenta. Transforma lo que ya existe como tabla o lo que Databricks alcanza con SQL (Volumes, conexiones federadas)
+- La ingesta la resuelven otras herramientas. La clásica del stack es **Fivetran**: tan de la mano van que hoy son la misma empresa (dbt Labs y Fivetran se fusionaron en 2025)
+- Databricks tiene su propia apuesta: **Lakeflow Connect** (conectores propios, donde antes dependía de Fivetran) y **Spark Declarative Pipelines** (lo que antes era DLT, Delta Live Tables). Y en Beta, un editor visual estilo Prophecy: misma idea, JSON que compila a código SDP en SQL o PySpark
+
+. . .
+
+> La regla: si el dato no se alcanza con un `SELECT` desde el warehouse, no es un problema de dbt. Es un problema de ingesta.
+
+::: notes
+La frontera que ordena el deck: dbt empieza donde el dato ya es consultable con SQL desde Databricks. Cierra el círculo con la slide del desvío: las gems con código propietario existen precisamente porque dbt no puede ir a buscar un Excel a SharePoint. Y conecta con sources.yml, que viene más adelante: las sources son cómo dbt declara esa frontera, tablas que otro proceso carga y el proyecto solo consume. La fusión Fivetran + dbt Labs se anunció en octubre de 2025; el pitch de ellos es cubrir ingesta y transformación en un solo stack. El editor visual de Databricks en Beta es Lakeflow Designer: vale la pena el paralelismo con Prophecy porque la arquitectura es la misma que la de esta sesión, metadata visual que compila a código abierto que corre en el cluster, o sea que todo lo de hoy aplica igual si algún día se migra de herramienta.
 :::
 
 ## La conexión con Databricks: dbt-databricks
@@ -103,7 +233,7 @@ Solo mencionar Cloud y CLI, sin profundizar: el mensaje es que dbt existe fuera 
 **dbt-databricks** es el *adapter*: el paquete que traduce lo que dbt quiere hacer al dialecto y las APIs de Databricks. La conexión vive en `profiles.yml`:
 
 ``` yaml
-ventas_analytics:
+prophecy-profile:
   target: dev
   outputs:
     dev:
@@ -135,7 +265,7 @@ En Prophecy esta conexión es la fabric que se elige al correr el pipeline: fabr
 ## dbt_project.yml: la cédula del proyecto
 
 ``` yaml
-name: ventas_analytics
+name: PROJECT_1
 profile: databricks
 model-paths: ["models"]
 
@@ -143,7 +273,7 @@ vars:
   fecha_inicio: "2020-01-01"
 
 models:
-  ventas_analytics:
+  PROJECT_1:
     staging:
       +materialized: view
     marts:
@@ -175,11 +305,15 @@ GROUP BY cliente_id, fecha
 
 - El **nombre del archivo es el nombre del objeto** en el catálogo: `mov_diarios.sql` crea `catalogo.esquema.mov_diarios`
 - Siempre es un `SELECT`: el `CREATE TABLE AS` lo escribe dbt. Si ves DDL a mano en un modelo, algo anda mal
-- `materialized` decide qué se crea: `view` (default), `table`, o `incremental` (tema de la próxima sesión)
+- `materialized` decide qué se crea: `view` (default), `table`, o `incremental` (tema de una próxima sesión)
 - El `config()` ya lo vimos en la sesión 4: ahí declaramos `liquid_clustered_by`
 
+. . .
+
+> **Una tabla = un modelo = un dueño.** dbt reconstruye la tabla entera desde su `SELECT` en cada corrida: por eso dos pipelines **no pueden escribir la misma tabla**, el segundo pisaría al primero.
+
 ::: notes
-Primer archivo del diff que ya queda resuelto: un .sql bajo models/ es una tabla o vista futura, y lo primero que se le mira es la materialización. La intuición de costo: view no materializa nada y se recalcula en cada lectura; table reconstruye todo en cada corrida; incremental agrega solo lo nuevo. En los modelos generados por Prophecy cada gem del pipeline visual suele aparecer como una CTE con su nombre adentro del SELECT, así que el archivo es más largo que este ejemplo pero la estructura es la misma. Verificar antes de la sesión con un modelo nuestro y tenerlo abierto para mostrar el paralelismo gem a gem.
+Primer archivo del diff que ya queda resuelto: un .sql bajo models/ es una tabla o vista futura, y lo primero que se le mira es la materialización. La intuición de costo: view no materializa nada y se recalcula en cada lectura; table reconstruye todo en cada corrida; incremental agrega solo lo nuevo. En los modelos generados por Prophecy cada gem del pipeline visual suele aparecer como una CTE con su nombre adentro del SELECT, así que el archivo es más largo que este ejemplo pero la estructura es la misma. Verificar antes de la sesión con un modelo nuestro y tenerlo abierto para mostrar el paralelismo gem a gem. La cita final responde la queja clásica del equipo, cómo que varios pipelines no pueden escribir la misma tabla: en dbt la tabla no es un lugar al que se le agregan filas, es el resultado materializado de un único SELECT versionado; cada corrida la reconstruye desde ese modelo (o mergea lo nuevo si es incremental, pero siempre desde el mismo modelo), así que cualquier otro escritor queda pisado. Si dos flujos necesitan aportar filas a la misma tabla, el patrón correcto es que cada uno sea su propio modelo y un tercero los una con UNION ALL: el DAG y el lineage siguen diciendo la verdad y nadie pisa a nadie.
 :::
 
 ## ref() y source(): así se arma el DAG
@@ -338,77 +472,60 @@ packages:
 - Dependencias del proyecto, como un `requirements.txt`: `dbt deps` las instala en `dbt_packages/`
 - `dbt_utils` es el paquete estrella: tests genéricos y macros que evitan reinventar (deduplicación, pivots, comparar esquemas)
 - Lo instalado en `dbt_packages/` es **código de terceros**: no se revisa, no se edita, y no debería estar comiteado
-- En Prophecy los paquetes se agregan como *dependencies* del proyecto y sus macros aparecen en el gem de macros
+- En Prophecy nadie edita este archivo a mano: se agrega desde **Dependencies** en los settings del proyecto, y lo elegido aterriza acá
+- Tres orígenes: otros proyectos Prophecy (Package Hub), repos de **GitHub** (fijados por tag, commit o branch) y paquetes del **dbt Hub**, cuyas macros quedan disponibles en el gem de Macro
 
 . . .
 
 > En la PR: ¿la **versión está fijada**? Un paquete sin versión fija es un deploy distinto cada vez que corre `dbt deps`.
 
 ::: notes
-El paralelo con requirements.txt o package.json ordena la slide entera: mismo concepto, mismo riesgo, misma regla de fijar versiones. Los paquetes se buscan en hub.getdbt.com. Si en nuestros repos aparece dbt_packages comiteado conviene limpiarlo y agregarlo al gitignore, mismo tratamiento que node_modules. dbt_utils da para mencionar dos o tres macros concretas si hay tiempo: deduplicate, que es el ROW_NUMBER de la sesión 3 empaquetado, y los tests genéricos como expression_is_true.
+El paralelo con requirements.txt o package.json ordena la slide entera: mismo concepto, mismo riesgo, misma regla de fijar versiones. Los paquetes se buscan en hub.getdbt.com. Si en nuestros repos aparece dbt_packages comiteado conviene limpiarlo y agregarlo al gitignore, mismo tratamiento que node_modules. dbt_utils da para mencionar dos o tres macros concretas si hay tiempo: deduplicate, que es el ROW_NUMBER de la sesión 3 empaquetado, y los tests genéricos como expression_is_true. Lado Prophecy, según su doc de dependencies (link en referencias): se gestionan desde los settings del proyecto o el engranaje de la sección Packages de la barra lateral, lo agregado aparece en esa barra para arrastrar al lienzo, y para dependencias de GitHub existe el flag warn unpinned, que avisa cuando el puntero no tiene versión: la misma regla del cierre, avisada por la propia herramienta.
 :::
 
-##  {data-background-color="#1e293b"}
+## Cómo encaja todo: del modelo al warehouse
 
-::: {style="color: white; text-align: center;"}
-[**3**]{style="font-size: 3em; opacity: 0.4;"}
-
-### La PR
-
-[Qué preguntarle a cada archivo]{style="font-size: 0.9em;"}
-:::
-
-## El checklist, archivo por archivo
-
-| Archivo en el diff | La pregunta que hay que hacerle |
-|------------------------|-----------------------------------------------|
-| `models/*.sql` nuevo | ¿Materialización razonable? ¿Todos los `FROM` con `ref()` o `source()`? |
-| `models/*.yml` | ¿El modelo nuevo trae tests y descripción, o vino pelado? |
-| `dbt_project.yml` | ¿Qué config global cambió y a cuántos modelos alcanza? |
-| `macros/*.sql` | ¿Quién más llama esta macro? El impacto es el proyecto entero |
-| `packages.yml` | ¿Versión fijada? ¿Para qué se necesita el paquete? |
-| Metadata de Prophecy (`.json`) | Nada: es la vista visual, no se revisa a mano |
-
-. . .
-
-> El SQL generado se revisa **igual que el escrito a mano**: los patrones de las sesiones 2 y 3 (`SELECT *` final, `DISTINCT` sospechoso, ventanas sin `PARTITION BY`) aplican tal cual.
-
-::: notes
-La slide que resume la sesión: seis tipos de archivo, seis preguntas. Aclarar que esto es la introducción: la próxima sesión es entera de PRs, con revisión guiada de casos reales del equipo, así que hoy alcanza con que el checklist se entienda, no hace falta dominarlo. La cita del final conecta la serie completa: que el SQL lo haya generado una herramienta no le da inmunidad, y de hecho el SQL generado es donde más aparecen el DISTINCT de más y el SELECT * arrastrado, porque nadie lo leyó nunca. La propuesta de convertir la tabla en template de descripción de PR del repo queda para la sesión que viene.
-:::
-
-## dbt compile: ver el SQL de verdad
-
-``` bash
-dbt compile --select mov_diarios
-# → target/compiled/ventas_analytics/models/marts/mov_diarios.sql
+```{=html}
+<div class="anat">
+  <div class="a-top">
+    <div class="mini mac"><span class="t">Macros propias</span><span class="s">macros/*.sql</span></div>
+    <div class="mini pkg"><span class="t">Paquetes</span><span class="s">dbt_utils y cía</span></div>
+  </div>
+  <div class="a-down"><span>▼</span><span>▼</span></div>
+  <div class="step modelo"><span class="t">Modelo</span><span class="s">un SELECT con {{ llaves }}</span></div>
+  <div class="arrow">→</div>
+  <div class="step"><span class="t">Jinja</span><span class="s">resuelve ref, source y var · expande macros</span></div>
+  <div class="arrow">→</div>
+  <div class="step sqlf"><span class="t">SQL final</span><span class="s">puro SQL, sin llaves</span></div>
+  <div class="arrow">→</div>
+  <div class="step adapter"><span class="t">Adapter</span><span class="s"><code>dbt-databricks</code>: dialecto y APIs</span></div>
+  <div class="arrow">→</div>
+  <div class="step"><span class="t">Databricks</span><span class="s">el warehouse ejecuta</span></div>
+</div>
 ```
 
-- Genera el SQL **con todo el Jinja resuelto**: sin llaves, sin macros, nombres completos. Eso es exactamente lo que ejecuta el warehouse
-- No corre nada contra los datos: es seguro compilar lo que sea
-- Además dbt marca cada query con un **comentario JSON** al inicio: en el Query History se ve qué modelo y qué corrida la generaron
+- Las macros que expande Jinja vienen de dos lados: las del proyecto (`macros/`) y las que traen los paquetes de `packages.yml`
+- El **adapter** vive fuera del proyecto: es el `dbt-databricks` de `profiles.yml`, el que traduce al dialecto y las APIs de Databricks
 
 . . .
 
-> Cuando la PR no se entiende, **compilá**: el SQL final no tiene magia. Y ese SQL es el que se analiza con el Query Profile de la sesión 1.
+> Ningún dato pasa por dbt: el modelo termina siendo SQL final, y ese SQL entra al warehouse por el enchufe del adapter.
 
 ::: notes
-El puente final con la serie: compile produce el artefacto que las sesiones 1 a 4 enseñaron a leer. El flujo completo de diagnóstico queda así: modelo lento, se busca la query en el Query History filtrando por el comentario de dbt que trae el node_id del modelo, se abre el profile, y se razona con las herramientas de las sesiones anteriores. Demo en vivo si el tiempo alcanza: compilar un modelo real del proyecto y mostrar el antes y después del Jinja, en particular cómo un ref se convierte en el nombre completo del catálogo según el target.
+El resumen visual de la sección, con los mismos colores de los chips del diff: naranja el modelo, verde las macros, teal los paquetes. Dos aclaraciones que suelen surgir: el adapter no va en packages.yml, es un paquete de Python que se instala con pip y se referencia desde profiles.yml; y si mañana se cambia de warehouse, se cambia el adapter (dbt-snowflake, dbt-bigquery) y el proyecto queda igual, esa es la gracia del diseño. Las macros de paquetes se llaman con prefijo, tipo dbt_utils.deduplicate, y los tests genéricos también son macros por debajo. Buen momento para pausar preguntas antes del cierre de la sesión.
 :::
 
 ## Para esta semana
 
-1.  Abrí la **última PR mergeada** de Prophecy y ponele nombre a cada archivo del diff con el checklist de hoy
-2.  Elegí un modelo y mirá su **SQL compilado** (en `target/compiled/` del job, o corriendo `dbt compile`): compará contra lo que aparece en el Query History
-3.  Buscá un `FROM` **sin llaves** en los modelos y proponé el `ref()` o `source()` que corresponde
-4.  Bonus: abrí `macros/generate_schema_name.sql` del proyecto y explicá con tus palabras qué hace
-
+1. En el proyecto del pipeline que estas trabajando identifica los paquetes utilizados, ver si tiene alguna macro y como se referencian desde los modelos.
+2. Revisa en tus últimos PR con cambios "controlables" y fíjate si el cambio de lógica es entendible mirando el diff en los models/ 
+3. Si tenes ganas, instala dbt en tu entorno local y probá correr los modelos del proyecto.
 . . .
 
-> Si encontrás un hardcodeo en el punto 3, no lo arregles todavía: traelo a la próxima sesión, que el impacto de tocarlo se conversa.
+> Para la próxima sesión, traé los hallazgos de los puntos 1 y 2.
 
 ::: notes
-Tarea deliberadamente de lectura, no de escritura: el objetivo de la sesión era entender lo que se revisa, así que la práctica es revisar. El punto 3 casi seguro encuentra algo, porque los hardcodeos existen en cualquier proyecto con historia. La advertencia final es en serio: cambiar un FROM hardcodeado por un ref puede cambiar de qué ambiente lee el modelo, así que es un cambio de comportamiento, no cosmético.
+Tarea deliberadamente de lectura, no de escritura: el objetivo de la sesión era entender lo que hay en el repo, así que la práctica es mirar el repo. El punto 2 casi seguro encuentra algo, porque los hardcodeos existen en cualquier proyecto con historia. La advertencia final es en serio: cambiar un FROM hardcodeado por un ref puede cambiar de qué ambiente lee el modelo, así que es un cambio de comportamiento, no cosmético. Lo que traigan de los puntos 1 y 2 es el insumo directo de la sesión 6, que revisa diffs y PRs reales en vivo.
 :::
 
 ##  {data-background-color="#1e293b"}
@@ -418,7 +535,7 @@ Tarea deliberadamente de lectura, no de escritura: el objetivo de la sesión era
 
 [**La PR, a fondo**]{style="font-size: 1.8em; font-weight: 700;"}
 
-[El checklist de hoy convertido en método: revisión guiada de PRs reales del equipo, dbt compile en vivo y qué pedir antes de aprobar]{style="color: #94a3b8; font-size: 0.85em; display: block; margin-top: 0.6em; padding: 0 2em;"}
+[Un diff de ejemplo por cada tipo de archivo, el Job que corre en producción, el checklist completo y revisión de PRs reales del equipo]{style="color: #94a3b8; font-size: 0.85em; display: block; margin-top: 0.6em; padding: 0 2em;"}
 
 ::: {style="margin-top: 2em; padding-top: 1em; border-top: 1px solid rgba(148,163,184,0.3);"}
 [¿Preguntas? · Mauro Loprete]{style="color: #cbd5e1; font-size: 0.8em;"}
@@ -426,7 +543,34 @@ Tarea deliberadamente de lectura, no de escritura: el objetivo de la sesión era
 ::::
 
 ::: notes
-Hoy la PR se presentó a nivel introducción; la próxima sesión es entera de eso: agarrar dos o tres PRs reales del equipo y revisarlas en vivo con el checklist, compilar los modelos tocados, y acordar qué se le pide a una PR antes de aprobarla. Lo que traiga el equipo de la tarea de esta semana es el insumo directo. Para más adelante queda el otro candidato fuerte: modelos incrementales, con is_incremental, la estrategia de merge del adapter y el full refresh.
+Hoy quedó el mapa completo del proyecto: qué es cada archivo y cómo encajan las piezas. La sesión 6 es la aplicación: un diff de ejemplo por cada tipo de archivo con la pregunta que hay que hacerle, el Job de producción con sus dbt tasks, dbt compile en vivo, el checklist completo y la revisión de dos o tres PRs reales del equipo. Lo que traiga el equipo de la tarea de esta semana es el insumo directo. Para más adelante queda el otro candidato fuerte: modelos incrementales, con is_incremental, la estrategia de merge del adapter y el full refresh.
+:::
+
+## Anexo: dbt en tu máquina {visibility="uncounted"}
+
+``` bash
+# 1. Entorno de Python (3.9+)
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+# 2. El adapter trae dbt Core adentro: una sola instalación
+pip install dbt-databricks
+dbt --version
+
+# 3. Credenciales en ~/.dbt/profiles.yml (el de la slide del adapter)
+
+# 4. Probar contra el proyecto clonado
+dbt debug        # valida Python, profiles y conexión
+dbt deps         # instala los paquetes de packages.yml
+dbt compile      # compila todo sin ejecutar nada
+```
+
+- `host` y `http_path` salen de **Connection details** del SQL warehouse; el token es un token personal de Databricks
+- `dbt debug` primero, siempre: valida la conexión antes de intentar cualquier otra cosa
+- Con `dbt compile` andando llegás con ventaja a la próxima sesión, que lo usa en vivo
+
+::: notes
+Anexo para que cualquiera del equipo deje dbt corriendo local en diez minutos. El token personal se genera en Databricks en User Settings, Developer, Access tokens; va en el profiles.yml de la home, nunca en el repo. El profiles.yml de referencia es el de la slide del adapter, con catalog y schema apuntando a dev. Aclarar que compile no toca datos ni gasta cómputo del warehouse más allá de conectarse, así que es seguro jugar. Si alguien usa uv o pipx, el paquete es el mismo dbt-databricks; lo único que importa es que dbt --version muestre el adapter en la lista.
 :::
 
 ## Referencias {visibility="uncounted"}
@@ -439,3 +583,5 @@ Hoy la PR se presentó a nivel introducción; la próxima sesión es entera de e
 - [Conectar dbt Core a Databricks — doc oficial de Databricks](https://docs.databricks.com/aws/en/partners/prep/dbt)
 - [dbt-databricks — repo del adapter](https://github.com/databricks/dbt-databricks)
 - [generate_schema_name en proyectos SQL — doc de Prophecy](https://docs.prophecy.ai/data-analysis/development/extensibility/generate-schema-name)
+- [Mensajes de estado del Studio — doc de Prophecy](https://docs.prophecy.ai/data-analysis/development/studio/messages)
+- [Dependencias en proyectos SQL — doc de Prophecy](https://docs.prophecy.ai/data-analysis/development/extensibility/dependencies)
