@@ -11,7 +11,345 @@
 <description>Databricks tips, Data Engineering, MLOps and survey data processing.</description>
 <language>en</language>
 <generator>quarto-1.9.38</generator>
-<lastBuildDate>Wed, 05 Aug 2026 03:00:00 GMT</lastBuildDate>
+<lastBuildDate>Sat, 24 Oct 2026 03:00:00 GMT</lastBuildDate>
+<item>
+  <title>Databricks Tips #18: Lakehouse//RT — sub-100 ms for real?</title>
+  <dc:creator>Mauro Loprete</dc:creator>
+  <link>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-18-lakehouse-rt/</link>
+  <description><![CDATA[ 
+
+
+
+
+<p>If your application or dashboard needs answers in milliseconds, the usual pattern hurts: you stand up a separate serving system next to the lakehouse and copy the data into it. Two systems, two copies, two governance models, and a sync pipeline to maintain. At the June Data + AI Summit, Databricks <a href="https://www.databricks.com/blog/introducing-lakehousert-real-time-performance-unified-lakehouse">announced <strong>Lakehouse//RT</strong></a> with a promise to kill that copy: sub-100 millisecond queries straight on your Unity Catalog tables. Instead of repeating the announcement, I enabled the Beta in my workspace and measured it properly.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>TL;DR
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Lakehouse//RT (doc name: Lakehouse Real-Time) is a new type of serverless SQL warehouse, in Beta, built for SELECT queries with low latency and high concurrency. Under the hood runs a new engine called Reyden.</li>
+<li>In my benchmark, the server-side median for a point lookup was <strong>35.5 ms on RT versus 501.5 ms on serverless</strong>: 14 times faster, both warehouses Small.</li>
+<li>At <strong>1000 queries in flight</strong> RT holds medians between 30 and 286 ms depending on the query; serverless without cache climbs into seconds.</li>
+<li>The same run cost <strong>US$ 9.21 on RT and US$ 22.88 on serverless</strong>: the faster engine burns fewer DBUs (Beta promo included).</li>
+<li>The Beta is read-only: GRANT, OPTIMIZE and AI Functions fail with <code>UNSUPPORTED_FEATURE</code>. The full benchmark is reproducible from <a href="https://github.com/mauroloprete/spark-de-ideas-labs">the lab on GitHub</a>.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>This lab is also on video
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The full benchmark running live, with the panel charting in real time: on <a href="https://youtu.be/esvcAsYsEIc">YouTube</a> and <a href="https://open.spotify.com/episode/6ipLIFNsLqfL0qm1Gl4e3w">Spotify</a>. And if you want to run it yourself, <a href="https://github.com/mauroloprete/spark-de-ideas-labs">the lab is on GitHub</a>: dataset, harness and panel, reproducible with <code>databricks bundle deploy</code> plus <code>bundle run</code>.</p>
+</div>
+</div>
+<section id="what-is-lakehouse-real-time" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-lakehouse-real-time">What is Lakehouse Real-Time?</h2>
+<p>It is a new type of serverless SQL warehouse that showed up as a Beta after the Summit announcement. The docs describe it for one specific job: serving read queries with sub-second latency and high concurrency, the territory currently held by the specialized serving stacks living next to the lakehouse. The engine underneath is called Reyden and, according to the press covering the keynote, the name comes from “Reynold’s Dream Engine”, after Reynold Xin, Databricks co-founder.</p>
+<p>The architectural point: queries run <strong>directly on Unity Catalog managed tables</strong>, in Delta or Iceberg format, under the same governance. No copy, no sync pipeline, no second permissions catalog.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Everything below is a <strong>Beta</strong>: the feature set can change before general availability. The numbers in this post are my own measurements, from October 2026, in my Azure workspace. They are not Databricks’ official benchmark and do not pretend to be.</p>
+</div>
+</div>
+</section>
+<section id="enabling-the-beta-and-creating-the-warehouse" class="level2">
+<h2 class="anchored" data-anchor-id="enabling-the-beta-and-creating-the-warehouse">Enabling the Beta and creating the warehouse</h2>
+<p>Enabling it is a toggle in the workspace Previews page, flipped by a workspace admin. With the preview on, the SQL warehouse creation flow shows a <strong>Real-Time</strong> type next to Serverless, Pro and Classic. Two details that caught my attention:</p>
+<ul>
+<li>The size is called Query size (Small to X-Large) and the docs put it in the main step of the form; in my workspace it only appeared after opening Advanced Options, Beta things. Autoscaling is not measured in clusters as usual: it is measured in DBUs, the compute unit Databricks bills with.</li>
+<li>The API shows it is a type of its own: in my workspace <code>databricks warehouses list</code> reports it as <code>warehouse_type: REALTIME</code>, an enum that landed in the official SDKs in October 2026. Note that regular serverless warehouses report as <code>PRO</code> with the <code>enable_serverless_compute</code> flag, a classic source of confusion.</li>
+</ul>
+</section>
+<section id="the-lab-20-million-orders-and-three-serving-queries" class="level2">
+<h2 class="anchored" data-anchor-id="the-lab-20-million-orders-and-three-serving-queries">The lab: 20 million orders and three serving queries</h2>
+<p>To measure something resembling real serving I built a synthetic dataset: 20 million orders and 200 thousand customers, Unity Catalog managed tables (a Beta requirement), with <a href="../databricks-tips-14-liquid-clustering/">Liquid Clustering</a> on <code>(cliente_id, ts)</code>, which is exactly how the queries arrive. Three queries any app would run:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Query</th>
+<th>What it does</th>
+<th>Pattern</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Q1</td>
+<td>Status of a single customer</td>
+<td>Lookup with clustering pruning</td>
+</tr>
+<tr class="even">
+<td>Q2</td>
+<td>Top 10 products in a category, last 24 h</td>
+<td>Aggregation with a time filter</td>
+</tr>
+<tr class="odd">
+<td>Q3</td>
+<td>Panel by segment for one country, last 7 days</td>
+<td>Join of orders against customers</td>
+</tr>
+</tbody>
+</table>
+<p>Generation is a 100-line notebook; the core is this:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">TABLE</span> pedidos</span>
+<span id="cb1-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CLUSTER</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">BY</span> (cliente_id, ts) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span></span>
+<span id="cb1-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">SELECT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">id</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> pedido_id,</span>
+<span id="cb1-4">       <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">CAST</span>(rand() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">199999</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">INT</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">AS</span> cliente_id,</span>
+<span id="cb1-5">       <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-- random product, category, amount and timestamp</span></span>
+<span id="cb1-6">       <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">..</span>.</span>
+<span id="cb1-7"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20000000</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>);</span></code></pre></div></div>
+<p>Both warehouses in the comparison are <strong>Small</strong>, on purpose: one Lakehouse//RT and one regular serverless.</p>
+</section>
+<section id="why-does-the-result-cache-ruin-your-benchmark" class="level2">
+<h2 class="anchored" data-anchor-id="why-does-the-result-cache-ruin-your-benchmark">Why does the result cache ruin your benchmark?</h2>
+<p>First trap on the road: I repeated a query on serverless and it answered instantly. Not because the engine got fast, but because <strong>the <a href="https://docs.databricks.com/aws/en/sql/user/queries/query-caching">result cache</a> returned the stored result without executing anything</strong>. And on serverless that cache does not even live in your warehouse: it is a remote, workspace-level cache that survives warehouse restarts.</p>
+<p>There is a documented session command to turn it off (<code>SET use_cached_result = false</code>), but it only disables the result cache: the editor also has its own UI cache and the disk cache keeps working, so in practice you can keep seeing instant answers. For a benchmark that is not enough, so I dodge it the way any serious harness would: <strong>random parameters on every request</strong>, plus a nonce projected as a column. The local cache matches on the exact query text and the serverless remote cache on the logical plan: fresh literals plus the projection dodge both levels.</p>
+<p>The key point is that the cache is not the villain: it is a variable you have to control. That is why the benchmark runs <strong>three series</strong>: RT, serverless dodging the cache, and a third one with the same serverless repeating the identical query, cache serving results. The <code>result_from_cache</code> flag the Query History API returns per statement is the audit: in my run it was 0 across the 8,228 requests of the no-cache series and 1 across the 4,104 of the cached series. Nobody cheated.</p>
+</section>
+<section id="the-benchmark-from-the-outside-statement-execution-api" class="level2">
+<h2 class="anchored" data-anchor-id="the-benchmark-from-the-outside-statement-execution-api">The benchmark from the outside: Statement Execution API</h2>
+<p>Editor timings are fine for intuition, but a real benchmark is measured from the outside, the way an application would hit it. The harness uses the <a href="https://docs.databricks.com/api/workspace/statementexecution">Statement Execution API</a>, officially supported by the Beta, and records two numbers per query:</p>
+<ul>
+<li><strong>client_ms</strong>: wall-clock of the full request from my machine in Montevideo. It includes network and API overhead: a baseline <code>SELECT 1</code> already costs hundreds of milliseconds from here. Good for comparing engines against each other, not for validating the sub-100 claim.</li>
+<li><strong>total_time_ms from Query History</strong>: everything Databricks records per statement (compilation, execution and result delivery), without the network back to my machine. That is what I use against the announcement claim; the raw data also carries <code>execution_time_ms</code> if you want the engine alone.</li>
+</ul>
+<p>Warm-up runs are discarded, and concurrency levels go from 1 to 1000 requests in flight. In total: 12,332 measured requests.</p>
+</section>
+<section id="results-latency" class="level2">
+<h2 class="anchored" data-anchor-id="results-latency">Results: latency</h2>
+<p>With one query at a time, the server-side distribution per query looked like this:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-1-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1"><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-18-lakehouse-rt/index_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864"></a></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Three direct takeaways:</p>
+<ul>
+<li>RT delivers sub-100 server-side on all three queries with one query in flight: medians of <strong>35.5, 59 and 86.5 ms</strong>.</li>
+<li>Serverless without cache lands between 14 and 14.3 times slower in median depending on the query.</li>
+<li>The serverless cache is great when it applies (189 to 208 ms), but it only applies to deterministic queries over unchanged data, and entries live 24 hours. A real app with variable parameters almost never lives in that world.</li>
+</ul>
+</section>
+<section id="what-happens-with-1000-queries-in-flight" class="level2">
+<h2 class="anchored" data-anchor-id="what-happens-with-1000-queries-in-flight">What happens with 1000 queries in flight?</h2>
+<p>The strong promise of the announcement is not latency at one query: it is holding it under concurrency. I raised the load from 1 to 1000 simultaneous requests:</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="index_files/figure-html/unnamed-chunk-2-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2"><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-18-lakehouse-rt/index_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="864"></a></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In short: RT does not just start lower, it stays lower. On the point lookup, the median at 1000 requests in flight was <strong>lower</strong> than at a single one (30 versus 35.5 ms). Serverless without cache degrades into seconds on the aggregation and join queries. And the cached series is the interesting exception: at 1000 identical requests the cache answers steadily (147 to 163 ms), because a thousand repetitions are the cache’s ideal scenario. If your real workload is “the same dashboard refreshed by a thousand people”, serverless with cache is enough; if every request carries different parameters, it is not.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Always measure both sides: client-side tells you what your user will feel (from Montevideo, network and API overhead set a floor of hundreds of milliseconds), and server-side tells you which engine is better. Comparing official claims against client-side numbers is cheating at solitaire.</p>
+</div>
+</div>
+</section>
+<section id="what-the-beta-does-not-support-and-what-ran-anyway" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-beta-does-not-support-and-what-ran-anyway">What the Beta does not support (and what ran anyway)</h2>
+<p>The docs say Lakehouse//RT is read-only: standard SELECT, no writes, no DDL (the commands that create or modify objects), no GRANT or REVOKE, no OPTIMIZE and no AI Functions. I probed the limits live and the real output was this:</p>
+<pre><code>[UNSUPPORTED_FEATURE] Function `ai_classify` is not supported in Lakehouse//RT.
+Please change your query or use a Serverless SQL Warehouse instead.
+See Lakehouse//RT limitations:
+https://docs.databricks.com/aws/compute/sql-warehouse/real-time#limitations
+SQLSTATE: 0A000</code></pre>
+<p>GRANT failed with the same kind of error. But here comes the finding I did not expect: <strong>INSERT and CREATE TABLE ran without error</strong> in my workspace, against what the docs say. Do not take it as a feature: whatever works outside the docs in a Beta can be cut without notice, and the engine’s declared design is serving reads. Treat it as read-only anyway.</p>
+<p>It also does not work today with Genie, Genie Agents or as compute for Jobs tasks, and it requires managed tables: no external tables, Hive, foreign tables or loose formats like CSV, JSON or Parquet. With custom applications it is the other way around: serving them data is precisely the use case, via drivers and the Statement Execution API.</p>
+</section>
+<section id="how-much-does-lakehousert-cost" class="level2">
+<h2 class="anchored" data-anchor-id="how-much-does-lakehousert-cost">How much does Lakehouse//RT cost?</h2>
+<p>I went to the system tables to read the fine print. Two data points from my run:</p>
+<ul>
+<li>In my region, on the day of the run, <code>system.billing.list_prices</code> showed <strong>the same unit price per DBU</strong> for both SKUs (the SKU is the product line Databricks bills you under). Do not take it for granted: since 2026-10-10 RT bills under its own SKU with its own regional rate, so check yours.</li>
+<li>The same battery of tests consumed <strong>32.69 DBUs (US$ 22.88) on serverless and 13.15 DBUs (US$ 9.21) on RT</strong>: a 60% smaller bill. Note those 13.15 already include the Beta promo, which emits 30% fewer DBUs until 2027-01-31: without the promo it would be ~18.8 DBUs and the saving would be around 42%.</li>
+</ul>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The low cost depends on the use case: this is short-read serving, the terrain where RT shines. Do not extrapolate to transformation workloads, which the Beta cannot run anyway.</p>
+</div>
+</div>
+</section>
+<section id="when-yes-when-no" class="level2">
+<h2 class="anchored" data-anchor-id="when-yes-when-no">When yes, when no?</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Your case</th>
+<th>What I would use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Serving analytics to an app or dashboard with high concurrency and variable parameters</td>
+<td><strong>Lakehouse//RT</strong></td>
+</tr>
+<tr class="even">
+<td>The same dashboard refreshed identically by many users</td>
+<td>Regular serverless: the result cache solves it for free</td>
+</tr>
+<tr class="odd">
+<td>Point lookups of features for models</td>
+<td>Look at the Online Feature Store with Lakebase first</td>
+</tr>
+<tr class="even">
+<td>Internal BI with no sub-second requirement</td>
+<td>The serverless you already have is plenty</td>
+</tr>
+<tr class="odd">
+<td>Writes, transformations, table maintenance</td>
+<td>Anything but RT: the Beta is read-only</td>
+</tr>
+<tr class="even">
+<td>Real-time stream processing</td>
+<td>That is Structured Streaming’s Real-time mode, a different product</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="gotchas" class="level2">
+<h2 class="anchored" data-anchor-id="gotchas">Gotchas</h2>
+<ol type="1">
+<li><strong>The serverless remote cache lives at workspace level</strong>: it survives warehouse restarts, and <code>SET use_cached_result = false</code> may not cut it in the editor. To compare engines, fresh parameters on every run.</li>
+<li><strong>The local cache matches on exact text and the serverless remote cache on the logical plan</strong>: to dodge both at once, the nonce goes projected as a column, not in a comment.</li>
+<li><strong>The API reports <code>warehouse_type: PRO</code> for regular serverless warehouses</strong>; RT does show up as <code>REALTIME</code>. If you filter by type, remember the <code>enable_serverless_compute</code> flag.</li>
+<li><strong>The first request after starting the warehouse is not representative</strong>: discard warm-up runs or you will measure the startup, not the engine.</li>
+<li><strong><code>result_from_cache</code> from Query History is your audit</strong>: if your “no cache” benchmark shows hits, the numbers are worthless.</li>
+</ol>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li><a href="https://learn.microsoft.com/en-us/azure/databricks/compute/sql-warehouse/real-time">Lakehouse Real-Time in the official Azure Databricks docs</a></li>
+<li><a href="https://www.databricks.com/blog/introducing-lakehousert-real-time-performance-unified-lakehouse">The official Lakehouse//RT announcement</a></li>
+<li><a href="https://github.com/mauroloprete/spark-de-ideas-labs">The full lab, reproducible with <code>databricks bundle deploy</code></a></li>
+<li>From the series: <a href="../databricks-tips-09-sql-warehouses/">Tips #9 — SQL Warehouses</a> and <a href="../databricks-tips-14-liquid-clustering/">Tips #14 — Liquid Clustering</a></li>
+</ul>
+<p>The video of this lab, with the benchmark running live, is on <a href="https://youtu.be/esvcAsYsEIc">YouTube</a> and <a href="https://open.spotify.com/episode/6ipLIFNsLqfL0qm1Gl4e3w">Spotify</a>. And if you want to reproduce it, the repo has the dataset, the harness and the panel: one afternoon of work and you have your own numbers.</p>
+<p><em>Next in the series: dbt on Databricks.</em></p>
+
+
+</section>
+
+ ]]></description>
+  <category>Databricks Tips</category>
+  <category>Data Engineering</category>
+  <category>Serverless</category>
+  <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-18-lakehouse-rt/</guid>
+  <pubDate>Sat, 24 Oct 2026 03:00:00 GMT</pubDate>
+  <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/databricks-tips-18-lakehouse-rt/cover.png" medium="image" type="image/png" height="81" width="144"/>
+</item>
 <item>
   <title>Databricks Tips #16: Data Quality — dynamic expectations, quarantine, and DQX</title>
   <dc:creator>Mauro Loprete</dc:creator>
@@ -23649,625 +23987,6 @@ font-style: inherit;">"bronze_transactions"</span>)</span></code></pre></div></d
   <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-contracts-framework/</guid>
   <pubDate>Tue, 14 Apr 2026 03:00:00 GMT</pubDate>
   <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-contracts-framework/cover.png" medium="image" type="image/png" height="81" width="144"/>
-</item>
-<item>
-  <title>Medallion vs Data Vault vs Kimball: when to use each one and why it matters</title>
-  <dc:creator>Mauro Loprete</dc:creator>
-  <link>https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-modeling-medallion-vault-kimball/</link>
-  <description><![CDATA[ 
-
-
-
-
-<p>Every time you start a data project, the first architectural question is: how do I model the data? And the answer I hear most often is “Medallion, obviously”. But it’s not always the best choice.</p>
-<p>In this post I compare the three most widely used approaches in the industry, with real trade-offs and no snake oil.</p>
-<section id="the-problem" class="level2">
-<h2 class="anchored" data-anchor-id="the-problem">The problem</h2>
-<p>You have raw data from multiple sources and you need to get it to a state that analysts, data scientists, and dashboards can consume. How do you organize the intermediate layers?</p>
-</section>
-<section id="kimball-dimensional-modeling" class="level2">
-<h2 class="anchored" data-anchor-id="kimball-dimensional-modeling">Kimball (Dimensional Modeling)</h2>
-<p>The grandfather of data modeling. Ralph Kimball published it in the 90s and it’s still going strong.</p>
-<section id="the-idea" class="level3">
-<h3 class="anchored" data-anchor-id="the-idea">The idea</h3>
-<p>You organize the data into <strong>fact tables</strong> and <strong>dimension tables</strong>. Facts are the metrics (sales, clicks, transactions); dimensions are the context (who, when, where, what).</p>
-<div class="cell" data-fig-width="8" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class="figure"><p></p>
-<div>
-<pre class="mermaid mermaid-js">erDiagram
-    dim_customer {
-        bigint customer_id PK
-        string name
-        string segment
-        string country
-    }
-    dim_product {
-        bigint product_id PK
-        string name
-        string category
-        string brand
-    }
-    dim_date {
-        int date_id PK
-        date full_date
-        int month
-        int year
-    }
-    fact_sales {
-        bigint sale_id PK
-        bigint customer_id FK
-        bigint product_id FK
-        int date_id FK
-        decimal amount
-        int quantity
-    }
-
-    dim_customer ||--o{ fact_sales : ""
-    dim_product  ||--o{ fact_sales : ""
-    dim_date     ||--o{ fact_sales : ""
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
-</section>
-<section id="when-to-use-it" class="level3">
-<h3 class="anchored" data-anchor-id="when-to-use-it">When to use it</h3>
-<ul>
-<li><strong>Classic reporting</strong>: BI dashboards, KPIs, dimensional analysis</li>
-<li><strong>Teams of analysts who use SQL</strong>: the star schema is intuitive, the JOINs are simple</li>
-<li><strong>Stable requirements</strong>: you know what questions you’ll be asked</li>
-</ul>
-</section>
-<section id="when-not-to-use-it" class="level3">
-<h3 class="anchored" data-anchor-id="when-not-to-use-it">When NOT to use it</h3>
-<ul>
-<li>When sources change frequently (Kimball assumes stable schemas)</li>
-<li>When you need a complete audit trail of change history</li>
-<li>When you have 50+ sources with complex relationships</li>
-</ul>
-</section>
-<section id="on-databricks" class="level3">
-<h3 class="anchored" data-anchor-id="on-databricks">On Databricks</h3>
-<div id="lst-kimball-ddl" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-kimball-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;1: Kimball on Databricks: fact table and dimension with SCD Type 2
-</figcaption>
-<div aria-describedby="lst-kimball-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Fact table</span></span>
-<span id="cb1-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> gold.fact_sales (</span>
-<span id="cb1-3">  sale_id BIGINT,</span>
-<span id="cb1-4">  customer_id BIGINT,</span>
-<span id="cb1-5">  product_id BIGINT,</span>
-<span id="cb1-6">  date_id <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">INT</span>,</span>
-<span id="cb1-7">  amount <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DECIMAL</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>),</span>
-<span id="cb1-8">  quantity <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">INT</span></span>
-<span id="cb1-9">)</span>
-<span id="cb1-10"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA</span>
-<span id="cb1-11"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CLUSTER</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">BY</span> (date_id, customer_id);</span>
-<span id="cb1-12"></span>
-<span id="cb1-13"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Dimension table with SCD Type 2</span></span>
-<span id="cb1-14"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> gold.dim_customer (</span>
-<span id="cb1-15">  customer_sk BIGINT <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">GENERATED</span> ALWAYS <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">AS</span> IDENTITY,</span>
-<span id="cb1-16">  customer_id BIGINT,</span>
-<span id="cb1-17">  name STRING,</span>
-<span id="cb1-18">  <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">segment</span> STRING,</span>
-<span id="cb1-19">  country STRING,</span>
-<span id="cb1-20">  valid_from <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DATE</span>,</span>
-<span id="cb1-21">  valid_to <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DATE</span>,</span>
-<span id="cb1-22">  is_current <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">BOOLEAN</span></span>
-<span id="cb1-23">)</span>
-<span id="cb1-24"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA;</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-</section>
-<section id="data-vault-2.0" class="level2">
-<h2 class="anchored" data-anchor-id="data-vault-2.0">Data Vault 2.0</h2>
-<p>Invented by Dan Linstedt. It’s the most robust approach for companies with many sources and audit requirements.</p>
-<section id="the-idea-1" class="level3">
-<h3 class="anchored" data-anchor-id="the-idea-1">The idea</h3>
-<p>Three types of tables: <strong>Hubs</strong> (business entities), <strong>Links</strong> (relationships between hubs), and <strong>Satellites</strong> (descriptive attributes with history).</p>
-<div class="cell" data-fig-width="8" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class="figure"><p></p>
-<div>
-<pre class="mermaid mermaid-js">erDiagram
-    hub_customer {
-        string hash_key PK
-        bigint customer_id
-        timestamp load_date
-        string record_source
-    }
-    hub_product {
-        string hash_key PK
-        bigint product_id
-        timestamp load_date
-        string record_source
-    }
-    link_sale {
-        string hash_key PK
-        string customer_hk FK
-        string product_hk FK
-        timestamp load_date
-        string record_source
-    }
-    sat_customer {
-        string hash_key FK
-        string name
-        string segment
-        string hash_diff
-        timestamp load_date
-    }
-    sat_product {
-        string hash_key FK
-        string name
-        string category
-        string hash_diff
-        timestamp load_date
-    }
-
-    hub_customer ||--o{ link_sale : ""
-    hub_product  ||--o{ link_sale : ""
-    hub_customer ||--o{ sat_customer : ""
-    hub_product  ||--o{ sat_product : ""
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
-</section>
-<section id="when-to-use-it-1" class="level3">
-<h3 class="anchored" data-anchor-id="when-to-use-it-1">When to use it</h3>
-<ul>
-<li><strong>Many heterogeneous sources</strong> (50+): Data Vault doesn’t break when you add a new source</li>
-<li><strong>Audit and compliance</strong>: every record has <code>load_date</code> and <code>record_source</code>, so you know exactly where each piece of data came from</li>
-<li><strong>Large teams</strong>: it parallelizes well; each developer can work on a Hub/Link without stepping on anyone else</li>
-<li><strong>Schemas that change frequently</strong>: adding an attribute means creating a new Satellite, not altering existing tables</li>
-</ul>
-</section>
-<section id="when-not-to-use-it-1" class="level3">
-<h3 class="anchored" data-anchor-id="when-not-to-use-it-1">When NOT to use it</h3>
-<ul>
-<li>Small teams (&lt; 5 people): the overhead of maintaining Hubs/Links/Satellites isn’t worth it</li>
-<li>Fast projects or POCs: too much ceremony</li>
-<li>If your analysts are going to run SQL directly against the vault (it’s ugly to consume without a presentation layer)</li>
-</ul>
-</section>
-<section id="on-databricks-1" class="level3">
-<h3 class="anchored" data-anchor-id="on-databricks-1">On Databricks</h3>
-<div id="lst-vault-ddl" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-vault-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;2: Data Vault on Databricks: Hub, Satellite, and Link in Delta
-</figcaption>
-<div aria-describedby="lst-vault-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Hub</span></span>
-<span id="cb2-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> vault.hub_customer (</span>
-<span id="cb2-3">  customer_hk STRING,  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- hash of the business key</span></span>
-<span id="cb2-4">  customer_id BIGINT,</span>
-<span id="cb2-5">  load_date <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">TIMESTAMP</span>,</span>
-<span id="cb2-6">  record_source STRING</span>
-<span id="cb2-7">)</span>
-<span id="cb2-8"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA;</span>
-<span id="cb2-9"></span>
-<span id="cb2-10"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Satellite</span></span>
-<span id="cb2-11"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> vault.sat_customer (</span>
-<span id="cb2-12">  customer_hk STRING,</span>
-<span id="cb2-13">  name STRING,</span>
-<span id="cb2-14">  <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">segment</span> STRING,</span>
-<span id="cb2-15">  country STRING,</span>
-<span id="cb2-16">  hash_diff STRING,  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- hash of the attributes to detect changes</span></span>
-<span id="cb2-17">  load_date <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">TIMESTAMP</span>,</span>
-<span id="cb2-18">  record_source STRING</span>
-<span id="cb2-19">)</span>
-<span id="cb2-20"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA;</span>
-<span id="cb2-21"></span>
-<span id="cb2-22"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Link</span></span>
-<span id="cb2-23"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> vault.link_sale (</span>
-<span id="cb2-24">  sale_hk STRING,</span>
-<span id="cb2-25">  customer_hk STRING,</span>
-<span id="cb2-26">  product_hk STRING,</span>
-<span id="cb2-27">  load_date <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">TIMESTAMP</span>,</span>
-<span id="cb2-28">  record_source STRING</span>
-<span id="cb2-29">)</span>
-<span id="cb2-30"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA;</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-</section>
-<section id="medallion-bronze-silver-gold" class="level2">
-<h2 class="anchored" data-anchor-id="medallion-bronze-silver-gold">Medallion (Bronze / Silver / Gold)</h2>
-<p>The approach popularized by Databricks. It’s not a data model in the Kimball or Data Vault sense — it’s a <strong>layered architecture</strong>.</p>
-<section id="the-idea-2" class="level3">
-<h3 class="anchored" data-anchor-id="the-idea-2">The idea</h3>
-<div class="cell" data-layout-align="center">
-<div class="cell-output-display">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><a href="index_files/figure-html/unnamed-chunk-3-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Medallion architecture: Bronze (raw data), Silver (cleaning and validation), Gold (business models)."><img src="https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-modeling-medallion-vault-kimball/index_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="672" alt="Medallion architecture: Bronze (raw data), Silver (cleaning and validation), Gold (business models)."></a></p>
-</figure>
-</div>
-<figcaption>Medallion architecture: Bronze (raw data), Silver (cleaning and validation), Gold (business models).</figcaption>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="the-key-point-many-people-miss" class="level3">
-<h3 class="anchored" data-anchor-id="the-key-point-many-people-miss">The key point many people miss</h3>
-<p><strong>Medallion doesn’t tell you how to model Gold.</strong> It only tells you there are layers. In Gold you can use Kimball, Data Vault, or flat tables. The modeling decision is still yours.</p>
-</section>
-<section id="when-to-use-it-2" class="level3">
-<h3 class="anchored" data-anchor-id="when-to-use-it-2">When to use it</h3>
-<ul>
-<li><strong>Always, as a layered architecture</strong>: it’s an organizational pattern, it doesn’t compete with Kimball or Data Vault</li>
-<li><strong>Teams that are just getting started</strong>: it’s simple to understand and implement</li>
-<li><strong>Projects on Databricks/Delta Lake</strong>: it’s optimized for the ecosystem</li>
-</ul>
-</section>
-<section id="when-not-to-use-it-on-its-own" class="level3">
-<h3 class="anchored" data-anchor-id="when-not-to-use-it-on-its-own">When NOT to use it (on its own)</h3>
-<ul>
-<li>When you need formal auditing (Medallion has no native <code>record_source</code>)</li>
-<li>When Gold needs serious dimensional modeling (that’s where you combine it with Kimball)</li>
-</ul>
-</section>
-<section id="on-databricks-2" class="level3">
-<h3 class="anchored" data-anchor-id="on-databricks-2">On Databricks</h3>
-<div id="lst-medallion-ddl" class="sql listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-medallion-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;3: Medallion on Databricks: Bronze, Silver, and Gold tables in Delta
-</figcaption>
-<div aria-describedby="lst-medallion-ddl-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Bronze: raw data</span></span>
-<span id="cb3-2"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> bronze.raw_transactions (</span>
-<span id="cb3-3">  _ingest_timestamp <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">TIMESTAMP</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">DEFAULT</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">current_timestamp</span>(),</span>
-<span id="cb3-4">  _source_file STRING,</span>
-<span id="cb3-5">  payload STRING  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- raw JSON</span></span>
-<span id="cb3-6">)</span>
-<span id="cb3-7"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA;</span>
-<span id="cb3-8"></span>
-<span id="cb3-9"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Silver: clean and typed</span></span>
-<span id="cb3-10"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> silver.transactions (</span>
-<span id="cb3-11">  transaction_id BIGINT,</span>
-<span id="cb3-12">  customer_id BIGINT,</span>
-<span id="cb3-13">  amount <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DECIMAL</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>),</span>
-<span id="cb3-14">  transaction_date <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DATE</span>,</span>
-<span id="cb3-15">  status STRING,</span>
-<span id="cb3-16">  _silver_timestamp <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">TIMESTAMP</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">DEFAULT</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">current_timestamp</span>()</span>
-<span id="cb3-17">)</span>
-<span id="cb3-18"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA</span>
-<span id="cb3-19"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CLUSTER</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">BY</span> (transaction_date);</span>
-<span id="cb3-20"></span>
-<span id="cb3-21"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-- Gold: business model (here you choose Kimball, flat, etc.)</span></span>
-<span id="cb3-22"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">CREATE</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">TABLE</span> gold.daily_revenue (</span>
-<span id="cb3-23">  <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">date</span> <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DATE</span>,</span>
-<span id="cb3-24">  <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">segment</span> STRING,</span>
-<span id="cb3-25">  total_revenue <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DECIMAL</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>),</span>
-<span id="cb3-26">  transaction_count BIGINT,</span>
-<span id="cb3-27">  avg_ticket <span class="dt" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">DECIMAL</span>(<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">18</span>,<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>)</span>
-<span id="cb3-28">)</span>
-<span id="cb3-29"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">USING</span> DELTA;</span></code></pre></div></div>
-</div>
-</figure>
-</div>
-</section>
-</section>
-<section id="the-comparison" class="level2">
-<h2 class="anchored" data-anchor-id="the-comparison">The comparison</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Criterion</th>
-<th>Kimball</th>
-<th>Data Vault</th>
-<th>Medallion</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Complexity</td>
-<td>Medium</td>
-<td>High</td>
-<td>Low</td>
-</tr>
-<tr class="even">
-<td>Auditability</td>
-<td>Limited (SCD)</td>
-<td>Complete</td>
-<td>Not native</td>
-</tr>
-<tr class="odd">
-<td>Source scalability</td>
-<td>Medium</td>
-<td>High</td>
-<td>High</td>
-</tr>
-<tr class="even">
-<td>Learning curve</td>
-<td>Medium</td>
-<td>High</td>
-<td>Low</td>
-</tr>
-<tr class="odd">
-<td>Analyst consumption</td>
-<td>Excellent</td>
-<td>Poor (without a layer)</td>
-<td>Depends on Gold</td>
-</tr>
-<tr class="even">
-<td>Flexibility to change</td>
-<td>Low</td>
-<td>High</td>
-<td>High</td>
-</tr>
-<tr class="odd">
-<td>Best for</td>
-<td>Classic BI</td>
-<td>Enterprise, compliance</td>
-<td>Lakehouse, startups</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="my-recommendation" class="level2">
-<h2 class="anchored" data-anchor-id="my-recommendation">My recommendation</h2>
-<p>They’re not mutually exclusive. The pattern that works best in practice:</p>
-<p><strong>Medallion as the layered architecture + Kimball in Gold for consumption.</strong></p>
-<div id="lst-pattern-recommended" class="listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pattern-recommended-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;4: Recommended pattern: Medallion + Kimball in Gold
-</figcaption>
-<div aria-describedby="lst-pattern-recommended-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<pre><code>Sources → Bronze (raw) → Silver (clean) → Gold (Kimball star schema)</code></pre>
-</div>
-</figure>
-</div>
-<p>If you’re in an enterprise context with 50+ sources and audit requirements:</p>
-<p><strong>Medallion + Data Vault in Silver + Kimball in Gold.</strong></p>
-<div id="lst-pattern-enterprise" class="listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pattern-enterprise-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;5: Enterprise pattern: Data Vault in Silver + Kimball in Gold
-</figcaption>
-<div aria-describedby="lst-pattern-enterprise-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<pre><code>Sources → Bronze (raw) → Silver (Data Vault) → Gold (Kimball)</code></pre>
-</div>
-</figure>
-</div>
-<p>And if you’re on a small team building an MVP:</p>
-<p><strong>Medallion with flat Gold. No ceremony.</strong></p>
-<div id="lst-pattern-mvp" class="listing quarto-float quarto-figure quarto-figure-left anchored">
-<figure class="quarto-float quarto-float-lst figure">
-<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-lst" id="lst-pattern-mvp-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Listing&nbsp;6: MVP pattern: Medallion with flat Gold, no formal modeling
-</figcaption>
-<div aria-describedby="lst-pattern-mvp-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<pre><code>Sources → Bronze → Silver → Gold (simple aggregated tables)</code></pre>
-</div>
-</figure>
-</div>
-<p>The important thing is understanding that each approach solves a different problem. There’s no universal answer — there’s context.</p>
-</section>
-<section id="links" class="level2">
-<h2 class="anchored" data-anchor-id="links">Links</h2>
-<ul>
-<li><a href="https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/books/">The Data Warehouse Toolkit (Kimball)</a> — the foundational book</li>
-<li><a href="https://datavaultalliance.com/">Data Vault 2.0 (Dan Linstedt)</a> — the official reference</li>
-<li><h2 id="medallion-architecture-databricks-official-documentation" class="anchored"><a href="https://docs.databricks.com/en/lakehouse/medallion.html">Medallion Architecture (Databricks)</a> — official documentation</h2></li>
-</ul>
-<p><em>Next week: Data Contracts — how to design a framework from scratch.</em></p>
-
-
-</section>
-
- ]]></description>
-  <category>Data Architecture</category>
-  <category>Data Engineering</category>
-  <category>Podcast</category>
-  <guid>https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-modeling-medallion-vault-kimball/</guid>
-  <pubDate>Tue, 07 Apr 2026 03:00:00 GMT</pubDate>
-  <media:content url="https://mauroloprete.github.io/mauroloprete/en/blog/posts/data-modeling-medallion-vault-kimball/cover.png" medium="image" type="image/png" height="81" width="144"/>
 </item>
 </channel>
 </rss>

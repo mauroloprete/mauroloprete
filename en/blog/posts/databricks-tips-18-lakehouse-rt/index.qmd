@@ -1,0 +1,310 @@
+---
+title: "Databricks Tips #18: Lakehouse//RT — sub-100 ms for real?"
+author: "Mauro Loprete"
+date: "2026-10-24"
+categories: [Databricks Tips, Data Engineering, Serverless]
+description: "I enabled the Lakehouse Real-Time Beta in Databricks and measured it against a serverless SQL warehouse: reproducible benchmark, real costs, limits."
+image: cover.png
+---
+
+If your application or dashboard needs answers in milliseconds, the usual pattern hurts: you stand up a separate serving system next to the lakehouse and copy the data into it. Two systems, two copies, two governance models, and a sync pipeline to maintain. At the June Data + AI Summit, Databricks [announced **Lakehouse//RT**](https://www.databricks.com/blog/introducing-lakehousert-real-time-performance-unified-lakehouse) with a promise to kill that copy: sub-100 millisecond queries straight on your Unity Catalog tables. Instead of repeating the announcement, I enabled the Beta in my workspace and measured it properly.
+
+::: {.callout-note}
+## TL;DR
+
+- Lakehouse//RT (doc name: Lakehouse Real-Time) is a new type of serverless SQL warehouse, in Beta, built for SELECT queries with low latency and high concurrency. Under the hood runs a new engine called Reyden.
+- In my benchmark, the server-side median for a point lookup was **35.5 ms on RT versus 501.5 ms on serverless**: 14 times faster, both warehouses Small.
+- At **1000 queries in flight** RT holds medians between 30 and 286 ms depending on the query; serverless without cache climbs into seconds.
+- The same run cost **US$ 9.21 on RT and US$ 22.88 on serverless**: the faster engine burns fewer DBUs (Beta promo included).
+- The Beta is read-only: GRANT, OPTIMIZE and AI Functions fail with `UNSUPPORTED_FEATURE`. The full benchmark is reproducible from [the lab on GitHub](https://github.com/mauroloprete/spark-de-ideas-labs).
+:::
+
+::: {.callout-tip}
+## This lab is also on video
+
+The full benchmark running live, with the panel charting in real time: on [YouTube](https://youtu.be/esvcAsYsEIc) and [Spotify](https://open.spotify.com/episode/6ipLIFNsLqfL0qm1Gl4e3w). And if you want to run it yourself, [the lab is on GitHub](https://github.com/mauroloprete/spark-de-ideas-labs): dataset, harness and panel, reproducible with `databricks bundle deploy` plus `bundle run`.
+:::
+
+## What is Lakehouse Real-Time?
+
+It is a new type of serverless SQL warehouse that showed up as a Beta after the Summit announcement. The docs describe it for one specific job: serving read queries with sub-second latency and high concurrency, the territory currently held by the specialized serving stacks living next to the lakehouse. The engine underneath is called Reyden and, according to the press covering the keynote, the name comes from "Reynold's Dream Engine", after Reynold Xin, Databricks co-founder.
+
+The architectural point: queries run **directly on Unity Catalog managed tables**, in Delta or Iceberg format, under the same governance. No copy, no sync pipeline, no second permissions catalog.
+
+::: {.callout-warning}
+Everything below is a **Beta**: the feature set can change before general availability. The numbers in this post are my own measurements, from October 2026, in my Azure workspace. They are not Databricks' official benchmark and do not pretend to be.
+:::
+
+## Enabling the Beta and creating the warehouse
+
+Enabling it is a toggle in the workspace Previews page, flipped by a workspace admin. With the preview on, the SQL warehouse creation flow shows a **Real-Time** type next to Serverless, Pro and Classic. Two details that caught my attention:
+
+- The size is called Query size (Small to X-Large) and the docs put it in the main step of the form; in my workspace it only appeared after opening Advanced Options, Beta things. Autoscaling is not measured in clusters as usual: it is measured in DBUs, the compute unit Databricks bills with.
+- The API shows it is a type of its own: in my workspace `databricks warehouses list` reports it as `warehouse_type: REALTIME`, an enum that landed in the official SDKs in October 2026. Note that regular serverless warehouses report as `PRO` with the `enable_serverless_compute` flag, a classic source of confusion.
+
+## The lab: 20 million orders and three serving queries
+
+To measure something resembling real serving I built a synthetic dataset: 20 million orders and 200 thousand customers, Unity Catalog managed tables (a Beta requirement), with [Liquid Clustering](../databricks-tips-14-liquid-clustering/) on `(cliente_id, ts)`, which is exactly how the queries arrive. Three queries any app would run:
+
+| Query | What it does | Pattern |
+|---|---|---|
+| Q1 | Status of a single customer | Lookup with clustering pruning |
+| Q2 | Top 10 products in a category, last 24 h | Aggregation with a time filter |
+| Q3 | Panel by segment for one country, last 7 days | Join of orders against customers |
+
+Generation is a 100-line notebook; the core is this:
+
+```sql
+CREATE TABLE pedidos
+CLUSTER BY (cliente_id, ts) AS
+SELECT id AS pedido_id,
+       1 + CAST(rand() * 199999 AS INT) AS cliente_id,
+       -- random product, category, amount and timestamp
+       ...
+FROM range(1, 20000000 + 1);
+```
+
+Both warehouses in the comparison are **Small**, on purpose: one Lakehouse//RT and one regular serverless.
+
+## Why does the result cache ruin your benchmark?
+
+First trap on the road: I repeated a query on serverless and it answered instantly. Not because the engine got fast, but because **the [result cache](https://docs.databricks.com/aws/en/sql/user/queries/query-caching) returned the stored result without executing anything**. And on serverless that cache does not even live in your warehouse: it is a remote, workspace-level cache that survives warehouse restarts.
+
+There is a documented session command to turn it off (`SET use_cached_result = false`), but it only disables the result cache: the editor also has its own UI cache and the disk cache keeps working, so in practice you can keep seeing instant answers. For a benchmark that is not enough, so I dodge it the way any serious harness would: **random parameters on every request**, plus a nonce projected as a column. The local cache matches on the exact query text and the serverless remote cache on the logical plan: fresh literals plus the projection dodge both levels.
+
+The key point is that the cache is not the villain: it is a variable you have to control. That is why the benchmark runs **three series**: RT, serverless dodging the cache, and a third one with the same serverless repeating the identical query, cache serving results. The `result_from_cache` flag the Query History API returns per statement is the audit: in my run it was 0 across the 8,228 requests of the no-cache series and 1 across the 4,104 of the cached series. Nobody cheated.
+
+## The benchmark from the outside: Statement Execution API
+
+Editor timings are fine for intuition, but a real benchmark is measured from the outside, the way an application would hit it. The harness uses the [Statement Execution API](https://docs.databricks.com/api/workspace/statementexecution), officially supported by the Beta, and records two numbers per query:
+
+- **client_ms**: wall-clock of the full request from my machine in Montevideo. It includes network and API overhead: a baseline `SELECT 1` already costs hundreds of milliseconds from here. Good for comparing engines against each other, not for validating the sub-100 claim.
+- **total_time_ms from Query History**: everything Databricks records per statement (compilation, execution and result delivery), without the network back to my machine. That is what I use against the announcement claim; the raw data also carries `execution_time_ms` if you want the engine alone.
+
+Warm-up runs are discarded, and concurrency levels go from 1 to 1000 requests in flight. In total: 12,332 measured requests.
+
+## Results: latency
+
+With one query at a time, the server-side distribution per query looked like this:
+
+```{r}
+#| echo: false
+#| warning: false
+#| fig-width: 9
+#| fig-height: 4.4
+#| fig-align: center
+library(ggplot2)
+
+navy <- "#1e293b"; orange <- "#FFA166"; purple <- "#593196"
+gray <- "#64748b"; bg <- "#f8fafc"; gris_claro <- "#94a3b8"
+caption <- "⚡ Spark de Ideas · mauroloprete.github.io/mauroloprete"
+
+# Real quantiles from the 2026-10-24 run (24 runs per cell, conc = 1)
+d <- read.table(header = TRUE, text = "
+serie query q05 q25 q50 q75 q95
+SQL_Serverless Q1 467.0 480.0 501.5 536.5 607.3
+SQL_Serverless Q2 828.8 848.8 863.5 891.8 932.0
+SQL_Serverless Q3 1189.0 1210.5 1236.0 1247.2 1358.8
+Serverless_(cache) Q1 169.6 179.8 189.0 195.0 237.0
+Serverless_(cache) Q2 185.6 192.8 202.0 214.2 240.6
+Serverless_(cache) Q3 185.9 198.0 208.0 222.0 284.4
+Lakehouse//RT Q1 28.3 32.0 35.5 39.5 68.1
+Lakehouse//RT Q2 55.1 57.0 59.0 60.0 65.7
+Lakehouse//RT Q3 82.3 85.0 86.5 90.0 99.7
+")
+d$serie <- gsub("_", " ", d$serie)
+# Series in descending median order (serverless > cache > RT)
+d$serie <- factor(d$serie, levels = c("SQL Serverless", "Serverless (cache)", "Lakehouse//RT"))
+d$query <- factor(d$query, labels = c("Q1 · point lookup", "Q2 · top products 24 h", "Q3 · join by segment"))
+colores <- c("SQL Serverless" = gray, "Serverless (cache)" = purple, "Lakehouse//RT" = orange)
+
+ggplot(d, aes(x = query, fill = serie)) +
+  geom_boxplot(
+    aes(ymin = q05, lower = q25, middle = q50, upper = q75, ymax = q95),
+    stat = "identity", position = position_dodge(width = 0.72),
+    width = 0.6, color = navy, linewidth = 0.35, alpha = 0.85
+  ) +
+  geom_text(
+    aes(y = q95, label = round(q50), group = serie),
+    position = position_dodge(width = 0.72),
+    vjust = -0.6, size = 2.9, color = navy, fontface = "bold"
+  ) +
+  scale_fill_manual(values = colores, name = NULL) +
+  scale_y_log10(breaks = c(30, 100, 300, 1000), labels = c("30", "100", "300", "1000")) +
+  labs(
+    x = NULL,
+    y = "server-side latency (ms, log10 scale)",
+    subtitle = "Median above each box · whiskers p5–p95 · 24 runs per cell · Small warehouses",
+    caption = caption
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.background = element_rect(fill = bg, color = NA),
+    panel.background = element_rect(fill = bg, color = NA),
+    panel.grid.major.x = element_blank(),
+    plot.subtitle = element_text(color = gray, size = 8.5),
+    axis.text = element_text(color = navy, size = 9),
+    axis.title = element_text(color = gray, size = 8),
+    legend.position = "bottom",
+    legend.text = element_text(color = navy, size = 8.5),
+    plot.caption = element_text(color = gris_claro, size = 7, hjust = 1, face = "italic")
+  )
+```
+
+Three direct takeaways:
+
+- RT delivers sub-100 server-side on all three queries with one query in flight: medians of **35.5, 59 and 86.5 ms**.
+- Serverless without cache lands between 14 and 14.3 times slower in median depending on the query.
+- The serverless cache is great when it applies (189 to 208 ms), but it only applies to deterministic queries over unchanged data, and entries live 24 hours. A real app with variable parameters almost never lives in that world.
+
+## What happens with 1000 queries in flight?
+
+The strong promise of the announcement is not latency at one query: it is holding it under concurrency. I raised the load from 1 to 1000 simultaneous requests:
+
+```{r}
+#| echo: false
+#| warning: false
+#| fig-width: 9
+#| fig-height: 3.8
+#| fig-align: center
+# Real server-side medians per concurrency level (2026-10-24 run)
+m <- read.table(header = TRUE, text = "
+query serie conc p50
+Q1 Lakehouse//RT 1 35.5
+Q1 Lakehouse//RT 16 63.5
+Q1 Lakehouse//RT 64 35.0
+Q1 Lakehouse//RT 256 32.0
+Q1 Lakehouse//RT 1000 30.0
+Q1 SQL_Serverless 1 501.5
+Q1 SQL_Serverless 16 765.0
+Q1 SQL_Serverless 64 732.5
+Q1 SQL_Serverless 256 534.0
+Q1 SQL_Serverless 1000 504.0
+Q1 Serverless_(cache) 1 189.0
+Q1 Serverless_(cache) 16 242.0
+Q1 Serverless_(cache) 64 195.0
+Q1 Serverless_(cache) 256 169.0
+Q1 Serverless_(cache) 1000 150.0
+Q2 Lakehouse//RT 1 59.0
+Q2 Lakehouse//RT 16 171.5
+Q2 Lakehouse//RT 64 158.0
+Q2 Lakehouse//RT 256 100.0
+Q2 Lakehouse//RT 1000 101.0
+Q2 SQL_Serverless 1 863.5
+Q2 SQL_Serverless 16 1458.0
+Q2 SQL_Serverless 64 2368.5
+Q2 SQL_Serverless 256 1455.5
+Q2 SQL_Serverless 1000 1196.5
+Q2 Serverless_(cache) 1 202.0
+Q2 Serverless_(cache) 16 256.0
+Q2 Serverless_(cache) 64 188.0
+Q2 Serverless_(cache) 256 181.0
+Q2 Serverless_(cache) 1000 147.0
+Q3 Lakehouse//RT 1 86.5
+Q3 Lakehouse//RT 16 455.0
+Q3 Lakehouse//RT 64 328.0
+Q3 Lakehouse//RT 256 284.0
+Q3 Lakehouse//RT 1000 286.0
+Q3 SQL_Serverless 1 1236.0
+Q3 SQL_Serverless 16 2296.0
+Q3 SQL_Serverless 64 3147.5
+Q3 SQL_Serverless 256 3022.5
+Q3 SQL_Serverless 1000 2363.5
+Q3 Serverless_(cache) 1 208.0
+Q3 Serverless_(cache) 16 216.0
+Q3 Serverless_(cache) 64 199.0
+Q3 Serverless_(cache) 256 191.0
+Q3 Serverless_(cache) 1000 163.0
+")
+m$serie <- gsub("_", " ", m$serie)
+m$serie <- factor(m$serie, levels = c("SQL Serverless", "Serverless (cache)", "Lakehouse//RT"))
+m$query <- factor(m$query, labels = c("Q1 · point lookup", "Q2 · top products 24 h", "Q3 · join by segment"))
+m$conc <- factor(m$conc, levels = c(1, 16, 64, 256, 1000))
+
+ggplot(m, aes(x = conc, y = p50, color = serie, group = serie)) +
+  geom_line(linewidth = 0.7) +
+  geom_point(size = 2) +
+  facet_wrap(~query, nrow = 1) +
+  scale_color_manual(values = colores, name = NULL) +
+  scale_y_log10(breaks = c(30, 100, 300, 1000, 3000), labels = c("30", "100", "300", "1000", "3000")) +
+  labs(
+    x = "requests in parallel",
+    y = "server-side median (ms, log10)",
+    caption = caption
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.background = element_rect(fill = bg, color = NA),
+    panel.background = element_rect(fill = bg, color = NA),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(color = navy, size = 9, face = "bold"),
+    axis.text = element_text(color = navy, size = 8.5),
+    axis.title = element_text(color = gray, size = 8),
+    legend.position = "bottom",
+    legend.text = element_text(color = navy, size = 8.5),
+    plot.caption = element_text(color = gris_claro, size = 7, hjust = 1, face = "italic")
+  )
+```
+
+In short: RT does not just start lower, it stays lower. On the point lookup, the median at 1000 requests in flight was **lower** than at a single one (30 versus 35.5 ms). Serverless without cache degrades into seconds on the aggregation and join queries. And the cached series is the interesting exception: at 1000 identical requests the cache answers steadily (147 to 163 ms), because a thousand repetitions are the cache's ideal scenario. If your real workload is "the same dashboard refreshed by a thousand people", serverless with cache is enough; if every request carries different parameters, it is not.
+
+::: {.callout-tip}
+Always measure both sides: client-side tells you what your user will feel (from Montevideo, network and API overhead set a floor of hundreds of milliseconds), and server-side tells you which engine is better. Comparing official claims against client-side numbers is cheating at solitaire.
+:::
+
+## What the Beta does not support (and what ran anyway)
+
+The docs say Lakehouse//RT is read-only: standard SELECT, no writes, no DDL (the commands that create or modify objects), no GRANT or REVOKE, no OPTIMIZE and no AI Functions. I probed the limits live and the real output was this:
+
+```
+[UNSUPPORTED_FEATURE] Function `ai_classify` is not supported in Lakehouse//RT.
+Please change your query or use a Serverless SQL Warehouse instead.
+See Lakehouse//RT limitations:
+https://docs.databricks.com/aws/compute/sql-warehouse/real-time#limitations
+SQLSTATE: 0A000
+```
+
+GRANT failed with the same kind of error. But here comes the finding I did not expect: **INSERT and CREATE TABLE ran without error** in my workspace, against what the docs say. Do not take it as a feature: whatever works outside the docs in a Beta can be cut without notice, and the engine's declared design is serving reads. Treat it as read-only anyway.
+
+It also does not work today with Genie, Genie Agents or as compute for Jobs tasks, and it requires managed tables: no external tables, Hive, foreign tables or loose formats like CSV, JSON or Parquet. With custom applications it is the other way around: serving them data is precisely the use case, via drivers and the Statement Execution API.
+
+## How much does Lakehouse//RT cost?
+
+I went to the system tables to read the fine print. Two data points from my run:
+
+- In my region, on the day of the run, `system.billing.list_prices` showed **the same unit price per DBU** for both SKUs (the SKU is the product line Databricks bills you under). Do not take it for granted: since 2026-10-10 RT bills under its own SKU with its own regional rate, so check yours.
+- The same battery of tests consumed **32.69 DBUs (US$ 22.88) on serverless and 13.15 DBUs (US$ 9.21) on RT**: a 60% smaller bill. Note those 13.15 already include the Beta promo, which emits 30% fewer DBUs until 2027-01-31: without the promo it would be ~18.8 DBUs and the saving would be around 42%.
+
+::: {.callout-important}
+The low cost depends on the use case: this is short-read serving, the terrain where RT shines. Do not extrapolate to transformation workloads, which the Beta cannot run anyway.
+:::
+
+## When yes, when no?
+
+| Your case | What I would use |
+|---|---|
+| Serving analytics to an app or dashboard with high concurrency and variable parameters | **Lakehouse//RT** |
+| The same dashboard refreshed identically by many users | Regular serverless: the result cache solves it for free |
+| Point lookups of features for models | Look at the Online Feature Store with Lakebase first |
+| Internal BI with no sub-second requirement | The serverless you already have is plenty |
+| Writes, transformations, table maintenance | Anything but RT: the Beta is read-only |
+| Real-time stream processing | That is Structured Streaming's Real-time mode, a different product |
+
+## Gotchas
+
+1. **The serverless remote cache lives at workspace level**: it survives warehouse restarts, and `SET use_cached_result = false` may not cut it in the editor. To compare engines, fresh parameters on every run.
+2. **The local cache matches on exact text and the serverless remote cache on the logical plan**: to dodge both at once, the nonce goes projected as a column, not in a comment.
+3. **The API reports `warehouse_type: PRO` for regular serverless warehouses**; RT does show up as `REALTIME`. If you filter by type, remember the `enable_serverless_compute` flag.
+4. **The first request after starting the warehouse is not representative**: discard warm-up runs or you will measure the startup, not the engine.
+5. **`result_from_cache` from Query History is your audit**: if your "no cache" benchmark shows hits, the numbers are worthless.
+
+## References
+
+- [Lakehouse Real-Time in the official Azure Databricks docs](https://learn.microsoft.com/en-us/azure/databricks/compute/sql-warehouse/real-time)
+- [The official Lakehouse//RT announcement](https://www.databricks.com/blog/introducing-lakehousert-real-time-performance-unified-lakehouse)
+- [The full lab, reproducible with `databricks bundle deploy`](https://github.com/mauroloprete/spark-de-ideas-labs)
+- From the series: [Tips #9 — SQL Warehouses](../databricks-tips-09-sql-warehouses/) and [Tips #14 — Liquid Clustering](../databricks-tips-14-liquid-clustering/)
+
+The video of this lab, with the benchmark running live, is on [YouTube](https://youtu.be/esvcAsYsEIc) and [Spotify](https://open.spotify.com/episode/6ipLIFNsLqfL0qm1Gl4e3w). And if you want to reproduce it, the repo has the dataset, the harness and the panel: one afternoon of work and you have your own numbers.
+
+*Next in the series: dbt on Databricks.*

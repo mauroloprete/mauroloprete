@@ -1,0 +1,268 @@
+---
+title: "Video — Lakehouse//RT · tarjetas"
+description: "Tarjetas del video del Tips #18: Lakehouse//RT medido contra un SQL warehouse serverless."
+author: "Mauro Loprete"
+date: "2026-10-24"
+image: ../spark-de-ideas-cover.jpg
+categories: [Video, Databricks Tips]
+title-slide-attributes:
+  data-visibility: hidden
+format:
+  revealjs:
+    output-file: index.html
+    theme: [default, ../video.scss, ../video-169.scss]
+    logo: ""
+    width: 1920
+    height: 1080
+    margin: 0.07
+    center: true
+    transition: fade
+    slide-number: false
+    controls: false
+    progress: false
+    menu: false
+    hash: false
+    highlight-style: monokai
+    code-line-numbers: false
+    auto-stretch: false
+    footer: ""
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+<!-- Tarjeta 1 — Portada -->
+
+## {background-color="#1e293b"}
+
+[Databricks Tips · Spark de Ideas]{.kicker-dark}
+
+[Lakehouse//RT]{style="color: white; font-size: 2em; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; display: block;"}
+
+[¿sub-100 milisegundos de verdad?]{style="color: #FFA166; font-size: 1em; display: block; margin-top: 0.4em;"}
+
+[Mauro Loprete · Databricks MVP]{.brand}
+
+<!-- Tarjeta 2 — Arquitectura: con copia vs sin copia -->
+
+##
+
+```{r}
+#| fig-width: 12
+#| fig-height: 5.6
+#| fig-align: center
+library(ggplot2)
+
+caja <- function(x, y, w, h, fill, border = NA) {
+  annotate("rect", xmin = x - w / 2, xmax = x + w / 2,
+           ymin = y - h / 2, ymax = y + h / 2,
+           fill = fill, color = border, linewidth = 0.4)
+}
+flecha <- function(x1, x2, y, col = "#64748b") {
+  annotate("segment", x = x1, xend = x2, y = y, yend = y,
+           color = col, linewidth = 0.5,
+           arrow = arrow(length = unit(0.12, "inches")))
+}
+
+ggplot() +
+  # ── Lado izquierdo: el patrón con copia ──
+  annotate("text", x = 2.6, y = 5.9, label = "Hasta ahora: con copia",
+           color = "#1e293b", size = 4.6, fontface = "bold") +
+  caja(1.2, 4.3, 1.9, 1.1, "#1e293b") +
+  annotate("text", x = 1.2, y = 4.3, label = "Lakehouse\n(tablas Delta)",
+           color = "white", size = 3, fontface = "bold", lineheight = 0.95) +
+  flecha(2.25, 3.05, 4.3) +
+  annotate("text", x = 2.65, y = 4.72, label = "pipeline\nde sync",
+           color = "#64748b", size = 2.5, lineheight = 0.95) +
+  caja(4.0, 4.3, 1.9, 1.1, "#64748b") +
+  annotate("text", x = 4.0, y = 4.3, label = "sistema de\nserving aparte",
+           color = "white", size = 3, fontface = "bold", lineheight = 0.95) +
+  annotate("label", x = 4.0, y = 3.52, label = "copia de los datos",
+           fill = "#fee2e2", color = "#b91c1c", size = 2.6,
+           label.padding = unit(0.18, "lines"), label.size = 0) +
+  flecha(5.05, 5.45, 4.3) +
+  caja(6.1, 4.3, 1.3, 1.1, "#f1f5f9", "#cbd5e1") +
+  annotate("text", x = 6.1, y = 4.3, label = "app /\ndashboard",
+           color = "#1e293b", size = 2.8, lineheight = 0.95) +
+  annotate("text", x = 3.6, y = 2.55,
+           label = "dos sistemas · dos copias · dos gobernanzas\ny un pipeline de sincronización que mantener",
+           color = "#b91c1c", size = 3, lineheight = 1.05, fontface = "italic") +
+  # ── Lado derecho: Lakehouse//RT ──
+  annotate("text", x = 10.2, y = 5.9, label = "Con Lakehouse//RT: sin copia",
+           color = "#1e293b", size = 4.6, fontface = "bold") +
+  caja(8.6, 4.3, 2.1, 1.1, "#1e293b") +
+  annotate("text", x = 8.6, y = 4.3,
+           label = "tablas Delta / Iceberg\nUnity Catalog",
+           color = "white", size = 2.9, fontface = "bold", lineheight = 0.95) +
+  flecha(9.75, 10.25, 4.3, "#e8854a") +
+  caja(11.2, 4.3, 1.9, 1.1, "#FFA166") +
+  annotate("text", x = 11.2, y = 4.3, label = "Lakehouse//RT\n(motor Reyden)",
+           color = "#1e293b", size = 3, fontface = "bold", lineheight = 0.95) +
+  flecha(12.25, 12.65, 4.3, "#e8854a") +
+  caja(13.3, 4.3, 1.3, 1.1, "#f1f5f9", "#cbd5e1") +
+  annotate("text", x = 13.3, y = 4.3, label = "app /\ndashboard",
+           color = "#1e293b", size = 2.8, lineheight = 0.95) +
+  annotate("text", x = 10.9, y = 2.55,
+           label = "las queries corren directo sobre tus tablas,\ngobernadas por Unity Catalog",
+           color = "#0d9488", size = 3, lineheight = 1.05, fontface = "italic") +
+  annotate("segment", x = 7.3, xend = 7.3, y = 1.9, yend = 6.1,
+           color = "#e2e8f0", linewidth = 0.6) +
+  coord_cartesian(xlim = c(0, 14.1), ylim = c(1.9, 6.4), expand = FALSE) +
+  labs(caption = "⚡ Spark de Ideas · mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#f8fafc", color = NA),
+        plot.margin = margin(10, 15, 10, 15),
+        plot.caption = element_text(color = "#94a3b8", size = 7,
+                                    hjust = 1, face = "italic"))
+```
+
+<!-- Tarjeta 3 — Números oficiales -->
+
+##
+
+[Los números del anuncio]{.kicker} [BETA]{style="background: #fef3c7; color: #92400e; font-size: 0.45em; font-weight: 800; padding: 0.15em 0.6em; border-radius: 6px; vertical-align: middle; margin-left: 0.6em;"}
+
+```{r}
+#| fig-width: 12
+#| fig-height: 4.4
+#| fig-align: center
+tiles <- data.frame(
+  x = c(1.6, 5.0, 8.4),
+  grande = c("desde 10 ms", "sub-100 ms", "16×"),
+  sub = c("en datasets chicos",
+          "sosteniendo 12.000 QPS\n(queries por segundo)",
+          "contra stacks de serving\nespecializados"),
+  fill = c("#FFA166", "#1e293b", "#593196"),
+  col_grande = c("#1e293b", "white", "white"),
+  col_sub = c("#7c2d12", "#cbd5e1", "#e2e8f0")
+)
+
+ggplot(tiles) +
+  geom_tile(aes(x = x, y = 1, fill = fill),
+            width = 3.0, height = 2.4, show.legend = FALSE) +
+  geom_text(aes(x = x, y = 1.5, label = grande, color = col_grande),
+            size = 7.4, fontface = "bold", show.legend = FALSE) +
+  geom_text(aes(x = x, y = 0.55, label = sub, color = col_sub),
+            size = 2.9, lineheight = 1.05, show.legend = FALSE) +
+  scale_fill_identity() +
+  scale_color_identity() +
+  annotate("text", x = 5.0, y = -0.75,
+           label = "la doc, más conservadora, promete sub-segundo",
+           color = "#64748b", size = 3.1, fontface = "italic") +
+  coord_cartesian(xlim = c(-0.2, 10.2), ylim = c(-1.2, 2.5), expand = FALSE) +
+  labs(caption = "⚡ Spark de Ideas · mauroloprete.github.io/mauroloprete") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#f8fafc", color = NA),
+        plot.margin = margin(10, 15, 10, 15),
+        plot.caption = element_text(color = "#94a3b8", size = 7,
+                                    hjust = 1, face = "italic"))
+```
+
+[Benchmark propio de Databricks (blog del anuncio, Data + AI Summit, jun 2026)]{.tabla-nota}
+
+<!-- Tarjeta 4 — Boxplots del bench (lee el CSV de la corrida si existe) -->
+
+##
+
+[Mis mediciones, desde fuera]{.kicker}
+
+```{r}
+#| fig-width: 12
+#| fig-height: 5.2
+#| fig-align: center
+rutas <- c("latencias.csv",
+           "~/Documents/spark-de-ideas-labs/tips/lakehouse-rt/bench/results/latencias.csv")
+rutas <- path.expand(rutas)
+ruta <- rutas[file.exists(rutas)][1]
+
+tipo_map <- c(REALTIME = "Lakehouse//RT",
+              SERVERLESS = "SQL Serverless", PRO = "SQL Serverless",
+              SERVERLESS_CACHE = "SQL Serverless (cache)")
+colores <- c("Lakehouse//RT" = "#FFA166",
+             "SQL Serverless" = "#64748b",
+             "SQL Serverless (cache)" = "#593196")
+query_map <- c(q1_estado_cliente = "Q1 · lookup puntual",
+               q2_top_productos  = "Q2 · top productos 24 h",
+               q3_panel_segmento = "Q3 · join por segmento")
+
+if (!is.na(ruta)) {
+  d <- read.csv(ruta)
+  d <- d[d$estado == "SUCCEEDED" & d$query != "baseline_select_1" &
+           !is.na(suppressWarnings(as.numeric(d$total_time_ms))), ]
+  d$total_time_ms <- as.numeric(d$total_time_ms)
+  lbl <- unname(tipo_map[d$tipo])
+  d$wh <- factor(lbl, levels = intersect(names(colores), unique(lbl)))
+  d$q <- factor(query_map[d$query], levels = unname(query_map))
+
+  ggplot(d, aes(x = factor(concurrencia), y = total_time_ms, fill = wh)) +
+    geom_boxplot(alpha = 0.75, outlier.shape = NA, color = "#1e293b",
+                 linewidth = 0.35, width = 0.62,
+                 position = position_dodge(width = 0.72, preserve = "single")) +
+    facet_wrap(~q, nrow = 1) +
+    scale_fill_manual(values = colores, name = NULL) +
+    scale_y_log10() +
+    labs(x = "requests en paralelo",
+         y = "latencia server-side (ms, escala log10)",
+         caption = "⚡ Spark de Ideas · mauroloprete.github.io/mauroloprete") +
+    theme_minimal(base_size = 12) +
+    theme(plot.background = element_rect(fill = "#f8fafc", color = NA),
+          panel.background = element_rect(fill = "#f8fafc", color = NA),
+          panel.grid.major.x = element_blank(),
+          strip.text = element_text(color = "#1e293b", face = "bold"),
+          axis.text = element_text(color = "#1e293b"),
+          axis.title = element_text(color = "#64748b", size = 9),
+          legend.position = "bottom",
+          plot.caption = element_text(color = "#94a3b8", size = 7,
+                                      hjust = 1, face = "italic"))
+} else {
+  ggplot() +
+    annotate("rect", xmin = 1, xmax = 11, ymin = 0.5, ymax = 4.5,
+             fill = NA, color = "#FFA166", linewidth = 0.8, linetype = "dashed") +
+    annotate("text", x = 6, y = 2.9, label = "Boxplots del bench",
+             color = "#1e293b", size = 6, fontface = "bold") +
+    annotate("text", x = 6, y = 2.0,
+             label = "pendiente de la corrida: python3 bench/bench.py (tres series)",
+             color = "#64748b", size = 3.4, family = "mono") +
+    coord_cartesian(xlim = c(0, 12), ylim = c(0, 5), expand = FALSE) +
+    theme_void() +
+    theme(plot.background = element_rect(fill = "#f8fafc", color = NA))
+}
+```
+
+[Mediciones propias (oct 2026, Beta) · warehouses Small · pueden cambiar antes del GA]{.tabla-nota}
+
+<!-- Tarjeta 5 — Pricing -->
+
+##
+
+[¿Cuánto cuesta?]{.kicker}
+
+| Qué | Detalle |
+|---|---|
+| SKU propio | factura en su propia línea de producto; en las system tables se ve separado |
+| Descuento de la Beta | no baja el precio: baja la emisión de DBUs un 30%. Consumís 10, te facturan 7 |
+| Vigencia del descuento | hasta el 31 de enero de 2027 |
+| DBU | la unidad de cómputo con la que Databricks factura |
+
+[Pricing de la Beta (doc oficial) · el feature set puede cambiar antes del GA]{.tabla-nota}
+
+<!-- Tarjeta 6 — Cuándo sí, cuándo no + CTA -->
+
+##
+
+[¿Cuándo sí, cuándo no?]{.kicker}
+
+::: {.check-list}
+**1.** Serving de analítica a apps o dashboards con mucha concurrencia: Lakehouse//RT, y la ventana del descuento es el momento barato de probarlo.
+
+**2.** Lookups puntuales de features: mirá antes el Online Feature Store con Lakebase.
+
+**3.** BI interno sin exigencia sub-segundo: el serverless de siempre ya te sobra.
+
+**4.** No lo confundas con el Real-time mode de Structured Streaming: eso es procesamiento de streams, esto es serving de queries.
+:::
+
+[El lab completo, reproducible y con los números crudos → el post en Spark de Ideas (link en la descripción)]{style="color: #593196; font-weight: 700; display: block; margin-top: 0.8em; font-size: 0.7em;"}
+
+[Mauro Loprete · Databricks MVP]{.brand}
